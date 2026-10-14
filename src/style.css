@@ -18,6 +18,11 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   background: #07050a;
   color: var(--ink);
   font-family: var(--body);
@@ -28,11 +33,18 @@ canvas#game {
   width: 100vw;
   height: 100vh;
   cursor: crosshair;
+  touch-action: none;
+}
+
+.screen,
+.panel {
+  touch-action: pan-y;
 }
 
 #overlay {
   position: fixed;
   inset: 0;
+  z-index: 10;
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -57,6 +69,11 @@ canvas#game {
     opacity 0.18s ease,
     transform 0.18s ease;
   overflow-y: auto;
+}
+
+/* Centre with auto margins so tall menus scroll instead of clipping their top. */
+.screen > * {
+  margin: auto;
 }
 
 .screen.shown {
@@ -534,5 +551,307 @@ kbd {
   .btn {
     min-width: 0;
     width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------- touch controls */
+
+#touch {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  pointer-events: none;
+  touch-action: none;
+  font-family: var(--serif);
+  --sl: env(safe-area-inset-left, 0px);
+  --sr: env(safe-area-inset-right, 0px);
+  --sb: env(safe-area-inset-bottom, 0px);
+}
+
+#touch.on {
+  display: block;
+}
+
+#touch.paused {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#touch.paused * {
+  pointer-events: none !important;
+}
+
+.joy-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: auto;
+}
+
+.joy-base {
+  position: absolute;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 216, 144, 0.4);
+  background: radial-gradient(circle, rgba(255, 216, 144, 0.08), rgba(0, 0, 0, 0.3));
+  pointer-events: none;
+}
+
+.joy-base.idle {
+  left: calc(110px + var(--sl));
+  top: calc(100% - 110px - var(--sb));
+  opacity: 0.35;
+}
+
+.joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 40% 35%, rgba(255, 220, 190, 0.9), rgba(200, 60, 80, 0.8));
+  box-shadow: 0 0 18px rgba(255, 80, 90, 0.5);
+}
+
+.tb {
+  --size: 62px;
+  --c: #ffd890;
+  --cd: 0;
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  color: var(--c);
+  font-size: calc(var(--size) * 0.4);
+  font-weight: 700;
+  background: radial-gradient(circle at 50% 35%, rgba(70, 20, 34, 0.85), rgba(12, 5, 14, 0.85));
+  border: 2px solid color-mix(in srgb, var(--c) 55%, transparent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  transition:
+    transform 0.06s,
+    background 0.06s;
+  overflow: hidden;
+}
+
+.tb span {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+/* Cooldown sweep */
+.tb .cd {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(0, 0, 0, 0.7) calc(var(--cd) * 360deg), transparent 0);
+}
+
+.tb.down {
+  transform: scale(0.9);
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 45%, transparent), rgba(12, 5, 14, 0.85));
+}
+
+.tb.aiming {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--c) 70%, transparent);
+}
+
+.tb.dim {
+  opacity: 0.45;
+}
+
+.tb.gone {
+  display: none;
+}
+
+.tb.small {
+  --size: 46px;
+}
+
+.tb.attack {
+  --size: 88px;
+  --c: #ff8a9a;
+  right: calc(26px + var(--sr));
+  bottom: calc(24px + var(--sb));
+}
+
+.tb.special {
+  --c: #ffc070;
+  right: calc(128px + var(--sr));
+  bottom: calc(16px + var(--sb));
+}
+
+.tb.dash {
+  --c: #ffe8b0;
+  right: calc(20px + var(--sr));
+  bottom: calc(124px + var(--sb));
+}
+
+.tb.cast {
+  --size: 54px;
+  --c: #ff5a6a;
+  right: calc(110px + var(--sr));
+  bottom: calc(96px + var(--sb));
+}
+
+.tb.jump {
+  --size: 54px;
+  --c: #bfe6ff;
+  right: calc(204px + var(--sr));
+  bottom: calc(22px + var(--sb));
+}
+
+.tb.art1 {
+  right: calc(186px + var(--sr));
+  bottom: calc(96px + var(--sb));
+}
+
+.tb.art2 {
+  right: calc(164px + var(--sr));
+  bottom: calc(160px + var(--sb));
+}
+
+.tb.art3 {
+  right: calc(104px + var(--sr));
+  bottom: calc(168px + var(--sb));
+}
+
+.tb.potion {
+  --c: #7dff8a;
+  right: calc(28px + var(--sr));
+  bottom: calc(200px + var(--sb));
+}
+
+.tb.pause {
+  --size: 42px;
+  font-size: 15px;
+  right: calc(14px + var(--sr));
+  top: 12px;
+}
+
+.tb.pill {
+  width: auto;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 23px;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  right: calc(250px + var(--sr));
+  bottom: calc(150px + var(--sb));
+  --c: #ffd890;
+}
+
+/* Portrait phones: ask for landscape. */
+#rotate {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  background: #07050a;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 20px;
+  text-align: center;
+  padding: 24px;
+}
+
+#rotate .phone {
+  width: 44px;
+  height: 76px;
+  border: 3px solid var(--gold);
+  border-radius: 8px;
+  animation: rotate-hint 2s ease-in-out infinite;
+}
+
+@keyframes rotate-hint {
+  0%,
+  30% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate {
+    display: flex;
+  }
+}
+
+/* Short landscape screens (phones): tighter menus, cards side by side. */
+@media (max-height: 520px) {
+  .panel {
+    padding: 14px 18px;
+  }
+  .title {
+    font-size: 24px;
+  }
+  .subtitle,
+  .quote {
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+  .cards {
+    flex-direction: row;
+    gap: 8px;
+  }
+  .cards > .card {
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+  .cards.grid {
+    display: grid;
+  }
+  .card-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 20px;
+  }
+  .card-title {
+    font-size: 16px;
+  }
+  .card-desc {
+    font-size: 14px;
+  }
+  .btn {
+    padding: 8px 16px;
+    margin: 4px;
+    font-size: 14px;
+  }
+  .logo {
+    font-size: 40px;
+  }
+  .tagline {
+    margin: 10px 0 14px;
+  }
+  .credits {
+    margin-top: 14px;
+  }
+  .upg {
+    padding: 6px 10px;
+  }
+  .stats {
+    margin: 8px 0 12px;
+  }
+  .stats div {
+    font-size: 15px;
   }
 }

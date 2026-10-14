@@ -10,6 +10,15 @@ import { esc, type Card } from './overlay';
 
 export type CardData = Card;
 
+const TOUCH_CONTROLS = `
+  <div class="controls">
+    <div><b>Left side</b>: drag to move</div><div><b>⚔</b> Attack (hold to repeat or charge)</div>
+    <div><b>✦</b> Special · <b>◆</b> Cast</div><div><b>»</b> Dash · <b>⤒</b> Jump</div>
+    <div>Drag an attack button to aim</div><div>Otherwise you aim at the nearest foe</div>
+    <div>Jump, then ⚔ mid-air: <b>Slam</b></div><div><b>⚗</b> Potion · artifact buttons above</div>
+  </div>
+  <p class="small">A controller or keyboard also works if you connect one.</p>`;
+
 const CONTROLS = `
   <div class="controls">
     <div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>
@@ -80,7 +89,7 @@ export function help(g: Game, intro = false): void {
       <p>Slain foes release <b>souls</b> that power soul artifacts. <b>Jump</b> over lava, chasms and shockwaves,
       and attack mid-air to <b>Slam</b> the ground. Your <b>potion</b> recharges over time.</p>
       <p>When you fall, you return to the Hall of Shades. <b>Ash</b> you gathered is kept — spend it at the Altar.</p>
-      ${CONTROLS}
+      ${document.body.classList.contains('touch') ? TOUCH_CONTROLS : CONTROLS}
       <button class="btn primary" data-nav data-a="ok">Got it</button>
     </div>`,
     { onBack: () => g.ui.pop() },

@@ -81,7 +81,8 @@ const PADMAP: Record<number, Action[]> = {
 
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']);
 
-export type AimSource = 'mouse' | 'stick' | 'move';
+/** 'auto' = touch play without a drag: aim at the nearest foe. */
+export type AimSource = 'mouse' | 'stick' | 'move' | 'auto';
 
 export class Input {
   private held = new Map<Action, number>();
@@ -95,6 +96,10 @@ export class Input {
   lastPadUse = -Infinity;
   padMove: Vec = { x: 0, y: 0 };
   padAim: Vec = { x: 0, y: 0 };
+  /** On-screen joystick and drag-to-aim vectors (touch controls). */
+  touchMove: Vec = { x: 0, y: 0 };
+  touchAim: Vec = { x: 0, y: 0 };
+  lastTouchUse = -Infinity;
   /** Listeners for raw key presses (used by menus). */
   onAction: ((a: Action) => void) | null = null;
 
@@ -142,6 +147,15 @@ export class Input {
     this.onAction?.(a);
   }
 
+  /** Presses from on-screen touch buttons. */
+  virtualPress(a: Action): void {
+    this.lastTouchUse = performance.now();
+    this.press(a);
+  }
+  virtualRelease(a: Action): void {
+    this.release(a);
+  }
+
   private release(a: Action): void {
     const n = (this.held.get(a) ?? 0) - 1;
     if (n <= 0) {
@@ -183,15 +197,25 @@ export class Input {
       x += this.padMove.x;
       y += this.padMove.y;
     }
+    if (len(this.touchMove) > 0.15) {
+      x += this.touchMove.x;
+      y += this.touchMove.y;
+    }
     const l = Math.hypot(x, y);
     return l > 1 ? { x: x / l, y: y / l } : { x, y };
   }
 
   /** Which aim source to trust right now. */
   aimSource(): AimSource {
-    if (len(this.padAim) > 0.35) return 'stick';
+    if (len(this.padAim) > 0.35 || len(this.touchAim) > 0.35) return 'stick';
+    if (this.lastTouchUse > this.lastMouseUse && this.lastTouchUse > this.lastPadUse) return 'auto';
     if (this.lastPadUse > this.lastMouseUse) return 'move';
     return this.mouseInside || performance.now() - this.lastMouseUse < 4000 ? 'mouse' : 'move';
+  }
+
+  /** Analog aim from the right stick or a touch drag. */
+  stickAim(): Vec {
+    return len(this.touchAim) > len(this.padAim) ? this.touchAim : this.padAim;
   }
 
   pollGamepads(): void {

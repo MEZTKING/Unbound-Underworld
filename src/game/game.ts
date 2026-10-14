@@ -5,7 +5,8 @@ import { clamp, fx, Rng } from '../engine/math';
 import { Particles } from '../engine/particles';
 import { UI } from '../ui/overlay';
 import * as screens from '../ui/screens';
-import { ARTIFACTS } from './artifacts';
+import { TouchControls } from '../ui/touch';
+import { ARTIFACT_BY_ID, ARTIFACTS } from './artifacts';
 import {
   BOON_BY_ID,
   GODS,
@@ -25,7 +26,7 @@ import { Pickup } from './entities';
 import { drawHUD } from './hud';
 import { applyMetaExtras, loadSave, metaBonuses, writeSave, type SaveData } from './meta';
 import { Player } from './player';
-import { REWARD_INFO } from './render';
+import { REWARD_INFO, renderOpts } from './render';
 import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
 import { Run, type RoomPlan } from './run';
 import type { PlayerStats } from './stats';
@@ -57,6 +58,7 @@ export class Game implements WorldHost {
   readonly camera = new Camera();
   readonly particles = new Particles();
   readonly ui: UI;
+  readonly touch: TouchControls;
   save: SaveData;
   run: Run | null = null;
   player: Player;
@@ -79,6 +81,7 @@ export class Game implements WorldHost {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.input = new Input(canvas);
     this.ui = new UI(overlay, this.input);
+    this.touch = new TouchControls(this.input);
     this.save = loadSave();
     this.godMode = this.params.has('god');
     // Debug: ?weapon=spear|bow tries a weapon for this session without unlocking it.
@@ -91,10 +94,11 @@ export class Game implements WorldHost {
     this.player = new Player(this.save.weapon);
     this.stats = computeStats([], [], metaBonuses(this.save));
     const unlock = () => audio.unlock();
-    window.addEventListener('keydown', unlock);
-    window.addEventListener('mousedown', unlock);
-    window.addEventListener('touchstart', unlock);
+    // iOS only lets audio start inside touchend/click, so listen for those too.
+    for (const ev of ['keydown', 'mousedown', 'touchstart', 'touchend', 'click']) window.addEventListener(ev, unlock);
+    this.touch.onFirstTouch = () => this.resize();
     window.addEventListener('resize', () => this.resize());
+    document.addEventListener('visibilitychange', () => this.onVisibility());
     this.resize();
   }
 
@@ -110,7 +114,8 @@ export class Game implements WorldHost {
   }
 
   resize(): void {
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    // Phones get a slightly lower render resolution to keep the frame rate up.
+    this.dpr = Math.min(this.touch.enabled ? 1.5 : 2, window.devicePixelRatio || 1);
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.canvas.width = Math.floor(w * this.dpr);
@@ -118,6 +123,15 @@ export class Game implements WorldHost {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.camera.resize(w, h);
+  }
+
+  /** Pause and go quiet when the tab or app is backgrounded. */
+  private onVisibility(): void {
+    if (document.hidden) {
+      this.touch.releaseAll();
+      audio.suspend();
+      if ((this.mode === 'hub' || this.mode === 'run') && !this.ui.open && this.player.state !== 'dead') screens.pause(this);
+    } else audio.resume();
   }
 
   persist(): void {
@@ -193,12 +207,14 @@ export class Game implements WorldHost {
   private render(): void {
     const ctx = this.ctx;
     const w = this.world;
+    renderOpts.touch = this.touch.enabled;
     if (w) {
       w.render(ctx, this.dpr);
       if (this.mode !== 'title') {
         ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        drawHUD(ctx, w, this.run, this.save, this.camera.vw, this.camera.vh, this.mode === 'hub');
+        drawHUD(ctx, w, this.run, this.save, this.camera.vw, this.camera.vh, this.mode === 'hub', this.touch.enabled);
       }
+      this.syncTouch(w);
     }
     if (this.fade > 0) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -207,6 +223,43 @@ export class Game implements WorldHost {
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       ctx.globalAlpha = 1;
     }
+  }
+
+  private syncTouch(w: World): void {
+    if (!this.touch.enabled) return;
+    const p = this.player;
+    const s = this.stats;
+    this.touch.update({
+      active: !this.ui.open && (this.mode === 'hub' || this.mode === 'run') && p.state !== 'dead',
+      artifacts: this.artifacts.map((id, i) => {
+        if (!id) return null;
+        const def = ARTIFACT_BY_ID[id];
+        return {
+          glyph: def.glyph,
+          color: def.color,
+          cd: Math.min(1, p.artifactCd[i] / (def.cooldown * s.artifactCdMult)),
+          usable: !def.souls || p.souls >= def.souls,
+        };
+      }),
+      potionCd: Math.min(1, p.potionCd / s.potionCooldown),
+      castAmmo: p.castAmmo,
+      interact: w.focus ? w.focus.prompt : null,
+    });
+  }
+
+  /** Android back button. Returns false when the app should go to the background instead. */
+  handleBack(): boolean {
+    if (this.mode === 'title') return false;
+    if (this.ui.back()) return true;
+    if ((this.mode === 'hub' || this.mode === 'run') && this.player.state !== 'dead') {
+      screens.pause(this);
+      return true;
+    }
+    return false;
+  }
+
+  onPlayerHurt(): void {
+    if (this.touch.enabled) navigator.vibrate?.(30);
   }
 
   transition(fn: () => void): void {

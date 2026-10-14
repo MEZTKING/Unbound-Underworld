@@ -359,7 +359,13 @@ export class Player extends Actor {
       const m = w.camera.screenToWorld(inp.mouse);
       this.aim = Math.atan2(m.y - (this.y - 24), m.x - this.x);
     } else if (src === 'stick') {
-      this.aim = Math.atan2(inp.padAim.y, inp.padAim.x);
+      const v = inp.stickAim();
+      this.aim = Math.atan2(v.y, v.x);
+    } else if (src === 'auto') {
+      // Touch play: lock onto the nearest foe, otherwise face where you move.
+      if (len(this.moveDir) > 0.2) this.aim = angleOf(this.moveDir);
+      const target = w.nearestEnemy(this.x, this.y, 600);
+      if (target) this.aim = Math.atan2(target.y - this.y, target.x - this.x);
     } else {
       if (len(this.moveDir) > 0.2) this.aim = angleOf(this.moveDir);
       // Gentle auto-aim toward a nearby foe in front when not using a mouse.

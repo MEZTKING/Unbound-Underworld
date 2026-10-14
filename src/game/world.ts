@@ -65,6 +65,8 @@ export interface WorldHost {
   onRoomCleared(w: World): void;
   onEnemyKilled(w: World, e: Enemy): void;
   tryDeathDefiance(): boolean;
+  /** Feedback hook (haptics on phones). */
+  onPlayerHurt?(): void;
   addGold(n: number): void;
   addAsh(n: number): void;
 }
@@ -592,6 +594,7 @@ export class World {
       p.flash = 0.1;
     } else {
       p.onHurt(amount);
+      this.host.onPlayerHurt?.();
       this.camera.shake(0.35);
       this.hitstop(0.06);
       this.hurtFlash = 0.35;

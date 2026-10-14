@@ -15,3 +15,19 @@ game.boot();
 
 // Exposed for debugging and automated smoke tests.
 (window as unknown as { __game: Game }).__game = game;
+
+const native = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+
+// Android app: the system back button closes menus / pauses instead of quitting.
+if (native) {
+  void import('@capacitor/app').then(({ App }) => {
+    void App.addListener('backButton', () => {
+      if (!game.handleBack()) void App.minimizeApp();
+    });
+  });
+}
+
+// Offline support for the installable web version (not inside the desktop or Android apps).
+if (import.meta.env.PROD && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !native) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}

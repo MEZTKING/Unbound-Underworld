@@ -77,6 +77,14 @@ export class AudioEngine {
     this.setMood(m);
   }
 
+  suspend(): void {
+    if (this.ctx?.state === 'running') void this.ctx.suspend();
+  }
+
+  resume(): void {
+    if (this.ctx?.state === 'suspended') void this.ctx.resume();
+  }
+
   get volume(): number {
     return this._volume;
   }

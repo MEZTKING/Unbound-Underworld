@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Unbound Underworld</string>
+    <string name="title_activity_main">Unbound Underworld</string>
+    <string name="package_name">io.github.meztking.unboundunderworld</string>
+    <string name="custom_url_scheme">io.github.meztking.unboundunderworld</string>
+</resources>
