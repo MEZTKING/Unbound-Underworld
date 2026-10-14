@@ -1,0 +1,169 @@
+import { Rng } from '../engine/math';
+import { ARTIFACTS } from './artifacts';
+import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
+import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
+import { applyMetaExtras, heatScale, metaBonuses, rank, type SaveData } from './meta';
+import { BIOMES, type BiomeInfo } from './rooms';
+import type { PlayerStats } from './stats';
+import type { GodId, RewardKind, RewardSpec, RoomKind, WeaponId } from './types';
+
+export interface RoomPlan {
+  kind: RoomKind;
+  reward: RewardSpec | null;
+}
+
+/** Everything that lives for the duration of one escape attempt. */
+export class Run {
+  readonly seed: number;
+  rng: Rng;
+  weapon: WeaponId;
+  biomeIndex = 0;
+  /** Combat rooms cleared in the current biome. */
+  depth = 0;
+  roomsCleared = 0;
+  boons: OwnedBoon[] = [];
+  hammers: string[] = [];
+  enchants: OwnedEnchant[] = [];
+  artifacts: (string | null)[] = [null, null, null];
+  gold = 0;
+  ash = 0;
+  kills = 0;
+  bonusHp = 0;
+  deathDefiance: number;
+  heat: number;
+  time = 0;
+  current: RoomPlan = { kind: 'combat', reward: { kind: 'boon' } };
+  /** Per-biome once-only rooms and rewards. */
+  private used = new Set<string>();
+
+  constructor(save: SaveData, seed = (Math.random() * 2 ** 31) | 0) {
+    this.seed = seed;
+    this.rng = new Rng(seed);
+    this.weapon = save.weapon;
+    this.heat = save.heat;
+    this.deathDefiance = rank(save, 'defiance');
+    this.gold = rank(save, 'fortune') * 40;
+    if (save.startArtifact) this.artifacts[0] = save.startArtifact;
+  }
+
+  get biome(): BiomeInfo {
+    return BIOMES[this.biomeIndex];
+  }
+
+  get isFinalBiome(): boolean {
+    return this.biomeIndex === BIOMES.length - 1;
+  }
+
+  favor(save: SaveData): number {
+    return rank(save, 'favor');
+  }
+
+  computeStats(save: SaveData): PlayerStats {
+    const s = computeStats(this.boons, this.hammers, metaBonuses(save));
+    s.maxHp += this.bonusHp;
+    applyMetaExtras(save, s);
+    applyEnchantStats(s, this.enchants);
+    return s;
+  }
+
+  scales(): { hp: number; dmg: number } {
+    const h = heatScale(this.heat);
+    return { hp: this.biome.hpScale * h.hp, dmg: this.biome.dmgScale * h.dmg };
+  }
+
+  ashMult(): number {
+    return heatScale(this.heat).ash;
+  }
+
+  private onceKey(k: string): string {
+    return `${this.biomeIndex}:${k}`;
+  }
+  markUsed(k: string): void {
+    this.used.add(this.onceKey(k));
+  }
+  isUsed(k: string): boolean {
+    return this.used.has(this.onceKey(k));
+  }
+
+  /** First room of the run (or of a new biome). */
+  startPlan(): RoomPlan {
+    const gods = availableGods(this.boons);
+    if (this.biome.combatRooms === 0) return { kind: 'antechamber', reward: null };
+    return { kind: 'combat', reward: { kind: 'boon', god: this.rng.pick(gods) } };
+  }
+
+  /** Rewards behind the exit doors of the room just cleared. */
+  rollDoors(): RoomPlan[] {
+    const b = this.biome;
+    if (this.current.kind === 'boss') {
+      if (this.isFinalBiome) return [];
+      const next = BIOMES[this.biomeIndex + 1];
+      if (next.combatRooms === 0) return [{ kind: 'antechamber', reward: { kind: 'antechamber' } }];
+      return [{ kind: 'combat', reward: { kind: 'boon', god: this.rng.pick(availableGods(this.boons)) } }];
+    }
+    if (this.current.kind === 'antechamber') return [{ kind: 'boss', reward: { kind: 'boss' } }];
+    if (this.depth >= b.combatRooms) return [{ kind: 'antechamber', reward: { kind: 'antechamber' } }];
+
+    const n = this.rng.weighted<number>([
+      [1, 1],
+      [2, 5],
+      [3, 3],
+    ]);
+    const plans: RoomPlan[] = [];
+    const usedGods = new Set<GodId>();
+    const usedKinds = new Set<RewardKind>();
+    for (let i = 0; i < n; i++) {
+      const plan = this.rollOneDoor(usedKinds, usedGods);
+      if (!plan) break;
+      plans.push(plan);
+    }
+    if (plans.length === 0) plans.push({ kind: 'combat', reward: { kind: 'gold' } });
+    return plans;
+  }
+
+  private rollOneDoor(usedKinds: Set<RewardKind>, usedGods: Set<GodId>): RoomPlan | null {
+    const d = this.depth;
+    const gods = availableGods(this.boons).filter((g) => !usedGods.has(g));
+    const freeArtifacts = ARTIFACTS.filter((a) => !this.artifacts.includes(a.id)).length > 0;
+    const enchantRoom = this.enchants.length < 13 || this.enchants.some((e) => e.tier < MAX_ENCHANT_TIER);
+    const options: [RewardKind, number][] = [
+      ['boon', gods.length ? 38 : 0],
+      ['pom', pomCandidates(this.boons).length && !usedKinds.has('pom') ? 12 : 0],
+      ['gold', usedKinds.has('gold') ? 0 : 9],
+      ['heart', usedKinds.has('heart') ? 0 : 7],
+      ['ash', usedKinds.has('ash') ? 0 : 9],
+      ['hammer', !this.isUsed('hammer') && rollHammerOffers(this.rng, this.weapon, this.hammers).length && d >= 1 && !usedKinds.has('hammer') ? 6 : 0],
+      ['hermes', !this.isUsed('hermes') && d >= 1 && !usedKinds.has('hermes') ? 4 : 0],
+      ['enchant', enchantRoom && !usedKinds.has('enchant') ? 9 : 0],
+      ['artifact', freeArtifacts && !usedKinds.has('artifact') ? 6 : 0],
+      ['shop', !this.isUsed('shop') && d >= 2 && !usedKinds.has('shop') ? 7 : 0],
+      ['fountain', !this.isUsed('fountain') && d >= 2 && !usedKinds.has('fountain') ? 4 : 0],
+    ];
+    if (options.every(([, w]) => w <= 0)) return null;
+    const kind = this.rng.weighted(options);
+    usedKinds.add(kind);
+    if (kind === 'boon') {
+      const god = this.rng.pick(gods);
+      usedGods.add(god);
+      return { kind: 'combat', reward: { kind, god } };
+    }
+    if (kind === 'shop' || kind === 'fountain') return { kind, reward: { kind } };
+    return { kind: 'combat', reward: { kind } };
+  }
+
+  /** Advances bookkeeping when entering a new room. */
+  enter(plan: RoomPlan): void {
+    if (this.current.kind === 'boss' && plan.kind !== 'boss') {
+      this.biomeIndex = Math.min(BIOMES.length - 1, this.biomeIndex + 1);
+      this.depth = 0;
+    }
+    if (plan.kind === 'shop') this.markUsed('shop');
+    if (plan.kind === 'fountain') this.markUsed('fountain');
+    this.current = plan;
+  }
+
+  /** Total rooms reached, used for "best depth" stats. */
+  get progress(): number {
+    return this.roomsCleared;
+  }
+}

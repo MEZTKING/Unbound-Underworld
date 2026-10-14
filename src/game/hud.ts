@@ -1,0 +1,340 @@
+import { TAU } from '../engine/math';
+import { ARTIFACT_BY_ID } from './artifacts';
+import { BOON_BY_ID, GODS, RARITY_COLOR } from './boons';
+import { Boss } from './enemies';
+import { ENCHANT_BY_ID } from './enchants';
+import type { Run } from './run';
+import type { SaveData } from './meta';
+import type { World } from './world';
+
+const FONT = '"Cinzel", Georgia, serif';
+
+function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, alpha = 0.65): void {
+  ctx.fillStyle = `rgba(8,4,12,${alpha})`;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,216,144,0.25)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function cooldownPie(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, frac: number): void {
+  if (frac <= 0) return;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + TAU * frac);
+  ctx.closePath();
+  ctx.fill();
+}
+
+export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, vw: number, vh: number, hub: boolean): void {
+  const p = w.player;
+  const s = w.stats;
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+
+  // ---------------------------------------------------------------- health & resources (bottom-left)
+  const hx = 24;
+  const hy = vh - 86;
+  panel(ctx, hx - 10, hy - 34, 330, 104);
+  const bw = 230;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(hx, hy, bw, 18);
+  const frac = Math.max(0, p.hp / p.maxHp);
+  const hg = ctx.createLinearGradient(hx, 0, hx + bw, 0);
+  hg.addColorStop(0, '#9a1028');
+  hg.addColorStop(1, '#ff3a4a');
+  ctx.fillStyle = hg;
+  ctx.fillRect(hx, hy, bw * frac, 18);
+  if (p.recoverPool > 0 && s.quickRecovery > 0) {
+    ctx.fillStyle = 'rgba(255,220,220,0.45)';
+    ctx.fillRect(hx + bw * frac, hy, bw * Math.min(1 - frac, (p.recoverPool * s.quickRecovery) / p.maxHp), 18);
+  }
+  ctx.strokeStyle = '#ffd890';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(hx, hy, bw, 18);
+  ctx.font = `700 14px ${FONT}`;
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${Math.ceil(p.hp)} / ${p.maxHp}`, hx + 6, hy + 14);
+  // Death defiance pips
+  const dd = run?.deathDefiance ?? 0;
+  for (let i = 0; i < dd; i++) {
+    ctx.fillStyle = '#ffcf5a';
+    ctx.font = `700 16px ${FONT}`;
+    ctx.fillText('✚', hx + bw + 10 + i * 18, hy + 15);
+  }
+  // Cast shards
+  ctx.font = `700 12px ${FONT}`;
+  ctx.fillStyle = '#c8b8c0';
+  ctx.fillText('CAST', hx, hy - 12);
+  for (let i = 0; i < s.castAmmo; i++) {
+    const x = hx + 50 + i * 20;
+    const y = hy - 17;
+    ctx.fillStyle = i < p.castAmmo ? (s.castPower ? GODS[s.castPower.god].color : '#ff3050') : 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(x, y - 9);
+    ctx.lineTo(x + 6, y);
+    ctx.lineTo(x, y + 9);
+    ctx.lineTo(x - 6, y);
+    ctx.fill();
+  }
+  // Dash charges
+  ctx.fillStyle = '#c8b8c0';
+  ctx.fillText('DASH', hx + 150, hy - 12);
+  for (let i = 0; i < s.dashCharges; i++) {
+    ctx.fillStyle = i < p.dashCharges ? '#ffd890' : 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.arc(hx + 202 + i * 16, hy - 16, 5, 0, TAU);
+    ctx.fill();
+  }
+  // Potion
+  const px = hx + 22;
+  const py = hy + 46;
+  ctx.fillStyle = p.potionCd > 0 ? '#3a5a3a' : '#5adf6a';
+  ctx.beginPath();
+  ctx.arc(px, py, 14, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#e8ffe8';
+  ctx.fillRect(px - 4, py - 22, 8, 8);
+  cooldownPie(ctx, px, py, 14, p.potionCd / s.potionCooldown);
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 11px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('R', px, py + 30);
+  if (p.potionCd > 0) {
+    ctx.font = `700 12px ${FONT}`;
+    ctx.fillText(`${Math.ceil(p.potionCd)}`, px, py + 4);
+  }
+  // Souls gauge
+  const sx = hx + 54;
+  const sy = py - 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#7fe8ff';
+  ctx.font = `700 11px ${FONT}`;
+  ctx.fillText(`SOULS ${Math.floor(p.souls)}`, sx, sy - 6);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(sx, sy, 120, 8);
+  ctx.fillStyle = '#7fe8ff';
+  ctx.fillRect(sx, sy, 120 * (p.souls / s.soulMax), 8);
+  // Artifacts
+  for (let i = 0; i < 3; i++) {
+    const id = w.artifacts[i];
+    const ax = sx + 152 + i * 46;
+    const ay = py;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.beginPath();
+    ctx.arc(ax, ay, 18, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,216,144,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (id) {
+      const def = ARTIFACT_BY_ID[id];
+      ctx.fillStyle = def.color;
+      ctx.font = `700 18px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(def.glyph, ax, ay + 6);
+      const cdFrac = p.artifactCd[i] / (def.cooldown * s.artifactCdMult);
+      cooldownPie(ctx, ax, ay, 18, cdFrac);
+      if (def.souls && p.souls < def.souls) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.arc(ax, ay, 18, 0, TAU);
+        ctx.fill();
+      }
+      if (id === 'void_beacon' && p.beamT > 0) {
+        ctx.strokeStyle = '#e0a8ff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(ax, ay, 20, 0, TAU);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = '#c8b8c0';
+    ctx.font = `700 10px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${i + 1}`, ax, ay + 30);
+  }
+
+  // ---------------------------------------------------------------- build (top-left)
+  if (run) {
+    const slots: ['attack' | 'special' | 'cast' | 'dash', string][] = [
+      ['attack', 'A'],
+      ['special', 'S'],
+      ['cast', 'C'],
+      ['dash', 'D'],
+    ];
+    let bx = 24;
+    const by = 30;
+    for (const [slot, letter] of slots) {
+      const owned = run.boons.find((b) => BOON_BY_ID[b.id]?.slot === slot);
+      const col = owned ? GODS[BOON_BY_ID[owned.id].god].color : 'rgba(255,255,255,0.12)';
+      ctx.fillStyle = 'rgba(8,4,12,0.7)';
+      ctx.beginPath();
+      ctx.arc(bx, by, 15, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = owned ? RARITY_COLOR[owned.rarity] : 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.font = `700 13px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(owned ? GODS[BOON_BY_ID[owned.id].god].glyph : letter, bx, by + 5);
+      if (owned && owned.level > 1) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `700 9px ${FONT}`;
+        ctx.fillText(`${owned.level}`, bx + 12, by + 14);
+      }
+      bx += 36;
+    }
+    // passives & duos
+    let row = 0;
+    let col = 0;
+    for (const b of run.boons) {
+      const def = BOON_BY_ID[b.id];
+      if (!def || (def.slot !== 'passive' && def.slot !== 'duo')) continue;
+      const x = 24 + col * 26;
+      const y = 62 + row * 26;
+      ctx.fillStyle = def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#100810';
+      ctx.font = `700 10px ${FONT}`;
+      ctx.fillText(GODS[def.god].glyph, x, y + 4);
+      col++;
+      if (col >= 6) {
+        col = 0;
+        row++;
+      }
+    }
+    // enchants
+    let ex = 24;
+    const ey = 62 + (row + (col > 0 ? 1 : 0)) * 26 + 4;
+    for (const e of run.enchants) {
+      const def = ENCHANT_BY_ID[e.id];
+      ctx.fillStyle = 'rgba(8,4,12,0.7)';
+      ctx.beginPath();
+      ctx.roundRect(ex - 11, ey - 11, 22, 22, 4);
+      ctx.fill();
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = def.color;
+      ctx.font = `700 12px ${FONT}`;
+      ctx.fillText(def.glyph, ex, ey + 4);
+      ctx.font = `700 8px ${FONT}`;
+      ctx.fillStyle = '#fff';
+      ctx.fillText('I'.repeat(e.tier), ex, ey + 19);
+      ex += 28;
+    }
+  }
+
+  // ---------------------------------------------------------------- currencies & location (top-right)
+  ctx.textAlign = 'right';
+  ctx.font = `700 17px ${FONT}`;
+  let ry = 34;
+  if (run) {
+    ctx.fillStyle = '#ffd04a';
+    ctx.fillText(`${run.gold} ◎`, vw - 24, ry);
+    ry += 24;
+  }
+  ctx.fillStyle = '#c8a8ff';
+  ctx.fillText(`${save.ash} ◆`, vw - 24, ry);
+  ry += 24;
+  ctx.font = `600 13px ${FONT}`;
+  ctx.fillStyle = '#c8b8c0';
+  if (run) {
+    const label = run.current.kind === 'boss' ? 'Guardian' : run.current.kind === 'combat' ? `Chamber ${run.depth + 1}` : run.current.kind === 'antechamber' ? 'Antechamber' : run.current.kind === 'shop' ? 'Wares' : 'Rest';
+    ctx.fillText(`${w.biome.name} · ${label}`, vw - 24, ry);
+    ry += 18;
+    if (run.heat > 0) {
+      ctx.fillStyle = '#ff6a5a';
+      ctx.fillText(`Torment ${run.heat}`, vw - 24, ry);
+      ry += 18;
+    }
+    const t = Math.floor(run.time);
+    ctx.fillStyle = '#8a7a88';
+    ctx.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, vw - 24, ry);
+  } else if (hub) {
+    ctx.fillText('The Hall of Shades', vw - 24, ry);
+  }
+
+  // ---------------------------------------------------------------- boss bar
+  const boss = w.boss;
+  if (boss && !boss.dead && !boss.spawning) {
+    const bw2 = Math.min(640, vw - 120);
+    const bx2 = vw / 2 - bw2 / 2;
+    const by2 = 34;
+    ctx.textAlign = 'center';
+    ctx.font = `700 20px ${FONT}`;
+    ctx.fillStyle = '#ffd8d0';
+    ctx.fillText(boss.name.toUpperCase(), vw / 2, by2 - 6);
+    if (boss instanceof Boss) {
+      ctx.font = `600 12px ${FONT}`;
+      ctx.fillStyle = '#c8a8a0';
+      ctx.fillText(boss.title, vw / 2, by2 + 30);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(bx2, by2, bw2, 12);
+    ctx.fillStyle = '#d8283c';
+    ctx.fillRect(bx2, by2, bw2 * Math.max(0, boss.hp / boss.maxHp), 12);
+    if (boss.maxArmor > 0 && boss.armor > 0) {
+      ctx.fillStyle = '#c8a060';
+      ctx.fillRect(bx2, by2 + 13, bw2 * (boss.armor / boss.maxArmor), 4);
+    }
+    ctx.fillStyle = '#ffd890';
+    ctx.fillRect(bx2 + bw2 * 0.5 - 1, by2 - 2, 2, 16);
+    ctx.strokeStyle = '#ffd890';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx2, by2, bw2, 12);
+  }
+
+  // ---------------------------------------------------------------- banner
+  const bn = w.banner;
+  if (bn) {
+    const a = Math.min(1, bn.t * 3, (3.2 - bn.t) * 2);
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.textAlign = 'center';
+    const g = ctx.createLinearGradient(vw / 2 - 300, 0, vw / 2 + 300, 0);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.5, 'rgba(0,0,0,0.6)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(vw / 2 - 300, vh * 0.22 - 44, 600, 84);
+    ctx.font = `700 36px ${FONT}`;
+    ctx.fillStyle = '#ffd890';
+    ctx.fillText(bn.title, vw / 2, vh * 0.22);
+    ctx.font = `italic 600 16px ${FONT}`;
+    ctx.fillStyle = '#d8c8c0';
+    ctx.fillText(bn.sub, vw / 2, vh * 0.22 + 28);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------- control hint
+  if (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0)) {
+    ctx.textAlign = 'right';
+    ctx.font = `600 12px ${FONT}`;
+    ctx.fillStyle = 'rgba(220,200,200,0.7)';
+    const lines = [
+      'WASD move · Mouse aim',
+      'LMB / J Attack · RMB / K Special · Q Cast',
+      'Space Dash · Shift / C Jump (attack mid-air to Slam)',
+      '1 2 3 Artifacts · R Potion · E Interact · Esc Pause',
+    ];
+    lines.forEach((l, i) => ctx.fillText(l, vw - 20, vh - 80 + i * 17));
+  }
+
+  if (p.beamT > 0) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#e0a8ff';
+    ctx.font = `700 12px ${FONT}`;
+    ctx.fillText('Void Prism — press again to stop', vw / 2, vh - 30);
+  }
+  ctx.restore();
+}
