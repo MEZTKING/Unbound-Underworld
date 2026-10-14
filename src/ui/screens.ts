@@ -21,6 +21,9 @@ const CONTROLS = `
   </div>
   <p class="small">Gamepad: Left stick move · Right stick aim · X attack · Y special · RB cast · A dash · B jump · LB potion · RT/LT/L3 artifacts · Select interact</p>`;
 
+/** True inside the packaged desktop app, where a Quit button makes sense. */
+const DESKTOP = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+
 function fmtTime(t: number): string {
   const s = Math.floor(t);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -42,6 +45,7 @@ export function title(g: Game): void {
         <button class="btn primary" data-nav data-a="play">${g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
         <button class="btn" data-nav data-a="settings">Settings</button>
+        ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit</button>' : ''}
       </div>
       <div class="credits">An original action roguelike inspired by Hades &amp; Minecraft Dungeons. Not affiliated with either.</div>
     </div>`,
@@ -60,6 +64,7 @@ export function title(g: Game): void {
       }
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
+    else if (a === 'quit') window.close();
     else settings(g);
   });
 }
@@ -162,6 +167,7 @@ export function pause(g: Game): void {
           <button class="btn" data-nav data-a="help">Controls</button>
           <button class="btn" data-nav data-a="settings">Settings</button>
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
+          ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit to desktop</button>' : ''}
         </div>
         <div class="build">${build}</div>
       </div>
@@ -173,7 +179,14 @@ export function pause(g: Game): void {
     if (a === 'resume') g.ui.pop();
     else if (a === 'help') help(g);
     else if (a === 'settings') settings(g);
-    else if (a === 'abandon') {
+    else if (a === 'quit') {
+      // Ash and upgrades are already saved; only an escape in progress is lost.
+      if (!run || b.dataset.armed) window.close();
+      else {
+        b.dataset.armed = '1';
+        b.textContent = 'Confirm: this escape will be lost';
+      }
+    } else if (a === 'abandon') {
       if (b.dataset.armed) {
         g.save.stats.deaths++;
         g.persist();
