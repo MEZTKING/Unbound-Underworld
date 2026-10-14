@@ -9,6 +9,9 @@ import { isSpear } from './weapons';
 
 const PAD = 90;
 
+/** Presentation switches set by the game each frame. */
+export const renderOpts = { touch: false };
+
 interface RoomCache {
   canvas: HTMLCanvasElement;
   scale: number;
@@ -1185,7 +1188,7 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
     ctx.strokeStyle = 'rgba(255,216,144,0.6)';
     ctx.strokeRect(f.x - tw / 2 - 40, y - 20, tw + 80, 30);
     ctx.fillStyle = '#ffd890';
-    ctx.fillText(`[E] ${f.prompt}: ${label}`, f.x, y);
+    ctx.fillText(renderOpts.touch ? `${f.prompt}: ${label}` : `[E] ${f.prompt}: ${label}`, f.x, y);
   }
 
   // ---- screen-space overlays

@@ -1,6 +1,6 @@
 # Unbound Underworld
 
-A fast, top-down action roguelike for the browser. You fight your way out of the realm of the dead, one chamber at a time. The core loop is modeled on **Hades**, and it adds systems inspired by **Minecraft Dungeons II**: jump attacks, cooldown artifacts, enchantments, loot chests and enchanted foes.
+A fast, top-down action roguelike for desktop, phones and the browser. You fight your way out of the realm of the dead, one chamber at a time. The core loop is modeled on **Hades**, and it adds systems inspired by **Minecraft Dungeons II**: jump attacks, cooldown artifacts, enchantments, loot chests and enchanted foes.
 
 ![Combat in Tartarus](docs/combat.png)
 
@@ -9,12 +9,46 @@ A fast, top-down action roguelike for the browser. You fight your way out of the
 | ![Title](docs/title.png) | ![Choosing a boon](docs/boons.png) |
 | ![Talos, the Bronze Colossus](docs/boss.png) | |
 
-## Play
+## Download
+
+Get the latest build from the [Releases page](https://github.com/MEZTKING/Unbound-Underworld/releases):
+
+| Platform | File | How to run |
+|---|---|---|
+| Windows | `Unbound-Underworld-Setup-<version>.exe` | Run the installer. |
+| Windows (no install) | `Unbound-Underworld-<version>-Portable.exe` | Double-click to play. |
+| macOS (Intel & Apple silicon) | `Unbound-Underworld-<version>-mac-universal.dmg` | Open the disk image and drag the app to Applications. |
+| Linux | `Unbound-Underworld-<version>-linux-x86_64.AppImage` | `chmod +x` the file, then run it. |
+| Android | `Unbound-Underworld-<version>-android.apk` | Open the file on your phone and allow installing from this source when asked. |
+
+The builds are **not code-signed** by a store, so your system will warn you the first time you open the game:
+
+- **Windows:** in the SmartScreen prompt, choose *More info → Run anyway*.
+- **macOS:** right-click the app and choose *Open*, then confirm. If it still refuses, run `xattr -cr "/Applications/Unbound Underworld.app"`.
+- **Android:** allow "Install unknown apps" for your browser or file manager.
+
+In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
+
+### iPhone and iPad (or any phone without installing a file)
+
+Play the web version at **https://meztking.github.io/Unbound-Underworld/**, then add it to your home screen:
+
+- **iPhone / iPad (Safari):** tap *Share → Add to Home Screen*.
+- **Android (Chrome):** tap *⋮ → Add to Home screen* or *Install app*.
+
+It then opens fullscreen like an app and works offline. Hold your phone sideways to play.
+
+On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (hold to repeat or charge, drag to aim), **✦** Special, **◆** Cast, **»** Dash and **⤒** Jump. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
+
+## Play from source
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # play in the browser at http://localhost:5173
+npm run desktop    # or play in the desktop app window
 ```
+
+To try the touch controls on a computer, open the browser's device toolbar (phone emulation) and reload.
 
 `npm run build` writes a static site to `dist/`. It uses relative paths, so you can host it on GitHub Pages, itch.io or any static server.
 
@@ -62,6 +96,38 @@ npm run typecheck
 npm run build
 ```
 
+### App builds
+
+The desktop app is the same game wrapped in [Electron](https://www.electronjs.org/) (`electron/main.cjs`), packaged with [electron-builder](https://www.electron.build/). The Android app wraps it with [Capacitor](https://capacitorjs.com/) (`android/`).
+
+```bash
+npm run dist:desktop            # installers for your current OS, written to release/
+npm run dist:desktop -- --linux # or pick a platform: --win, --mac, --linux
+npm run android:apk             # Android debug APK (needs the Android SDK and Java 21)
+```
+
+The **App builds** GitHub workflow builds Windows, macOS, Linux and Android. Push a version tag and it publishes everything on a GitHub Release:
+
+```bash
+npm version patch               # bump the version in package.json and create a tag such as v0.1.1
+git push --follow-tags
+```
+
+You can also start that workflow by hand from the Actions tab. A manual run attaches the installers to the run as downloadable artifacts instead of making a Release.
+
+**Web version.** The **Web version (GitHub Pages)** workflow publishes the installable browser version on every version tag. It needs a one-time setup: in the repository's *Settings → Pages*, set the source to *GitHub Actions*.
+
+**Android signing.** Without extra setup, the APK is signed with a throwaway debug key. Each build gets a different key, so installing a newer version means uninstalling the old one first, which loses your saves. To sign every build with the same key, create one once:
+
+```bash
+keytool -genkeypair -v -keystore unbound.keystore -alias unbound -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 unbound.keystore   # on macOS: base64 -i unbound.keystore
+```
+
+Then add these repository secrets (*Settings → Secrets and variables → Actions*): `ANDROID_KEYSTORE_BASE64` (the base64 output), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`unbound`) and `ANDROID_KEY_PASSWORD`. Keep the keystore file somewhere safe: you need the same key for every future update.
+
+### Debug parameters
+
 These URL parameters are handy for testing:
 
 | Param | Effect |
@@ -75,6 +141,11 @@ These URL parameters are handy for testing:
 ### Project layout
 
 ```
+electron/        desktop app shell (window, app:// file serving, fullscreen toggle)
+android/         Android app project (Capacitor): landscape, immersive fullscreen, icons
+pwa/             service worker template for the installable web version
+public/          web manifest and home-screen icons
+build/           app icon used for the installers
 src/
   engine/        math & RNG, collision, input (keyboard/mouse/gamepad), synth audio, camera, particles
   game/
@@ -90,11 +161,11 @@ src/
     run.ts       per-run state and door rewards
     meta.ts      save data and permanent upgrades
     render.ts    room art, lighting, effects     hud.ts  HUD
-  ui/            DOM menus (boon cards, altar, armory, pause…)
+  ui/            DOM menus (boon cards, altar, armory, pause…) and touch controls
 tests/           Vitest suites
 ```
 
-The art is all drawn in code on the canvas, and every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. Progress is saved to `localStorage`.
+The art is all drawn in code on the canvas, and every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. The fonts (Cinzel and EB Garamond, under the SIL Open Font License) are bundled, so the game also runs offline. Progress is saved to `localStorage`.
 
 ## Credits
 

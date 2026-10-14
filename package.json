@@ -1,19 +1,102 @@
 {
   "name": "unbound-underworld",
+  "productName": "Unbound Underworld",
   "private": true,
   "version": "0.1.0",
-  "description": "A Hades-inspired action roguelike for the browser.",
+  "description": "A Hades-inspired action roguelike with Minecraft Dungeons-style artifacts, enchantments and jump attacks.",
+  "author": "MEZTKING",
+  "homepage": "https://github.com/MEZTKING/Unbound-Underworld",
+  "desktopName": "unbound-underworld.desktop",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "desktop": "vite build && electron .",
+    "dist:desktop": "vite build && electron-builder --publish never",
+    "android:sync": "vite build && cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/eb-garamond": "^5.3.0",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"
+  },
+  "build": {
+    "appId": "io.github.meztking.unboundunderworld",
+    "productName": "Unbound Underworld",
+    "copyright": "Unbound Underworld contributors",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "artifactName": "Unbound-Underworld-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Unbound-Underworld-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Unbound-Underworld-${version}-Portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.action-games",
+      "identity": null
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Game",
+      "syncDesktopName": true
+    }
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3"
   }
 }

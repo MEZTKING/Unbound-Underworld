@@ -10,6 +10,15 @@ import { esc, type Card } from './overlay';
 
 export type CardData = Card;
 
+const TOUCH_CONTROLS = `
+  <div class="controls">
+    <div><b>Left side</b>: drag to move</div><div><b>⚔</b> Attack (hold to repeat or charge)</div>
+    <div><b>✦</b> Special · <b>◆</b> Cast</div><div><b>»</b> Dash · <b>⤒</b> Jump</div>
+    <div>Drag an attack button to aim</div><div>Otherwise you aim at the nearest foe</div>
+    <div>Jump, then ⚔ mid-air: <b>Slam</b></div><div><b>⚗</b> Potion · artifact buttons above</div>
+  </div>
+  <p class="small">A controller or keyboard also works if you connect one.</p>`;
+
 const CONTROLS = `
   <div class="controls">
     <div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>
@@ -20,6 +29,9 @@ const CONTROLS = `
     <div><kbd>E</kbd> Interact</div><div><kbd>Esc</kbd> Pause · <kbd>M</kbd> Mute</div>
   </div>
   <p class="small">Gamepad: Left stick move · Right stick aim · X attack · Y special · RB cast · A dash · B jump · LB potion · RT/LT/L3 artifacts · Select interact</p>`;
+
+/** True inside the packaged desktop app, where a Quit button makes sense. */
+const DESKTOP = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
 
 function fmtTime(t: number): string {
   const s = Math.floor(t);
@@ -42,6 +54,7 @@ export function title(g: Game): void {
         <button class="btn primary" data-nav data-a="play">${g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
         <button class="btn" data-nav data-a="settings">Settings</button>
+        ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit</button>' : ''}
       </div>
       <div class="credits">An original action roguelike inspired by Hades &amp; Minecraft Dungeons. Not affiliated with either.</div>
     </div>`,
@@ -60,6 +73,7 @@ export function title(g: Game): void {
       }
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
+    else if (a === 'quit') window.close();
     else settings(g);
   });
 }
@@ -75,7 +89,7 @@ export function help(g: Game, intro = false): void {
       <p>Slain foes release <b>souls</b> that power soul artifacts. <b>Jump</b> over lava, chasms and shockwaves,
       and attack mid-air to <b>Slam</b> the ground. Your <b>potion</b> recharges over time.</p>
       <p>When you fall, you return to the Hall of Shades. <b>Ash</b> you gathered is kept — spend it at the Altar.</p>
-      ${CONTROLS}
+      ${document.body.classList.contains('touch') ? TOUCH_CONTROLS : CONTROLS}
       <button class="btn primary" data-nav data-a="ok">Got it</button>
     </div>`,
     { onBack: () => g.ui.pop() },
@@ -162,6 +176,7 @@ export function pause(g: Game): void {
           <button class="btn" data-nav data-a="help">Controls</button>
           <button class="btn" data-nav data-a="settings">Settings</button>
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
+          ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit to desktop</button>' : ''}
         </div>
         <div class="build">${build}</div>
       </div>
@@ -173,7 +188,14 @@ export function pause(g: Game): void {
     if (a === 'resume') g.ui.pop();
     else if (a === 'help') help(g);
     else if (a === 'settings') settings(g);
-    else if (a === 'abandon') {
+    else if (a === 'quit') {
+      // Ash and upgrades are already saved; only an escape in progress is lost.
+      if (!run || b.dataset.armed) window.close();
+      else {
+        b.dataset.armed = '1';
+        b.textContent = 'Confirm: this escape will be lost';
+      }
+    } else if (a === 'abandon') {
       if (b.dataset.armed) {
         g.save.stats.deaths++;
         g.persist();

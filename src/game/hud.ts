@@ -29,16 +29,27 @@ function cooldownPie(ctx: CanvasRenderingContext2D, x: number, y: number, r: num
   ctx.fill();
 }
 
-export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, vw: number, vh: number, hub: boolean): void {
+export function drawHUD(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  run: Run | null,
+  save: SaveData,
+  vw: number,
+  vh: number,
+  hub: boolean,
+  touch = false,
+): void {
   const p = w.player;
   const s = w.stats;
   ctx.save();
   ctx.textBaseline = 'alphabetic';
 
-  // ---------------------------------------------------------------- health & resources (bottom-left)
+  // ---------------------------------------------------------------- health & resources
+  // Bottom-left on desktop; top-left on touch screens (the joystick lives bottom-left,
+  // and the potion/artifacts are on-screen buttons there).
   const hx = 24;
-  const hy = vh - 86;
-  panel(ctx, hx - 10, hy - 34, 330, 104);
+  const hy = touch ? 44 : vh - 86;
+  panel(ctx, hx - 10, hy - 34, 330, touch ? 78 : 104);
   const bw = 230;
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(hx, hy, bw, 18);
@@ -90,6 +101,27 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
     ctx.arc(hx + 202 + i * 16, hy - 16, 5, 0, TAU);
     ctx.fill();
   }
+  if (touch) {
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#7fe8ff';
+    ctx.font = `700 11px ${FONT}`;
+    ctx.fillText(`SOULS ${Math.floor(p.souls)}`, hx, hy + 36);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(hx + 80, hy + 29, 150, 8);
+    ctx.fillStyle = '#7fe8ff';
+    ctx.fillRect(hx + 80, hy + 29, 150 * (p.souls / s.soulMax), 8);
+  } else drawLoadout(ctx, w, hx, hy);
+
+  drawBuild(ctx, run, touch ? 96 : 0);
+  drawTopRight(ctx, w, run, save, vw - (touch ? 70 : 24), hub);
+  drawOverlays(ctx, w, vw, vh, run, hub, touch);
+  ctx.restore();
+}
+
+/** Potion, soul gauge and artifact slots (desktop layout). */
+function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: number): void {
+  const p = w.player;
+  const s = w.stats;
   // Potion
   const px = hx + 22;
   const py = hy + 46;
@@ -158,8 +190,10 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
     ctx.textAlign = 'center';
     ctx.fillText(`${i + 1}`, ax, ay + 30);
   }
+}
 
-  // ---------------------------------------------------------------- build (top-left)
+/** Boon slots, passives and enchantments (top-left). */
+function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number): void {
   if (run) {
     const slots: ['attack' | 'special' | 'cast' | 'dash', string][] = [
       ['attack', 'A'],
@@ -168,7 +202,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
       ['dash', 'D'],
     ];
     let bx = 24;
-    const by = 30;
+    const by = 30 + top;
     for (const [slot, letter] of slots) {
       const owned = run.boons.find((b) => BOON_BY_ID[b.id]?.slot === slot);
       const col = owned ? GODS[BOON_BY_ID[owned.id].god].color : 'rgba(255,255,255,0.12)';
@@ -197,7 +231,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
       const def = BOON_BY_ID[b.id];
       if (!def || (def.slot !== 'passive' && def.slot !== 'duo')) continue;
       const x = 24 + col * 26;
-      const y = 62 + row * 26;
+      const y = 62 + top + row * 26;
       ctx.fillStyle = def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color;
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
@@ -215,7 +249,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
     }
     // enchants
     let ex = 24;
-    const ey = 62 + (row + (col > 0 ? 1 : 0)) * 26 + 4;
+    const ey = 62 + top + (row + (col > 0 ? 1 : 0)) * 26 + 4;
     for (const e of run.enchants) {
       const def = ENCHANT_BY_ID[e.id];
       ctx.fillStyle = 'rgba(8,4,12,0.7)';
@@ -234,38 +268,43 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
       ex += 28;
     }
   }
+}
 
-  // ---------------------------------------------------------------- currencies & location (top-right)
+/** Currencies, location and run timer, right-aligned at x = rx. */
+function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, rx: number, hub: boolean): void {
   ctx.textAlign = 'right';
   ctx.font = `700 17px ${FONT}`;
   let ry = 34;
   if (run) {
     ctx.fillStyle = '#ffd04a';
-    ctx.fillText(`${run.gold} ◎`, vw - 24, ry);
+    ctx.fillText(`${run.gold} ◎`, rx, ry);
     ry += 24;
   }
   ctx.fillStyle = '#c8a8ff';
-  ctx.fillText(`${save.ash} ◆`, vw - 24, ry);
+  ctx.fillText(`${save.ash} ◆`, rx, ry);
   ry += 24;
   ctx.font = `600 13px ${FONT}`;
   ctx.fillStyle = '#c8b8c0';
   if (run) {
     const label = run.current.kind === 'boss' ? 'Guardian' : run.current.kind === 'combat' ? `Chamber ${run.depth + 1}` : run.current.kind === 'antechamber' ? 'Antechamber' : run.current.kind === 'shop' ? 'Wares' : 'Rest';
-    ctx.fillText(`${w.biome.name} · ${label}`, vw - 24, ry);
+    ctx.fillText(`${w.biome.name} · ${label}`, rx, ry);
     ry += 18;
     if (run.heat > 0) {
       ctx.fillStyle = '#ff6a5a';
-      ctx.fillText(`Torment ${run.heat}`, vw - 24, ry);
+      ctx.fillText(`Torment ${run.heat}`, rx, ry);
       ry += 18;
     }
     const t = Math.floor(run.time);
     ctx.fillStyle = '#8a7a88';
-    ctx.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, vw - 24, ry);
+    ctx.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, rx, ry);
   } else if (hub) {
-    ctx.fillText('The Hall of Shades', vw - 24, ry);
+    ctx.fillText('The Hall of Shades', rx, ry);
   }
+}
 
-  // ---------------------------------------------------------------- boss bar
+/** Boss bar, room banner and hints. */
+function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: number, run: Run | null, hub: boolean, touch: boolean): void {
+  const p = w.player;
   const boss = w.boss;
   if (boss && !boss.dead && !boss.spawning) {
     const bw2 = Math.min(640, vw - 120);
@@ -317,7 +356,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
   }
 
   // ---------------------------------------------------------------- control hint
-  if (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0)) {
+  if (!touch && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
     ctx.textAlign = 'right';
     ctx.font = `600 12px ${FONT}`;
     ctx.fillStyle = 'rgba(220,200,200,0.7)';
@@ -336,5 +375,4 @@ export function drawHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null
     ctx.font = `700 12px ${FONT}`;
     ctx.fillText('Void Prism — press again to stop', vw / 2, vh - 30);
   }
-  ctx.restore();
 }

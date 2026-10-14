@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.meztking.unboundunderworld",
+  "appName": "Unbound Underworld",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#07050a"
+  }
+}

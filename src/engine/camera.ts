@@ -21,6 +21,8 @@ export class Camera {
     this.vh = h;
     // Show roughly 1280x760 world units; fill the larger dimension.
     this.zoom = Math.min(w / 1280, h / 760);
+    // Small (phone) screens zoom in a little so characters stay readable.
+    if (Math.min(w, h) < 560) this.zoom = Math.max(this.zoom, Math.min(w / 1000, h / 600));
     this.zoom = Math.max(0.35, this.zoom);
   }
 

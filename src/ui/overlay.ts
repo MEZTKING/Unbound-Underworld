@@ -117,7 +117,8 @@ export class UI {
     s.items.forEach((it) => it.classList.remove('sel'));
     s.index = i;
     s.items[i].classList.add('sel');
-    s.items[i].scrollIntoView?.({ block: 'nearest' });
+    // Only follow focus when navigating by key/pad, so menus open scrolled to the top.
+    if (sound) s.items[i].scrollIntoView?.({ block: 'nearest' });
   }
 
   private handle(a: Action): void {
@@ -163,6 +164,17 @@ export class UI {
       default:
         break;
     }
+  }
+
+  /** Hardware/system back: closes the top menu if it allows. True when a menu consumed it. */
+  back(): boolean {
+    const s = this.top;
+    if (!s) return false;
+    if (s.onBack) {
+      audio.play('select');
+      s.onBack();
+    }
+    return true;
   }
 
   toast(text: string, ms = 2200): void {
