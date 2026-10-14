@@ -113,7 +113,7 @@ npm version patch               # bump the version in package.json and create a 
 git push --follow-tags
 ```
 
-You can also start that workflow by hand from the Actions tab. A manual run attaches the installers to the run as downloadable artifacts instead of making a Release.
+You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts. A release made this way doesn't trigger the web version automatically, so also run *Actions → Web version (GitHub Pages) → Run workflow*.
 
 **Web version.** The **Web version (GitHub Pages)** workflow publishes the installable browser version on every version tag. It needs a one-time setup: in the repository's *Settings → Pages*, set the source to *GitHub Actions*.
 
