@@ -403,6 +403,17 @@ export class World {
         const n = o.type === 'rect' ? resolveCircleRect(c, o) : resolveCircleCircle(c, { x: o.x, y: o.y, r: o.r });
         if (n) hit = n;
       }
+      // Stations, shops, chests and braziers are solid too.
+      if (!a.flying) {
+        for (const it of this.interactables) {
+          const n = resolveCircleCircle(c, { x: it.x, y: it.y, r: PROP_RADIUS[it.kind] });
+          if (n) hit = n;
+        }
+        for (const b of this.room.braziers) {
+          const n = resolveCircleCircle(c, { x: b.x, y: b.y, r: 14 });
+          if (n) hit = n;
+        }
+      }
       // Walking foes treat pits and lava as walls unless they are knocked in.
       if (isEnemy && !a.flying && !knocked) {
         for (const h of this.room.hazards) {
@@ -1199,6 +1210,9 @@ export class World {
     renderWorld(this, ctx, dpr);
   }
 }
+
+/** Solid size of each kind of interactable (its `r` is the reach to use it). */
+const PROP_RADIUS: Record<Interactable['kind'], number> = { station: 30, shop: 26, fountain: 40, chest: 24, npc: 16 };
 
 /** How much an enemy yields when crowding (0 = immovable). */
 function pushWeight(e: Enemy): number {

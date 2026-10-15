@@ -13,6 +13,9 @@ export interface Card {
   disabled?: boolean;
 }
 
+/** How long a new card choice ignores picks (ms). */
+export const CHOICE_LOCK_MS = 2000;
+
 export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
@@ -214,6 +217,7 @@ export class UI {
       </button>`,
       )
       .join('');
+    const readyAt = performance.now() + CHOICE_LOCK_MS;
     const el = this.push(
       'choice',
       `<div class="panel choice-panel" style="--c:${opts.color}">
@@ -221,13 +225,22 @@ export class UI {
         <h2 class="title" style="color:${opts.color}">${esc(opts.title)}</h2>
         ${opts.subtitle ? `<div class="subtitle">${esc(opts.subtitle)}</div>` : ''}
         ${opts.quote ? `<div class="quote">“${esc(opts.quote)}”</div>` : ''}
-        <div class="cards">${cards}</div>
+        <div class="cards locked">${cards}</div>
+        <div class="choice-lock"><i></i></div>
         ${opts.skip ? `<button class="btn ghost" data-nav data-skip>${esc(opts.skip.label)}</button>` : ''}
       </div>`,
-      { onBack: opts.skip ? () => this.finish(opts.skip!.onSkip) : null },
+      { onBack: opts.skip ? () => performance.now() >= readyAt && this.finish(opts.skip!.onSkip) : null },
     );
+    // Picks are ignored for a moment, so a click or tap meant for grabbing the
+    // reward doesn't land on a card by accident.
+    const ready = () => performance.now() >= readyAt;
+    window.setTimeout(() => {
+      el.querySelector('.cards')?.classList.remove('locked');
+      el.querySelector('.choice-lock')?.remove();
+    }, CHOICE_LOCK_MS);
     el.querySelectorAll<HTMLElement>('.card').forEach((b) => {
       b.onclick = () => {
+        if (!ready()) return;
         if (b.classList.contains('disabled')) {
           audio.play('deny');
           return;
@@ -244,7 +257,7 @@ export class UI {
       };
     }
     const skip = el.querySelector<HTMLElement>('[data-skip]');
-    if (skip) skip.onclick = () => this.finish(opts.skip!.onSkip);
+    if (skip) skip.onclick = () => ready() && this.finish(opts.skip!.onSkip);
   }
 
   private finish(fn: () => void): void {

@@ -192,9 +192,9 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
 |---|---|---|
 | Armory | Always | Buy, equip and forge weapons |
 | Altar of Ashes | Always | Permanent upgrades for Ash |
-| Hall of Heroes | Always | Choose your hero |
+| Hall of Heroes | Always | Choose your hero; customise their colours and headwear |
 | Ascension | Always | Spend talent points (the prompt shows unspent points) |
-| Chronicle | Always | Lifetime stats |
+| Chronicle | Always | Records, bestiary (foes stay silhouettes until slain) and achievements |
 | Artifact Shelf | Level 4 | Choose (or buy) a starting artifact |
 | Oath of Torment | After a guardian kill | Choose a difficulty |
 | Old Bones | Always | Training dummy |
@@ -208,10 +208,16 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
 - **Touch:** a floating joystick on the left and an action cluster on the right: Attack, Special above it, Dash beside it, Cast, Jump, Wrath, potion and artifacts. Buttons appear as their mechanics unlock.
 - **Views:** the 3D voxel view (default) renders the world with three.js, which is only loaded when this view is used. It has a Hades-style camera: the room is turned 45° and seen from about 40° up, so rooms show as diamonds with the doors on the far edges. Movement, sticks and mouse aim are turned to match, so up on the keyboard is up on screen. Effects, damage numbers, health bars, pickups and prompts are drawn by a 2D layer on top. That layer uses the same angle (`Camera.setAngle`), and heights go through `Camera.lift`, so the effects line up with the 3D scene. The classic 2D view looks straight down and draws everything on the canvas. On desktop the 3D view has shadows and point lights; phones get no shadows and a lower resolution.
 - **Scaling:** the HUD and menus scale with screen size (1 at 1280×760, up to ×3 on 4K). Phones get compact layouts: a narrower health panel and boon choices that fit without scrolling.
+- **Tooltips (PC):** pointing at a HUD icon shows what it is; a door's description pops up when you point at its icon (or walk up to it). Phones show door descriptions on the floor.
+- **Card choices** ignore input for 2s (`CHOICE_LOCK_MS`), so a click meant for the reward doesn't pick a card by accident.
+- **Charon's wares** show what they do once you've bought that kind before (`save.shopSeen`); until then the text is blurred.
+- **Achievements** (`src/game/codex.ts`) are checked whenever the save is written. God mode or developer options switch them off for the session.
+- **Developer options** (`src/ui/dev.ts`): unlocked per device by tapping the version in Settings 7 times, or with `?dev`.
+- **Music:** each guardian has its own theme (`BOSS_THEMES` in `audio.ts`); phase 2 adds hi-hats and a high lead.
 - **Settings:**
   - Audio.
   - Assist mode, aim assist, damage numbers, control hints, and door descriptions (every door, or only the nearest).
-  - 3D voxel view or classic 2D view, shake, flashes, hit-stop, FPS counter, fullscreen.
+  - 3D voxel view or classic 2D view, UI size, shake, flashes, hit-stop, FPS counter, fullscreen.
   - Touch button size, opacity, left-handed layout and vibration.
 
 ## 11. Where things live in the code
@@ -233,6 +239,8 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
 | HUD / 2D world rendering and the 3D view's overlay | `src/game/hud.ts` / `src/game/render.ts` |
 | 3D voxel view (rooms, props, figures, lights) | `src/render3d/voxel.ts` |
 | Menus / touch controls | `src/ui/screens.ts` / `src/ui/touch.ts` |
+| Bestiary and achievements | `src/game/codex.ts` |
+| Developer options | `src/ui/dev.ts` |
 
 ## 12. How to add content
 

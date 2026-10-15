@@ -1,6 +1,6 @@
 import { TAU } from '../engine/math';
 import { ARTIFACT_BY_ID } from './artifacts';
-import { BOON_BY_ID, GODS, RARITY_COLOR } from './boons';
+import { BOON_BY_ID, describeBoon, GODS, RARITY_COLOR } from './boons';
 import { Boss } from './enemies';
 import { ENCHANT_BY_ID } from './enchants';
 import { prefs } from './prefs';
@@ -10,6 +10,64 @@ import type { SaveData } from './meta';
 import type { World } from './world';
 
 const FONT = '"Cinzel", Georgia, serif';
+
+/** What each HUD icon is, for mouse-over tooltips (HUD coordinates). */
+interface Tip {
+  x: number;
+  y: number;
+  r: number;
+  title: string;
+  body: string;
+  color: string;
+}
+let tips: Tip[] = [];
+const tip = (x: number, y: number, r: number, title: string, body: string, color = '#ffd890') => tips.push({ x, y, r, title, body, color });
+
+/** Draws the tooltip for the HUD icon under the mouse, if any (mx, my in HUD coordinates). */
+export function drawHudTooltip(ctx: CanvasRenderingContext2D, mx: number, my: number, vw: number): void {
+  const t = tips.find((t) => Math.hypot(mx - t.x, my - t.y) <= t.r + 3);
+  if (!t) return;
+  ctx.save();
+  ctx.font = `700 14px ${FONT}`;
+  const lines = wrap(ctx, t.body, 260, 'italic 13px "EB Garamond", Georgia, serif');
+  const tw = Math.max(ctx.measureText(t.title).width, ...lines.map((l) => l.w)) + 20;
+  const th = 30 + lines.length * 16;
+  let x = t.x + t.r + 8;
+  if (x + tw > vw - 8) x = t.x - t.r - 8 - tw;
+  const y = Math.max(8, t.y - 14);
+  ctx.fillStyle = 'rgba(10,6,14,0.94)';
+  ctx.strokeStyle = t.color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, tw, th, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = t.color;
+  ctx.font = `700 14px ${FONT}`;
+  ctx.fillText(t.title, x + 10, y + 20);
+  ctx.fillStyle = '#e0d4cc';
+  ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
+  lines.forEach((l, i) => ctx.fillText(l.text, x + 10, y + 38 + i * 16));
+  ctx.restore();
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, max: number, font: string): { text: string; w: number }[] {
+  ctx.save();
+  ctx.font = font;
+  const out: { text: string; w: number }[] = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(next).width > max) {
+      out.push({ text: line, w: ctx.measureText(line).width });
+      line = word;
+    } else line = next;
+  }
+  if (line) out.push({ text: line, w: ctx.measureText(line).width });
+  ctx.restore();
+  return out;
+}
 
 function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, alpha = 0.65): void {
   ctx.fillStyle = `rgba(8,4,12,${alpha})`;
@@ -45,6 +103,7 @@ export function drawHUD(
 ): void {
   const p = w.player;
   const s = w.stats;
+  tips = [];
   ctx.save();
   ctx.textBaseline = 'alphabetic';
 
@@ -180,6 +239,7 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
     ctx.stroke();
     if (id) {
       const def = ARTIFACT_BY_ID[id];
+      tip(ax, ay, 18, def.name, `${def.desc} (key ${i + 1})`, def.color);
       ctx.fillStyle = def.color;
       ctx.font = `700 18px ${FONT}`;
       ctx.textAlign = 'center';
@@ -210,6 +270,7 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
 function drawPotion(ctx: CanvasRenderingContext2D, w: World, px: number, py: number): void {
   const p = w.player;
   const s = w.stats;
+  tip(px, py, 14, 'Healing Potion', `Restores health. Recharges in ${Math.round(s.potionCooldown)}s. (key R)`, '#5adf6a');
   ctx.fillStyle = p.potionCd > 0 ? '#3a5a3a' : '#5adf6a';
   ctx.beginPath();
   ctx.arc(px, py, 14, 0, TAU);
@@ -242,6 +303,9 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number, 
       const owned = run.boons.find((b) => BOON_BY_ID[b.id]?.slot === slot);
       if (slot === 'cast' && !canCast && !owned) continue;
       const col = owned ? GODS[BOON_BY_ID[owned.id].god].color : 'rgba(255,255,255,0.12)';
+      const slotName = { attack: 'Attack', special: 'Special', cast: 'Cast', dash: 'Dash' }[slot];
+      if (owned) tip(bx, by, 15, `${BOON_BY_ID[owned.id].name} (${slotName})`, `${owned.rarity} · level ${owned.level}. ${describeBoon(owned)}`, col);
+      else tip(bx, by, 15, `${slotName} slot`, `No boon yet. A god's ${slotName.toLowerCase()} boon goes here.`, '#c8b8c0');
       ctx.fillStyle = 'rgba(8,4,12,0.7)';
       ctx.beginPath();
       ctx.arc(bx, by, 15, 0, TAU);
@@ -269,6 +333,7 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number, 
       const x = x0 + col * 26;
       const y = 62 + top + row * 26;
       ctx.fillStyle = def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color;
+      tip(x, y, 9, def.name, `${b.rarity} · level ${b.level}. ${describeBoon(b)}`, def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color);
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
       ctx.arc(x, y, 9, 0, TAU);
@@ -288,6 +353,7 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number, 
     const ey = 62 + top + (row + (col > 0 ? 1 : 0)) * 26 + 4;
     for (const e of run.enchants) {
       const def = ENCHANT_BY_ID[e.id];
+      tip(ex, ey, 11, `${def.name} ${'I'.repeat(e.tier)}`, def.desc(e.tier), def.color);
       ctx.fillStyle = 'rgba(8,4,12,0.7)';
       ctx.beginPath();
       ctx.roundRect(ex - 11, ey - 11, 22, 22, 4);

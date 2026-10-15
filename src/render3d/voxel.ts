@@ -92,6 +92,8 @@ interface Rig {
   walk: number;
   seen: number;
   weapon: string;
+  /** The hero palette this rig was built with (rebuilt when it changes). */
+  look?: string;
 }
 
 interface Look {
@@ -396,7 +398,7 @@ function shadeHex(hex: string, k: number): string {
 }
 
 function buildHeroRig(p: Player, b: RigBuilder, shadowMat: THREE.Material): Rig {
-  const pal = p.hero.palette;
+  const pal = p.palette;
   const rig = newRig('humanoid', 56, b, shadowMat);
   const g = rig.body;
   rig.legs.push(b.limb(g, pal.tunic, 6, 16, 7, -4, 16, 0), b.limb(g, pal.tunic, 6, 16, 7, 4, 16, 0));
@@ -715,9 +717,15 @@ export class VoxelRenderer {
     }
     // Glowing trim where the walls meet the floor.
     const trim = new Blocks();
-    trim.add(l.w / 2, 3, -1, l.w, 6, 2, bio.trim);
-    trim.add(-1, 3, l.h / 2, 2, 6, l.h, bio.trim);
-    trim.add(l.w + 1, 3, l.h / 2, 2, 6, l.h, bio.trim);
+    // Kept just clear of the wall faces and the floor: shared faces flicker (z-fighting).
+    let from = 0;
+    for (const x of [...w.doors.map((d) => d.x)].sort((a, b) => a - b).concat(l.w + DOOR_W)) {
+      const to = Math.min(l.w, x - DOOR_W / 2);
+      if (to > from) trim.add((from + to) / 2, 3.5, 1.2, to - from, 6, 2, bio.trim);
+      from = x + DOOR_W / 2;
+    }
+    trim.add(1.2, 3.5, l.h / 2, 2, 6, l.h, bio.trim);
+    trim.add(l.w - 1.2, 3.5, l.h / 2, 2, 6, l.h, bio.trim);
 
     // Obstacles: stacked blocks, pillars and urns.
     const obst = new Blocks();
@@ -813,7 +821,7 @@ export class VoxelRenderer {
         g.add(post);
         const tr = new THREE.Mesh(BOX, trimM);
         tr.scale.set(3, 120, 2);
-        tr.position.set(s * (half - 1), 60, B + 1);
+        tr.position.set(s * (half - 1.5), 61, B + 1.2);
         g.add(tr);
       }
       const lintel = new THREE.Mesh(BOX, frame);
@@ -1028,6 +1036,7 @@ export class VoxelRenderer {
     const b = new RigBuilder(this.quality === 'high');
     if (a === w.player) {
       rig = buildHeroRig(w.player, b, this.shadowMat);
+      rig.look = JSON.stringify(w.player.palette);
     } else if ((a as Ally).kind === 'wolf' || (a as Ally).kind === 'lantern') {
       rig = buildAllyRig(a as Ally, b, this.shadowMat);
     } else {
@@ -1311,6 +1320,11 @@ export class VoxelRenderer {
     this.frame++;
     const seen = this.frame;
     const p = w.player;
+    const old = this.rigs.get(p);
+    if (old && old.look !== JSON.stringify(p.palette)) {
+      this.dropRig(old);
+      this.rigs.delete(p);
+    }
     const pr = this.rigFor(p, w);
     pr.seen = seen;
     this.posePlayer(pr, p, w, dt);
