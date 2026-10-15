@@ -29,6 +29,14 @@ The builds are **not code-signed** by a store, so your system will warn you the 
 
 In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
 
+### Updates
+
+When a new version comes out, the title screen shows **Update now**. You can also check under *Settings → Check for updates*. Your progress carries over.
+
+- **Windows (installer) and Linux:** one press downloads the update, and the game restarts on the new version.
+- **Windows (portable), macOS and Android:** the button downloads the new version for you. Open the file to install it over the old one.
+- **Web version:** the game picks up the new version on its own. If it's open while you update the site, it offers *Restart to update*.
+
 ### iPhone and iPad (the web version)
 
 iPhones only install apps from the App Store, so on iOS you play the web version instead. Each release includes `Unbound-Underworld-<version>-web.zip`. Put it on a free static host once, and you get a link you can open on any phone or computer:
@@ -116,14 +124,23 @@ git push --follow-tags
 
 You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts.
 
-**Android signing.** Without extra setup, the APK is signed with a throwaway debug key. Each build gets a different key, so installing a newer version means uninstalling the old one first, which loses your saves. To sign every build with the same key, create one once:
+**Android signing (needed for updates and Google Play).** Without extra setup, the APK is signed with a throwaway debug key. Each build gets a different key, so Android refuses to install a newer version over the old one ("App not installed"), and the old one has to be uninstalled first, which loses its saves. Set this up before you share the APK, so every build is signed with the same key. Create a key once:
 
 ```bash
 keytool -genkeypair -v -keystore unbound.keystore -alias unbound -keyalg RSA -keysize 2048 -validity 10000
 base64 -w0 unbound.keystore   # on macOS: base64 -i unbound.keystore
 ```
 
-Then add these repository secrets (*Settings → Secrets and variables → Actions*): `ANDROID_KEYSTORE_BASE64` (the base64 output), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`unbound`) and `ANDROID_KEY_PASSWORD`. Keep the keystore file somewhere safe: you need the same key for every future update.
+Then add these repository secrets (*Settings → Secrets and variables → Actions*): `ANDROID_KEYSTORE_BASE64` (the base64 output), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`unbound`) and `ANDROID_KEY_PASSWORD`. Keep the keystore file and passwords somewhere safe and private: you need the same key for every future update, and anyone who has it can sign apps as you.
+
+**Google Play.** Once the signing secrets are set, each **App builds** run also makes `Unbound-Underworld-<version>-play.aab`. Download it from the run's *Artifacts* section; it isn't attached to the public release. That build has no in-game update button, because Google Play installs updates itself. To publish:
+
+1. Create a [Google Play Console](https://play.google.com/console) developer account (a one-time fee of US$25).
+2. Create the app, fill in the store listing, content rating and data safety forms, and link a privacy policy. The game collects no data: saves stay on the device.
+3. Upload the `.aab` to a release track. Google keeps the final app-signing key (Play App Signing); your key becomes the *upload key*.
+4. For each new version, bump the version in `package.json`, run the workflow and upload the new `.aab`. Play then updates players' games automatically.
+
+New personal developer accounts must run a closed test with at least 12 testers for 14 days before the app can go public.
 
 ### Debug parameters
 
@@ -140,12 +157,13 @@ These URL parameters are handy for testing:
 ### Project layout
 
 ```
-electron/        desktop app shell (window, app:// file serving, fullscreen toggle)
+electron/        desktop app shell (window, app:// file serving, fullscreen toggle, self-updating)
 android/         Android app project (Capacitor): landscape, immersive fullscreen, icons
 pwa/             service worker template for the installable web version
 public/          web manifest and home-screen icons
 build/           app icon used for the installers
 src/
+  updates.ts     update checks against the latest GitHub release, and the one-button update
   engine/        math & RNG, collision, input (keyboard/mouse/gamepad), synth audio, camera, particles
   game/
     game.ts      orchestrator: hub, run flow, rewards, shop, saves (implements WorldHost)

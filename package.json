@@ -39,7 +39,7 @@
       "dist/**/*",
       "electron/**/*",
       "package.json",
-      "!node_modules/**/*"
+      "!node_modules/@capacitor{,/**/*}"
     ],
     "directories": {
       "output": "release",
@@ -93,10 +93,18 @@
       ],
       "category": "Game",
       "syncDesktopName": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "MEZTKING",
+        "repo": "Unbound-Underworld"
+      }
+    ]
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",
-    "@capacitor/core": "^8.5.3"
+    "@capacitor/core": "^8.5.3",
+    "electron-updater": "^6.8.9"
   }
 }
