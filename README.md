@@ -29,14 +29,23 @@ The builds are **not code-signed** by a store, so your system will warn you the 
 
 In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
 
-### iPhone and iPad (or any phone without installing a file)
+### Updates
 
-Play the web version at **https://meztking.github.io/Unbound-Underworld/**, then add it to your home screen:
+When a new version comes out, the title screen shows **Update now**. You can also check under *Settings → Check for updates*. Your progress carries over.
 
-- **iPhone / iPad (Safari):** tap *Share → Add to Home Screen*.
-- **Android (Chrome):** tap *⋮ → Add to Home screen* or *Install app*.
+- **Windows (installer) and Linux:** one press downloads the update, and the game restarts on the new version.
+- **Windows (portable), macOS and Android:** the button downloads the new version for you. Open the file to install it over the old one.
+- **Web version:** the game picks up the new version on its own. If it's open while you update the site, it offers *Restart to update*.
 
-It then opens fullscreen like an app and works offline. Hold your phone sideways to play.
+### iPhone and iPad (the web version)
+
+iPhones only install apps from the App Store, so on iOS you play the web version instead. Each release includes `Unbound-Underworld-<version>-web.zip`. Put it on a free static host once, and you get a link you can open on any phone or computer:
+
+- **Cloudflare Pages** (free, recommended): sign up at [cloudflare.com](https://dash.cloudflare.com/sign-up), then go to *Workers & Pages → Create → Pages → Upload assets*. Name the project and drop in the zip. You get an address like `https://unbound-underworld.pages.dev`. To update it later, upload the newer zip to the same project.
+- **Netlify Drop:** drag the unzipped folder onto [app.netlify.com/drop](https://app.netlify.com/drop). Create a free account when it asks, or the site is deleted after an hour.
+- **itch.io:** create a project, set *Kind of project* to *HTML*, upload the zip and tick *This file will be played in the browser*. This is the easiest place to share the game with friends. The game runs inside the itch.io page, though, so it doesn't open fullscreen from the home screen like the options above.
+
+Open your link in Safari and tap *Share → Add to Home Screen* (in Chrome on Android: *⋮ → Add to Home screen*). The game then opens fullscreen like an app, works offline and keeps its saves on the phone. Hold your phone sideways to play.
 
 On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (hold to repeat or charge, drag to aim), **✦** Special, **◆** Cast, **»** Dash and **⤒** Jump. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
 
@@ -50,7 +59,7 @@ npm run desktop    # or play in the desktop app window
 
 To try the touch controls on a computer, open the browser's device toolbar (phone emulation) and reload.
 
-`npm run build` writes a static site to `dist/`. It uses relative paths, so you can host it on GitHub Pages, itch.io or any static server.
+`npm run build` writes a static site to `dist/`. It uses relative paths, so you can host it on any static server, in a subfolder too.
 
 ## Controls
 
@@ -106,25 +115,32 @@ npm run dist:desktop -- --linux # or pick a platform: --win, --mac, --linux
 npm run android:apk             # Android debug APK (needs the Android SDK and Java 21)
 ```
 
-The **App builds** GitHub workflow builds Windows, macOS, Linux and Android. Push a version tag and it publishes everything on a GitHub Release:
+The **App builds** GitHub workflow builds Windows, macOS, Linux, Android and the web version zip. Push a version tag and it publishes everything on a GitHub Release:
 
 ```bash
 npm version patch               # bump the version in package.json and create a tag such as v0.1.1
 git push --follow-tags
 ```
 
-You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts. A release made this way doesn't trigger the web version automatically, so also run *Actions → Web version (GitHub Pages) → Run workflow*.
+You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts.
 
-**Web version.** The **Web version (GitHub Pages)** workflow publishes the installable browser version on every version tag. It needs a one-time setup: in the repository's *Settings → Pages*, set the source to *GitHub Actions*.
-
-**Android signing.** Without extra setup, the APK is signed with a throwaway debug key. Each build gets a different key, so installing a newer version means uninstalling the old one first, which loses your saves. To sign every build with the same key, create one once:
+**Android signing (needed for updates and Google Play).** Without extra setup, the APK is signed with a throwaway debug key. Each build gets a different key, so Android refuses to install a newer version over the old one ("App not installed"), and the old one has to be uninstalled first, which loses its saves. Set this up before you share the APK, so every build is signed with the same key. Create a key once:
 
 ```bash
 keytool -genkeypair -v -keystore unbound.keystore -alias unbound -keyalg RSA -keysize 2048 -validity 10000
 base64 -w0 unbound.keystore   # on macOS: base64 -i unbound.keystore
 ```
 
-Then add these repository secrets (*Settings → Secrets and variables → Actions*): `ANDROID_KEYSTORE_BASE64` (the base64 output), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`unbound`) and `ANDROID_KEY_PASSWORD`. Keep the keystore file somewhere safe: you need the same key for every future update.
+Then add these repository secrets (*Settings → Secrets and variables → Actions*): `ANDROID_KEYSTORE_BASE64` (the base64 output), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`unbound`) and `ANDROID_KEY_PASSWORD`. Keep the keystore file and passwords somewhere safe and private: you need the same key for every future update, and anyone who has it can sign apps as you.
+
+**Google Play.** Once the signing secrets are set, each **App builds** run also makes `Unbound-Underworld-<version>-play.aab`. Download it from the run's *Artifacts* section; it isn't attached to the public release. That build has no in-game update button, because Google Play installs updates itself. To publish:
+
+1. Create a [Google Play Console](https://play.google.com/console) developer account (a one-time fee of US$25).
+2. Create the app, fill in the store listing, content rating and data safety forms, and link a privacy policy. The game collects no data: saves stay on the device.
+3. Upload the `.aab` to a release track. Google keeps the final app-signing key (Play App Signing); your key becomes the *upload key*.
+4. For each new version, bump the version in `package.json`, run the workflow and upload the new `.aab`. Play then updates players' games automatically.
+
+New personal developer accounts must run a closed test with at least 12 testers for 14 days before the app can go public.
 
 ### Debug parameters
 
@@ -141,12 +157,13 @@ These URL parameters are handy for testing:
 ### Project layout
 
 ```
-electron/        desktop app shell (window, app:// file serving, fullscreen toggle)
+electron/        desktop app shell (window, app:// file serving, fullscreen toggle, self-updating)
 android/         Android app project (Capacitor): landscape, immersive fullscreen, icons
 pwa/             service worker template for the installable web version
 public/          web manifest and home-screen icons
 build/           app icon used for the installers
 src/
+  updates.ts     update checks against the latest GitHub release, and the one-button update
   engine/        math & RNG, collision, input (keyboard/mouse/gamepad), synth audio, camera, particles
   game/
     game.ts      orchestrator: hub, run flow, rewards, shop, saves (implements WorldHost)

@@ -7,6 +7,7 @@ import '@fontsource/eb-garamond/latin-400-italic.css';
 import '@fontsource/eb-garamond/latin-600.css';
 import './style.css';
 import { Game } from './game/game';
+import { initUpdates } from './updates';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const overlay = document.getElementById('overlay') as HTMLElement;
@@ -27,7 +28,5 @@ if (native) {
   });
 }
 
-// Offline support for the installable web version (not inside the desktop or Android apps).
-if (import.meta.env.PROD && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !native) {
-  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
+// Update checks, and offline support for the installable web version.
+initUpdates();

@@ -6,6 +6,7 @@ import type { Game, RunSummary } from '../game/game';
 import { clearSave, heatScale, nextCost, rank, UPGRADES } from '../game/meta';
 import type { WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
+import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
 import { esc, type Card } from './overlay';
 
 export type CardData = Card;
@@ -42,6 +43,47 @@ function bind(el: HTMLElement, sel: string, fn: (b: HTMLElement) => void): void 
   el.querySelectorAll<HTMLElement>(sel).forEach((b) => (b.onclick = () => fn(b)));
 }
 
+/**
+ * Keeps `box` showing the update status and its one-button action. On the
+ * title screen it only appears once an update is found; in Settings it always
+ * holds exactly one button, so menu focus never jumps as the status changes.
+ */
+function updateBox(g: Game, screen: HTMLElement, box: HTMLElement, inSettings: boolean): void {
+  const action = (s: UpdateState & { kind: 'available' }): string =>
+    s.action === 'install' ? 'Update now' : s.action === 'reload' ? 'Restart to update' : 'Download update';
+  watchUpdates((s) => {
+    if (!box.isConnected) return false;
+    let note = '';
+    let button = '';
+    if (s.kind === 'available') {
+      note = s.version ? `Version ${esc(s.version)} is out!` : 'A new version is ready.';
+      button = `<button class="btn primary" data-nav data-update="apply">${action(s)}</button>`;
+    } else if (s.kind === 'downloading') {
+      note = `Downloading version ${esc(s.version)}… The game restarts when it's done.`;
+      button = `<button class="btn disabled" data-nav>Downloading ${Math.floor(s.percent)}%</button>`;
+    } else if (s.kind === 'opened') {
+      note = `Open the downloaded file to install version ${esc(s.version)}.`;
+      if (inSettings) button = '<button class="btn" data-nav data-update="check">Check for updates</button>';
+    } else if (inSettings) {
+      if (s.kind === 'current') note = 'You have the latest version.';
+      if (s.kind === 'error') note = esc(s.message);
+      button =
+        s.kind === 'checking'
+          ? '<button class="btn disabled" data-nav>Checking…</button>'
+          : '<button class="btn" data-nav data-update="check">Check for updates</button>';
+    }
+    box.innerHTML = note || button ? `${note ? `<div class="update-note">${note}</div>` : ''}${button}` : '';
+    bind(box, '[data-update]', (b) => {
+      audio.play('select');
+      if (b.dataset.update === 'apply') void applyUpdate();
+      else void check();
+    });
+    box.querySelectorAll<HTMLElement>('.disabled').forEach((b) => (b.onclick = () => audio.play('deny')));
+    if (!screen.classList.contains('hidden')) g.ui.refreshItems();
+    return true;
+  });
+}
+
 // ---------------------------------------------------------------- title
 
 export function title(g: Game): void {
@@ -56,9 +98,12 @@ export function title(g: Game): void {
         <button class="btn" data-nav data-a="settings">Settings</button>
         ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit</button>' : ''}
       </div>
+      <div class="update-box" data-box></div>
       <div class="credits">An original action roguelike inspired by Hades &amp; Minecraft Dungeons. Not affiliated with either.</div>
-    </div>`,
+    </div>
+    <div class="version">v${APP_VERSION}</div>`,
   );
+  updateBox(g, el, el.querySelector<HTMLElement>('[data-box]')!, false);
   bind(el, '[data-a]', (b) => {
     audio.unlock();
     audio.play('select');
@@ -108,10 +153,15 @@ export function settings(g: Game): void {
       <label class="row">Screen shake <input type="range" min="0" max="1.5" step="0.1" value="${s.shake}" data-k="shake"></label>
       <button class="btn" data-nav data-a="mute">${s.muted ? 'Unmute' : 'Mute'} sound</button>
       <button class="btn danger" data-nav data-a="reset">Erase save data</button>
+      <div class="update-box">
+        <div class="update-version">Version ${APP_VERSION}</div>
+        <div data-box></div>
+      </div>
       <button class="btn primary" data-nav data-a="back">Back</button>
     </div>`,
     { onBack: () => g.ui.pop() },
   );
+  if (updatesSupported) updateBox(g, el, el.querySelector<HTMLElement>('[data-box]')!, true);
   el.querySelectorAll<HTMLInputElement>('input[type=range]').forEach((inp) => {
     inp.oninput = () => {
       const v = Number(inp.value);

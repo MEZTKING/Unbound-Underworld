@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vitest/config';
 
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+
 /** Emits dist/sw.js with every built file precached and a content-based version. */
 function serviceWorker(): Plugin {
   return {
@@ -23,6 +25,9 @@ export default defineConfig({
   // Relative base so the production build runs from any static host or sub-path.
   base: './',
   plugins: [serviceWorker()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',

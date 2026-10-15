@@ -1,7 +1,7 @@
 // Desktop shell for Unbound Underworld. Serves the Vite build from an `app://`
 // origin (so ES modules and localStorage behave exactly like on the web) and
 // opens it in a plain, menu-less window.
-const { app, BrowserWindow, net, protocol, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, net, protocol, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -27,6 +27,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       autoplayPolicy: 'no-user-gesture-required',
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   });
   win.setMenu(null);
@@ -53,6 +54,35 @@ function createWindow() {
   void win.loadURL('app://game/index.html');
 }
 
+// The Windows installer and the Linux AppImage can replace themselves with a new
+// version. The portable .exe and the unsigned macOS app can't, so the game
+// offers their new download in the browser instead.
+function canSelfUpdate() {
+  if (!app.isPackaged) return false;
+  if (process.platform === 'win32') return !process.env.PORTABLE_EXECUTABLE_DIR;
+  if (process.platform === 'linux') return !!process.env.APPIMAGE;
+  return false;
+}
+
+function registerUpdates() {
+  ipcMain.handle('updates:info', () => ({ platform: process.platform, canSelfUpdate: canSelfUpdate() }));
+  ipcMain.handle('updates:install', async (event) => {
+    if (!canSelfUpdate()) return 'none';
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.autoDownload = false;
+    autoUpdater.removeAllListeners('download-progress');
+    autoUpdater.on('download-progress', (p) => {
+      if (!event.sender.isDestroyed()) event.sender.send('updates:progress', p.percent);
+    });
+    const result = await autoUpdater.checkForUpdates();
+    if (!result || !result.isUpdateAvailable) return 'none';
+    await autoUpdater.downloadUpdate();
+    // Close, install silently and start the new version.
+    setImmediate(() => autoUpdater.quitAndInstall(true, true));
+    return 'installing';
+  });
+}
+
 // Keep a single instance so two windows never fight over the same save.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -73,6 +103,7 @@ if (!app.requestSingleInstanceLock()) {
       if (!file.startsWith(DIST + path.sep) || !fs.existsSync(file)) return new Response('Not found', { status: 404 });
       return net.fetch(pathToFileURL(file).toString());
     });
+    registerUpdates();
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

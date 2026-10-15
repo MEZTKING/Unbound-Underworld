@@ -1,8 +1,8 @@
 name: App builds
 
-# Builds the Windows, macOS, Linux and Android apps. Pushing a tag like
-# `v0.1.0`, or running this workflow from the Actions tab with a version,
-# also publishes them as downloads on a GitHub Release.
+# Builds the Windows, macOS, Linux and Android apps plus a zip of the web
+# version. Pushing a tag like `v0.1.0`, or running this workflow from the
+# Actions tab with a version, also publishes them on a GitHub Release.
 on:
   push:
     tags: ['v*']
@@ -57,10 +57,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Unbound-Underworld-${{ matrix.name }}
+          # latest*.yml and the blockmaps tell the in-app updater what to download.
           path: |
             release/*.AppImage
             release/*.exe
             release/*.dmg
+            release/latest*.yml
+            release/*.blockmap
           if-no-files-found: error
 
   android:
@@ -109,11 +112,53 @@ jobs:
           name: Unbound-Underworld-Android
           path: release/*.apk
           if-no-files-found: error
+      # Google Play needs an app bundle signed with your key. This build leaves
+      # updates to the Play Store, so it has no in-game update button.
+      - name: Build Play Store bundle
+        if: env.ANDROID_KEYSTORE_PATH != ''
+        env:
+          VITE_DISTRIBUTION: play
+        run: |
+          npm run android:sync
+          cd android
+          ./gradlew --no-daemon bundleRelease
+          VERSION=$(node -p "require('../package.json').version")
+          mkdir -p ../play
+          cp app/build/outputs/bundle/release/app-release.aab "../play/Unbound-Underworld-$VERSION-play.aab"
+      - uses: actions/upload-artifact@v4
+        if: env.ANDROID_KEYSTORE_PATH != ''
+        with:
+          name: Play-Store-Bundle
+          path: play/*.aab
+          if-no-files-found: error
+
+  web:
+    name: Package (Web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # index.html sits at the root of the zip, as itch.io and other static hosts expect.
+      - name: Zip the web version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p release
+          (cd dist && zip -qr "../release/Unbound-Underworld-$VERSION-web.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Unbound-Underworld-Web
+          path: release/*.zip
+          if-no-files-found: error
 
   release:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
-    needs: [desktop, android]
+    needs: [desktop, android, web]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -134,6 +179,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          # The Play Store bundle is for uploading to Google Play, not for players.
+          pattern: Unbound-Underworld-*
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
