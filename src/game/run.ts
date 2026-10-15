@@ -3,7 +3,8 @@ import { ARTIFACTS } from './artifacts';
 import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
 import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
 import type { GearRarity, MaterialId } from './gear';
-import { applyMetaExtras, heatScale, metaBonuses, rank, type SaveData } from './meta';
+import { altarDefiance, altarFavor, applyAltar, rankOf } from './altar';
+import { heatScale, type SaveData } from './meta';
 import { DOOR_COUNT, DOOR_WEIGHT } from './odds';
 import { hasFeature } from './progression';
 import { BIOMES, type BiomeInfo } from './rooms';
@@ -70,7 +71,7 @@ export function newBuild(save: SaveData): Build {
     enchants: [],
     artifacts: [save.startArtifact || null, null, null],
     bonusHp: 0,
-    deathDefiance: rank(save, 'defiance'),
+    deathDefiance: altarDefiance(save.upgrades),
   };
 }
 
@@ -108,7 +109,7 @@ export class Run {
     this.seed = seed;
     this.rng = new Rng(seed);
     this.heat = save.heat;
-    this.gold = rank(save, 'fortune') * 40;
+    this.gold = rankOf(save.upgrades, 'fortune') * 40;
     this.builds.set(0, newBuild(save));
   }
 
@@ -234,13 +235,13 @@ export class Run {
   }
 
   favor(save: SaveData): number {
-    return rank(save, 'favor');
+    return altarFavor(save.upgrades);
   }
 
   computeStats(save: SaveData): PlayerStats {
-    const s = computeStats(this.boons, this.hammers, metaBonuses(save));
+    const s = computeStats(this.boons, this.hammers);
     s.maxHp += this.bonusHp;
-    applyMetaExtras(save, s);
+    applyAltar(save.upgrades, s);
     applyEnchantStats(s, this.enchants);
     return s;
   }

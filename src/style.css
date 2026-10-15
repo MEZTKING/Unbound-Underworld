@@ -1615,6 +1615,65 @@ h3.section small {
   text-transform: uppercase;
   color: rgba(232, 220, 200, 0.45);
 }
+/* Every tier wears its colour: border, tint, name and glyph. */
+.gear-item:not(.empty) {
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  border-left: 4px solid var(--c);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 12%, transparent), color-mix(in srgb, var(--c) 3%, transparent) 60%);
+}
+.gear-item.tier-common {
+  --c: #cfcac4;
+}
+.gear-item.tier-uncommon {
+  --c: #5fd35f;
+}
+.gear-item.tier-rare {
+  --c: #4aa8ff;
+}
+.gear-item.tier-epic {
+  --c: #b45cff;
+}
+
+/* Legendary: a gilded double frame with corner studs and a slow gleam. */
+.gear-item.tier-legendary {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #ffb02e;
+  outline: 1px solid rgba(255, 214, 120, 0.55);
+  outline-offset: -5px;
+  box-shadow: 0 0 14px rgba(255, 176, 46, 0.35), inset 0 0 18px rgba(255, 176, 46, 0.18);
+}
+.gear-item.tier-legendary::before,
+.gear-item.tier-legendary::after {
+  content: '◆';
+  position: absolute;
+  font-size: 10px;
+  color: #ffe08a;
+  text-shadow: 0 0 6px #ffb02e;
+  pointer-events: none;
+}
+.gear-item.tier-legendary::before {
+  top: 1px;
+  right: 4px;
+}
+.gear-item.tier-legendary::after {
+  bottom: 1px;
+  left: 6px;
+}
+.gear-item.tier-legendary .gear-text b {
+  background: linear-gradient(90deg, #ffb02e, #fff2c0, #ffb02e);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gleam 3.5s linear infinite;
+}
+@keyframes gleam {
+  to {
+    background-position: -200% 0;
+  }
+}
+
 /* The top tiers shimmer: Unique pulses, Ghost drifts like a spirit. */
 .gear-item.tier-unique,
 .gear-item.tier-ghost {
@@ -1624,11 +1683,34 @@ h3.section small {
 .gear-item.tier-unique {
   box-shadow: inset 0 0 14px color-mix(in srgb, var(--c) 22%, transparent);
 }
+/* Ghost: a spectral frame that slowly circles the piece, half there, half not. */
+@property --ghost-a {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
 .gear-item.tier-ghost {
-  background: linear-gradient(120deg, rgba(159, 247, 255, 0.04), rgba(159, 247, 255, 0.12), rgba(159, 247, 255, 0.04));
-  background-size: 300% 100%;
-  animation: ghostdrift 5s ease-in-out infinite;
-  box-shadow: 0 0 12px rgba(159, 247, 255, 0.25), inset 0 0 16px rgba(159, 247, 255, 0.15);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(120deg, rgba(10, 30, 36, 0.92), rgba(20, 50, 58, 0.85), rgba(10, 30, 36, 0.92)) padding-box,
+    conic-gradient(from var(--ghost-a), rgba(159, 247, 255, 0.15), #9ff7ff, #ffffff, rgba(159, 247, 255, 0.15) 40%, rgba(200, 160, 255, 0.7), rgba(159, 247, 255, 0.15)) border-box;
+  animation: ghostspin 6s linear infinite;
+  box-shadow: 0 0 16px rgba(159, 247, 255, 0.35), inset 0 0 18px rgba(159, 247, 255, 0.18);
+}
+.gear-item.tier-ghost .gear-text b {
+  text-shadow: 0 0 8px rgba(159, 247, 255, 0.8);
+  animation: ghostflicker 4s ease-in-out infinite;
+}
+@keyframes ghostspin {
+  to {
+    --ghost-a: 360deg;
+  }
+}
+@keyframes ghostflicker {
+  45%,
+  55% {
+    opacity: 0.55;
+  }
 }
 .gear-item.tier-ghost .gear-glyph {
   animation: ghostfloat 3s ease-in-out infinite;
@@ -1647,8 +1729,251 @@ h3.section small {
 }
 @media (prefers-reduced-motion: reduce) {
   .gear-item.tier-ghost,
-  .gear-item.tier-ghost .gear-glyph {
+  .gear-item.tier-ghost .gear-glyph,
+  .gear-item.tier-ghost .gear-text b,
+  .gear-item.tier-legendary .gear-text b {
     animation: none;
+  }
+}
+/* Gear listed elsewhere (the Hall of Heroes, spoils) keeps its tier colour. */
+ul.worn {
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+ul.worn li {
+  margin: 3px 0;
+  padding: 3px 8px;
+  border-left: 3px solid var(--c, #555);
+  color: var(--c, var(--muted));
+  font-size: 14px;
+}
+ul.worn li.empty {
+  opacity: 0.55;
+}
+ul.worn li.tier-legendary {
+  border-left: 3px double #ffb02e;
+  background: rgba(255, 176, 46, 0.08);
+}
+ul.worn li.tier-ghost {
+  border-left: 3px solid #9ff7ff;
+  background: rgba(159, 247, 255, 0.08);
+  text-shadow: 0 0 6px rgba(159, 247, 255, 0.6);
+}
+ul.worn .stars {
+  display: inline;
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------- Altar, Ascension, Hall of Heroes, Blacksmith */
+
+.tabs .btn.tab {
+  width: auto;
+  min-width: 0;
+  margin: 2px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.altar-sec.sealed {
+  color: #6a5a68;
+}
+.upg.sealed {
+  filter: grayscale(0.85);
+  opacity: 0.45;
+}
+.skill-tree {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+.tree-head {
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  color: #ffe68a;
+  text-align: center;
+  letter-spacing: 0.06em;
+}
+.tree-head small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+.skill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  border-radius: 8px;
+  background: rgba(8, 4, 12, 0.6);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.skill .glyph {
+  font-size: 20px;
+  color: var(--c);
+}
+.skill b {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 13px;
+}
+.skill small {
+  color: #d8ccc4;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.skill em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+.skill .pips i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 1px;
+  border-radius: 50%;
+  border: 1px solid var(--c);
+}
+.skill .pips i.on {
+  background: var(--c);
+}
+.skill.taken {
+  background: color-mix(in srgb, var(--c) 14%, rgba(8, 4, 12, 0.7));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 30%, transparent);
+}
+.skill.capstone {
+  border-width: 2px;
+}
+.skill.sealed {
+  opacity: 0.4;
+}
+.skill.disabled:not(.taken):not(.sealed) {
+  opacity: 0.75;
+}
+.skill:hover,
+.skill.sel {
+  border-color: var(--c);
+}
+.hero-sheet .hero-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 6px 4px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  text-align: left;
+}
+.hero-sheet h3 {
+  margin: 0;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 24px;
+  color: var(--c);
+}
+.hero-level {
+  min-width: 160px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hero-level .bar {
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.hero-level .bar i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+}
+.hero-sheet .mp-grid section > .btn {
+  margin-top: 6px;
+}
+.smith-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+}
+.smith-part {
+  padding: 6px 8px;
+  border: 1px dashed rgba(255, 154, 74, 0.35);
+  border-radius: 6px;
+  text-align: left;
+  opacity: 0.6;
+}
+.smith-part b {
+  margin-right: 6px;
+  color: #6a5040;
+  font-size: 18px;
+}
+.smith-part span {
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  color: #b89880;
+}
+.smith-part small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.smith-part.have {
+  border: 1px solid #ff9a4a;
+  background: rgba(255, 140, 60, 0.1);
+  opacity: 1;
+}
+.smith-part.have b {
+  color: #ffb06a;
+  text-shadow: 0 0 8px #ff7a2a;
+}
+.smith-part.have span {
+  color: #ffd0a0;
+}
+.recipes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+.recipe {
+  padding: 10px 12px;
+  border: 1px solid var(--c);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c) 10%, rgba(8, 4, 12, 0.6));
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.recipe b {
+  display: block;
+  font-family: 'Cinzel', Georgia, serif;
+  color: var(--c);
+}
+.recipe small {
+  color: var(--muted);
+}
+.recipe.locked {
+  opacity: 0.45;
+  border-style: dashed;
+  cursor: default;
+}
+.recipe.disabled {
+  opacity: 0.7;
+}
+@media (max-width: 640px) {
+  .skill-tree {
+    gap: 4px;
+  }
+  .skill small {
+    font-size: 11px;
   }
 }
 .section small {

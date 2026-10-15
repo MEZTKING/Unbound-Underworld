@@ -994,15 +994,17 @@ export class VoxelRenderer {
         b.glow(t, '#9a60e0', 60, 108, 2, 0, 66, 5.5, 0.9);
         b.box(t, '#3a2a24', 80, 6, 18, 0, 3, 0);
         break;
-      case 'weapons': {
-        b.box(t, '#3a2a24', 6, 80, 8, -44, 40, 0);
-        b.box(t, '#3a2a24', 6, 80, 8, 44, 40, 0);
-        b.box(t, '#3a2a24', 94, 8, 10, 0, 72, 0);
-        b.box(t, '#3a2a24', 94, 6, 10, 0, 16, 0);
-        ['#ff5a6a', '#ffb14a', '#8ad0ff'].forEach((c, i) => {
-          b.box(t, '#c8c8d8', 3, 66, 3, -26 + i * 26, 46, 4);
-          b.glow(t, c, 5, 8, 5, -26 + i * 26, 82, 4);
-        });
+      case 'smith': {
+        // Furnace, anvil and the Blacksmith himself.
+        b.box(t, '#2a1e1a', 44, 90, 34, -34, 45, -6);
+        b.box(t, '#3a2a24', 50, 8, 40, -34, 94, -6);
+        b.glow(t, '#ff8a3a', 24, 18, 2, -34, 30, 11.5, 0.95);
+        b.box(t, '#4a4a56', 40, 10, 18, 22, 26, 4);
+        b.box(t, '#4a4a56', 18, 16, 14, 22, 13, 4);
+        b.box(t, '#3e3e48', 34, 6, 22, 22, 3, 4);
+        b.box(t, '#5a3a2a', 18, 30, 14, 50, 22, -8);
+        b.box(t, '#d8a888', 12, 12, 12, 50, 44, -8);
+        b.box(t, '#8a8a96', 4, 4, 18, 40, 34, 2).rotation.x = -0.5;
         break;
       }
       case 'artifacts':

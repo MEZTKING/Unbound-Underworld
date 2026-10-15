@@ -33,10 +33,14 @@ import { drawHUD, drawHudTooltip, drawPartnerHUD, drawSaveIcon, setPartnerShown,
 import { newAchievements } from './codex';
 import { applyGear, costText, equippedItems, gearDefiance, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollDrop, rollGhost, rollStarred, salvageValue, SLOT_NAME, type MaterialId } from './gear';
 import type { Loot } from './entities';
-import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, type SaveData } from './meta';
+import { applyAltar } from './altar';
+import { applySkills, HERO_MAX_LEVEL, heroLevelFromXp, heroPoints, heroXpForLevel, spentSkill } from './herotree';
+import { partFor, SMITH_PART_BY_ID } from './smith';
+import { smithScreen } from '../ui/smith';
+import { loadRun, loadSave, writeRun, writeSave, type SaveData } from './meta';
 import { Player, useHeroLooks } from './player';
 import { prefs } from './prefs';
-import { applyFeatures, applyForge, applyTalents, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
+import { applyFeatures, applyForge, applyLevel, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
 import { REWARD_INFO, renderOpts, renderOverlay } from './render';
 import type { VoxelQuality, VoxelRenderer } from '../render3d/voxel';
 import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
@@ -65,6 +69,9 @@ export interface Grant {
   escape?: boolean;
   /** An escape began, or ended in death (their run and death counts). */
   run?: 'start' | 'death';
+  /** A guardian fell (the Blacksmith's parts), and the Torment it fell at. */
+  guardian?: string;
+  heat?: number;
 }
 
 export interface RunSummary {
@@ -205,7 +212,7 @@ export class Game implements WorldHost {
       profile,
       character: def.id,
       player: new Player(kind === 'local' ? profile.weapon : def.weapon, def.id),
-      stats: computeStats([], [], metaBonuses(profile)),
+      stats: computeStats([], []),
       pad,
       hubArtifacts: [null, null, null],
     };
@@ -332,7 +339,7 @@ export class Game implements WorldHost {
     this.withMember(m, () => this.recomputeStats(true));
     m.player.castAmmo = m.stats.castAmmo;
     m.player.dashCharges = m.stats.dashCharges;
-    m.player.souls = m.stats.soulMax;
+    m.player.souls = 0;
     const w = this.world;
     if (w) {
       const lead = this.me.player;
@@ -579,6 +586,9 @@ export class Game implements WorldHost {
   /** Grants experience and announces any level-ups and what they unlock. */
   gainXp(n: number): void {
     if (n <= 0) return;
+    // Each hero played also grows in their own level (skill points at Ascension).
+    const heroes = new Set(this.members.filter((m) => m.profile === this.save).map((m) => m.player.hero.id));
+    for (const id of heroes) this.gainHeroXp(id, n);
     const before = this.level;
     this.save.xp += n;
     const after = this.level;
@@ -594,6 +604,36 @@ export class Game implements WorldHost {
     }
     this.persist();
     this.announceLevels();
+  }
+
+  /** A hero's own experience; announces their new levels. */
+  private gainHeroXp(id: CharacterId, n: number): void {
+    const xp = this.save.heroXp;
+    const before = heroLevelFromXp(xp[id] ?? 0).level;
+    xp[id] = Math.min(heroXpForLevel(HERO_MAX_LEVEL), (xp[id] ?? 0) + n);
+    const after = heroLevelFromXp(xp[id] ?? 0).level;
+    if (after > before) {
+      const name = CHARACTER_BY_ID[id]?.name ?? 'Your hero';
+      this.ui.toast(`${name} reached hero level ${after}: a skill point awaits at Ascension.`, 3500);
+    }
+  }
+
+  /** Skill points the selected hero hasn't spent yet. */
+  unspentSkills(): number {
+    const id = this.me.player.hero.id;
+    const level = heroLevelFromXp(this.save.heroXp[id] ?? 0).level;
+    return Math.max(0, heroPoints(level) - spentSkill(this.save.skills[id] ?? {}));
+  }
+
+  /** A guardian fell: the Blacksmith's part it carried, if this save still lacks it. */
+  awardPart(guardian: string, heat: number): void {
+    const part = partFor(guardian, heat, this.save.smith.parts);
+    if (!part) return;
+    this.save.smith.parts.push(part);
+    this.persist();
+    const def = SMITH_PART_BY_ID[part];
+    this.world?.showBanner(`Found: ${def.name}`, 'A lost part of the forge. Bring it to the Blacksmith in the Hall.');
+    this.ui.toast(`The Blacksmith can now: ${def.unlocks}`, 5000);
   }
 
   /** Experience for the whole party: this save once, and each player online their share. */
@@ -627,9 +667,9 @@ export class Game implements WorldHost {
       w?.showBanner(`Unlocked: ${u.title}`, `${u.desc}${keys}`);
       if (unlocks.length > 1) this.ui.toast(`Also unlocked: ${unlocks.slice(0, -1).map((x) => x.title).join(', ')}`, 4000);
     } else {
-      w?.showBanner(`Level ${level}`, `${tier.name} · +1 talent point`);
+      w?.showBanner(`Level ${level}`, `${tier.name} · +1 max Health for every hero`);
     }
-    if (this.save.seenLevel > 1) this.ui.toast(`Level ${level}! A talent point awaits at Ascension in the Hall.`, 3000);
+    if (this.save.seenLevel > 1) this.ui.toast(`Level ${level}! New sections of the Altar of Ashes may be open.`, 3000);
   }
   // ---------------------------------------------------------------- loop
 
@@ -822,13 +862,14 @@ export class Game implements WorldHost {
     let s: PlayerStats;
     if (this.run) s = this.run.computeStats(save);
     else {
-      s = computeStats([], [], metaBonuses(save));
-      applyMetaExtras(save, s);
+      s = computeStats([], []);
+      applyAltar(save.upgrades, s);
     }
-    // Order matters: features decide what exists, then talents, hero and forge build on top.
+    // Order matters: features decide what exists, then level, hero, skills and forge build on top.
     applyFeatures(level, s, save.stats.escapes > 0);
-    applyTalents(save.talents, s);
+    applyLevel(level, s);
     m.player.hero.apply(s);
+    applySkills(m.player.hero.id, save.skills[m.player.hero.id], s);
     applyForge(save.forge[m.player.weapon.id] ?? 1, s);
     if (hasFeature(level, 'gear', save.stats.escapes > 0)) applyGear(equippedItems(save.gear), s);
     // Assist mode is this device's setting: it covers this device's players.
@@ -859,7 +900,7 @@ export class Game implements WorldHost {
         this.recomputeStats(true);
         m.player.castAmmo = m.stats.castAmmo;
         m.player.dashCharges = m.stats.dashCharges;
-        m.player.souls = m.stats.soulMax;
+        // Echoes start empty: foes fill the gauge.
       });
     }
     const layout = hubLayout();
@@ -868,11 +909,11 @@ export class Game implements WorldHost {
     w.doors = [{ x: layout.w / 2, reward: null, open: true }];
     const st = (id: string, x: number, y: number, label: string, prompt: string, color: string): Interactable => ({ id, x, y, r: 90, label, prompt, kind: 'station', color });
     w.interactables.push(
-      st('weapons', 230, 360, 'Armory', 'Choose weapon', 'rgba(255,120,120,0.5)'),
+      st('smith', 230, 360, 'Blacksmith', 'Visit the forge', 'rgba(255,140,60,0.55)'),
       st('mirror', layout.w - 230, 360, 'Altar of Ashes', 'Upgrade', 'rgba(200,140,255,0.6)'),
       st('chronicle', layout.w - 230, 650, 'Chronicle', 'Read', 'rgba(255,220,160,0.5)'),
       st('heroes', 440, 470, 'Hall of Heroes', 'Choose hero', 'rgba(255,140,110,0.5)'),
-      st('ascension', layout.w - 440, 470, 'Ascension', this.unspentTalents() > 0 ? `Spend talents (${this.unspentTalents()})` : 'Talents', 'rgba(255,230,140,0.55)'),
+      st('ascension', layout.w - 440, 470, 'Ascension', this.ascensionPrompt(), 'rgba(255,230,140,0.55)'),
     );
     if (this.has('artifacts')) w.interactables.push(st('artifacts', 230, 650, 'Artifact Shelf', 'Equip artifact', 'rgba(127,232,255,0.5)'));
     if (this.save.stats.bossesSlain > 0 || this.save.maxHeat > 0) w.interactables.push(st('pact', layout.w / 2, 300, 'Oath of Torment', 'Swear', 'rgba(255,80,80,0.5)'));
@@ -905,12 +946,13 @@ export class Game implements WorldHost {
       this.withMember(m, () => {
         const level = this.levelOf(m);
         const esc = m.profile.stats.escapes > 0;
-        run.deathDefiance += m.profile.talents.undying ?? 0;
         if (hasFeature(level, 'gear', esc)) run.deathDefiance += gearDefiance(equippedItems(m.profile.gear));
         run.artifacts[0] = hasFeature(level, 'artifacts', esc) ? m.profile.startArtifact || null : null;
         this.recomputeStats(true);
         m.player.castAmmo = m.stats.castAmmo;
         m.player.dashCharges = m.stats.dashCharges;
+        // Echoes start empty, unless the Deep Altar's Echo Well pre-fills them.
+        m.player.souls = m.stats.soulMax * Math.min(1, m.stats.soulStart);
       });
     }
     this.mode = 'run';
@@ -1204,7 +1246,8 @@ export class Game implements WorldHost {
     if (this.run) this.run.kills++;
     this.save.stats.kills++;
     this.save.bestiary[e.name] = (this.save.bestiary[e.name] ?? 0) + 1;
-    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { kill: e.name });
+    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { kill: e.name, ...(e.isBoss && { guardian: e.name, heat: this.run?.heat ?? 0 }) });
+    if (e.isBoss && this.run) this.awardPart(e.name, this.run.heat);
     this.checkAchievements();
     this.dropLoot(w, e);
     if (this.stats.lifeOnKill > 0) w.healPlayer(this.stats.lifeOnKill, false);
@@ -1303,13 +1346,13 @@ export class Game implements WorldHost {
   onInteract(w: World, it: Interactable): void {
     switch (it.kind) {
       case 'station':
-        if (it.id === 'weapons') screens.weapons(this);
+        if (it.id === 'smith') smithScreen(this);
         else if (it.id === 'mirror') screens.mirror(this);
         else if (it.id === 'artifacts') screens.artifactLoadout(this);
         else if (it.id === 'chronicle') screens.chronicle(this);
         else if (it.id === 'pact') screens.pact(this);
         else if (it.id === 'heroes') screens.heroes(this);
-        else if (it.id === 'ascension') screens.talents(this);
+        else if (it.id === 'ascension') screens.ascension(this);
         break;
       case 'npc':
         audio.play('select');
@@ -1689,15 +1732,15 @@ export class Game implements WorldHost {
     });
   }
 
-  unspentTalents(): number {
-    const spent = Object.values(this.save.talents).reduce((a, b) => a + b, 0);
-    return Math.max(0, this.level - 1 - spent);
-  }
-
-  /** Refreshes the Ascension station prompt after spending points. */
+  /** Refreshes the Ascension station prompt after spending points or changing hero. */
   refreshHubPrompts(): void {
     const it = this.world?.interactables.find((i) => i.id === 'ascension');
-    if (it) it.prompt = this.unspentTalents() > 0 ? `Spend talents (${this.unspentTalents()})` : 'Talents';
+    if (it) it.prompt = this.ascensionPrompt();
+  }
+
+  private ascensionPrompt(): string {
+    const n = this.unspentSkills();
+    return n > 0 ? `Skill tree (${n} point${n === 1 ? '' : 's'})` : 'Skill tree';
   }
 
   abandonRun(): void {

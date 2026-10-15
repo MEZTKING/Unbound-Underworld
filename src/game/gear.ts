@@ -5,7 +5,7 @@
 // they can't be starred up. Rare and better pieces drop with stars (each star
 // half as likely as the one before, capped by your level) and are starred up
 // with materials (1–5 gold stars, then 5 more that turn purple). Gear is kept
-// between escapes, equipped at the Armory, and salvaged for materials.
+// between escapes, equipped in the Hall of Heroes, and starred up or salvaged at the Blacksmith.
 
 import type { Rng } from '../engine/math';
 import { GHOST_STARS, PLAIN_TIER, STAR_CHANCE, STARRED_TIER, type DropSource } from './odds';
@@ -58,12 +58,12 @@ export const SLOT_GLYPH: Record<GearSlot, string> = { helmet: '⛑', armor: '⛨
 
 export type GearRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'unique' | 'ghost';
 export const GEAR_RARITY: Record<GearRarity, { name: string; color: string; affixes: number; power: number }> = {
-  common: { name: 'Common', color: '#d8d0c8', affixes: 1, power: 1 },
-  uncommon: { name: 'Uncommon', color: '#7ad87a', affixes: 2, power: 1.15 },
-  rare: { name: 'Rare', color: '#5ac8ff', affixes: 2, power: 1.3 },
-  epic: { name: 'Epic', color: '#c86bff', affixes: 3, power: 1.55 },
-  legendary: { name: 'Legendary', color: '#ffb14a', affixes: 4, power: 1.85 },
-  unique: { name: 'Unique', color: '#ff5a7a', affixes: 4, power: 2.1 },
+  common: { name: 'Common', color: '#cfcac4', affixes: 1, power: 1 },
+  uncommon: { name: 'Uncommon', color: '#5fd35f', affixes: 2, power: 1.15 },
+  rare: { name: 'Rare', color: '#4aa8ff', affixes: 2, power: 1.3 },
+  epic: { name: 'Epic', color: '#b45cff', affixes: 3, power: 1.55 },
+  legendary: { name: 'Legendary', color: '#ffb02e', affixes: 4, power: 1.85 },
+  unique: { name: 'Unique', color: '#ff4a6a', affixes: 4, power: 2.1 },
   ghost: { name: 'Ghost', color: '#9ff7ff', affixes: 5, power: 2.5 },
 };
 /** Tiers from worst to best. */
@@ -166,7 +166,7 @@ export const AFFIXES: Record<AffixId, AffixDef> = {
   guard: { name: (v) => `−${pct(v)} damage taken`, base: 0.03, slots: ['armor', 'legs', 'helmet'], apply: (s, v) => (s.damageTaken *= 1 - v) },
   dash: { name: (v) => `−${pct(v)} dash recharge`, base: 0.06, slots: ['boots'], apply: (s, v) => (s.dashRecharge *= 1 - v) },
   gold: { name: (v) => `+${pct(v)} obols found`, base: 0.06, apply: (s, v) => (s.goldMult += v) },
-  souls: { name: (v) => `+${pct(v)} souls gathered`, base: 0.08, slots: ['helmet', 'armor'], apply: (s, v) => (s.soulGain += v) },
+  souls: { name: (v) => `+${pct(v)} Echoes gathered`, base: 0.08, slots: ['helmet', 'armor'], apply: (s, v) => (s.soulGain += v) },
   wrath: { name: (v) => `+${pct(v)} Wrath gain`, base: 0.06, slots: ['helmet'], apply: (s, v) => (s.wrathGain += v) },
   potion: { name: (v) => `+${pct(v)} potion healing`, base: 0.06, slots: ['armor'], apply: (s, v) => (s.potionHeal += v) },
 };
@@ -285,10 +285,26 @@ export function rollGhost(rng: Rng, playerLevel: number): GearItem {
   return rollStarred(rng, 'ghost', playerLevel);
 }
 
-/** A crafted piece: plain recipes give Common/Uncommon, the others a 1-star piece of their tier. */
-export function craftGear(rng: Rng, recipe: (typeof CRAFTS)[number]): GearItem {
+/** A crafted piece (of the chosen slot, if any): plain recipes give Common/Uncommon, the others a 1-star piece of their tier. */
+export function craftGear(rng: Rng, recipe: (typeof CRAFTS)[number], slot?: GearSlot): GearItem {
   const rarity = pickTier(rng, recipe.tiers);
-  return makeGear(rng, rarity, isStarredTier(rarity) ? 1 : 0);
+  return makeGear(rng, rarity, isStarredTier(rarity) ? 1 : 0, slot);
+}
+
+/** Materials to reforge a piece (roll its bonuses anew). */
+export function reforgeCost(item: GearItem): Materials {
+  const t = rarityRank(item.rarity);
+  const cost: Materials = { bone: 15 + t * 10 };
+  if (t >= 2) cost.ember = 3 + t;
+  if (t >= 3) cost.scale = t - 1;
+  if (t >= 4) cost.pearl = 2 * t;
+  return cost;
+}
+
+/** Rolls a piece's bonuses again: same tier, slot, stars and perk; new bonuses and rolls. */
+export function reforgeGear(rng: Rng, item: GearItem): void {
+  const fresh = makeGear(rng, item.rarity, item.level, item.slot);
+  item.affixes = fresh.affixes;
 }
 
 /**
@@ -355,11 +371,12 @@ export function salvageValue(item: GearItem): Materials {
   return { bone: 3 + r * 3 + item.level * 2, ...(r >= 3 ? { scale: r - 2 + (item.level > 5 ? item.level - 5 : 0) } : {}) };
 }
 
-/** Crafting recipes: the tiers each can make. Legendary pieces can't be crafted (guardians only). */
-export const CRAFTS: { name: string; tiers: Partial<Record<GearRarity, number>>; cost: Materials }[] = [
-  { name: 'Craft a plain piece', tiers: { common: 0.7, uncommon: 0.3 }, cost: { bone: 25, ember: 6 } },
-  { name: 'Craft a fine piece (1★ Rare)', tiers: { rare: 1 }, cost: { bone: 40, ichor: 6 } },
-  { name: 'Craft a grand piece (1★ Epic)', tiers: { epic: 1 }, cost: { bone: 60, pearl: 6, scale: 3 } },
+/** The Blacksmith's recipes, and the forge part each needs. Unique and Ghost pieces can't be crafted. */
+export const CRAFTS: { name: string; tiers: Partial<Record<GearRarity, number>>; cost: Materials; part: 'crucible' | 'bellows' | 'heart' }[] = [
+  { name: 'Plain piece', tiers: { common: 0.7, uncommon: 0.3 }, cost: { bone: 25, ember: 6 }, part: 'crucible' },
+  { name: 'Fine piece (1★ Rare)', tiers: { rare: 1 }, cost: { bone: 40, ichor: 6 }, part: 'crucible' },
+  { name: 'Grand piece (1★ Epic)', tiers: { epic: 1 }, cost: { bone: 60, pearl: 6, scale: 3 }, part: 'bellows' },
+  { name: 'Legendary piece (1★ Legendary)', tiers: { legendary: 1 }, cost: { bone: 140, pearl: 18, scale: 12 }, part: 'heart' },
 ];
 export const CRAFT_COST = CRAFTS[0].cost;
 

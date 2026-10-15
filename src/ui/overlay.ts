@@ -26,7 +26,7 @@ const GLOSSARY: [RegExp, string, string][] = [
   [/\bWrath\b/, 'Wrath', "Fill the gauge by fighting, then unleash your hero's ultimate."],
   [/\barmor\b/i, 'Armor', 'Must be broken before health takes damage. Breaking it stuns.'],
   [/\bencounter|chamber/i, 'Chamber', 'One room of the Underworld. Most must be cleared of foes to go on.'],
-  [/\bsouls?\b/i, 'Souls', 'Gathered from fallen foes; some artifacts spend them.'],
+  [/\bEchoes\b/, 'Echoes', 'Left behind by fallen foes; some artifacts spend them. The gauge starts each escape empty.'],
 ];
 
 function glossaryFor(texts: string[]): string {

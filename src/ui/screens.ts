@@ -5,17 +5,20 @@ import { BIOMES } from '../game/rooms';
 import { ACHIEVEMENTS, BESTIARY, foeRegions, type FoeEntry } from '../game/codex';
 import { ENCHANT_BY_ID } from '../game/enchants';
 import type { Game, RunSummary } from '../game/game';
-import { CHARACTERS, characterUnlocked, heroForWeapon, type CharacterId, type GuardStyle, type Palette } from '../game/characters';
-import { clearSave, currentSlot, eraseSlot, heatScale, loadSave, nextCost, peekSlot, rank, setSlot, slotHasRun, SLOTS, UPGRADES, WEAPON_IDS, writeSave } from '../game/meta';
-import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS } from '../game/progression';
-import type { AbilitySlot, WeaponId } from '../game/types';
+import { CHARACTERS, characterUnlocked, type CharacterId, type GuardStyle, type Palette } from '../game/characters';
+import { clearSave, currentSlot, eraseSlot, heatScale, loadSave, peekSlot, setSlot, slotHasRun, SLOTS, writeSave } from '../game/meta';
+import { FORGE, levelFromXp, UNLOCKS } from '../game/progression';
+import { HERO_MAX_LEVEL, HERO_TREES, heroLevelFromXp, heroPoints, spentSkill } from '../game/herotree';
+import { ascension } from './progress';
+export { altar as mirror, ascension } from './progress';
+import type { AbilitySlot } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
 import { CAN_EXIT, exitGame, getWindowMode, HAS_WINDOW_MODES, setWindowMode, type WindowMode } from '../platform';
 import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
 import { BINDABLE, keyLabel, type Action } from '../engine/input';
 import { devMenu } from './dev';
-import { gearScreen } from './gear';
-import { GEAR_RARITY, MATERIAL_IDS, MATERIALS } from '../game/gear';
+import { gearScreen, starsHtml } from './gear';
+import { GEAR_RARITY, GEAR_SLOTS, MATERIAL_IDS, MATERIALS, SLOT_GLYPH, SLOT_NAME } from '../game/gear';
 import { mapScreen } from './map';
 import { leaveOnline, multiplayer } from './multiplayer';
 import { esc, type Card } from './overlay';
@@ -342,8 +345,8 @@ export function help(g: Game, intro = false): void {
       (let go on the flash for a Perfect). Use your Special right out of a chain for a stronger <b>combo special</b>.
       Hits in a row build your <b>combo</b>. Each hero is a class with their own weapon.</p>
       <p>Every foe and chamber earns <b>experience</b>. Levelling up unlocks new skills one at a time — the Potion, Cast,
-      Artifacts, Jump, Enchantments and finally your hero's <b>Wrath</b> — and gives a talent point to spend at <b>Ascension</b>.</p>
-      <p>When you fall, you return to the Hall of Shades. <b>Ash</b> you gathered is kept — spend it at the Altar or the Armory.</p>
+      Artifacts, Jump, Enchantments and finally your hero's <b>Wrath</b>. Each level also makes every hero sturdier, and the hero you play grows too: their skill points are spent at <b>Ascension</b>.</p>
+      <p>When you fall, you return to the Hall of Shades. <b>Ash</b> you gathered is kept: spend it at the Altar of Ashes, or with the Blacksmith.</p>
       ${document.body.classList.contains('touch') ? touchControls(g) : keyControls(g)}
       <button class="btn primary" data-nav data-a="ok">Got it</button>
     </div>`,
@@ -644,7 +647,7 @@ function spoilsHtml(sp: RunSummary['spoils']): string {
   const mats = MATERIAL_IDS.filter((k) => sp.materials[k]).map((k) => `<span class="mat" style="--c:${MATERIALS[k].color}"><b>${MATERIALS[k].glyph}</b>${sp.materials[k]}<small>${esc(MATERIALS[k].name)}</small></span>`);
   const gear = sp.gear.map((it) => `<span class="spoil-gear" style="color:${GEAR_RARITY[it.rarity].color}">${esc(it.name)}</span>`);
   if (!mats.length && !gear.length) return '';
-  return `<h3 class="section">Spoils</h3><div class="mats">${mats.join('')}</div>${gear.length ? `<div class="spoils-gear">${gear.join('')}</div><p class="small">Equip new gear at the Armory or from the pause menu.</p>` : ''}`;
+  return `<h3 class="section">Spoils</h3><div class="mats">${mats.join('')}</div>${gear.length ? `<div class="spoils-gear">${gear.join('')}</div><p class="small">Equip new gear in the Hall of Heroes or from the pause menu.</p>` : ''}`;
 }
 
 /** The end-of-escape button: online guests wait for the host to take everyone back. */
@@ -703,84 +706,18 @@ export function victory(g: Game, s: RunSummary): void {
 
 // ---------------------------------------------------------------- hub stations
 
-/** The Armory: each class's signature weapon, forged stronger with Ash. Weapons come with their heroes. */
-export function weapons(g: Game): void {
-  const render = () =>
-    WEAPON_IDS.map((id) => {
-      const info = WEAPON_INFO[id];
-      const hero = heroForWeapon(id);
-      const owned = characterUnlocked(hero, g.save, g.level);
-      const sel = g.save.weapon === id;
-      const tier = g.save.forge[id] ?? 1;
-      const note = sel ? `Wielding · ${hero.name}` : owned ? `Take up as ${hero.name}` : `Locked: ${hero.unlock?.text ?? ''}`;
-      const can = owned;
-      const next = owned ? nextForge(tier) : null;
-      const forgeOk = next && g.level >= next.level && g.save.ash >= next.cost;
-      const forge = owned
-        ? next
-          ? `<button class="btn forge${forgeOk ? '' : ' disabled'}" data-nav data-f="${id}">Forge ${esc(next.name)} — ${next.cost} ◆${g.level < next.level ? ` · Lv ${next.level}` : ''}<small>${esc(next.desc)}</small></button>`
-          : '<div class="forge-max">Mythic — fully forged</div>'
-        : '';
-      return `<div class="weapon-row"><button class="card${can ? '' : ' disabled'}" data-nav data-w="${id}" style="--c:${info.color}">
-          <div class="card-body"><div class="card-head"><span class="card-title">${esc(info.name)}${owned ? ` <span class="tierpip">${'★'.repeat(tier)}</span>` : ''}</span><span class="card-tag" style="--t:${sel ? '#7dff8a' : info.color}">${esc(note)}</span></div>
-          <div class="card-sub">${esc(hero.role)}'s weapon</div>
-          <div class="card-desc">${esc(info.blurb)}</div></div></button>${forge}</div>`;
-    }).join('');
-  const el = g.ui.push(
-    'station',
-    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Every class has its own weapon: pick a weapon to play its hero. Forge weapons stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards list" data-list>${render()}</div>
-      ${g.has('gear') ? '<button class="btn primary" data-nav data-a="gear">Gear &amp; Inventory</button>' : `<p class="small">Gear (helmets, armor, leggings and boots) unlocks here at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}.</p>`}
-      <button class="btn" data-nav data-a="back">Back</button></div>`,
-    { onBack: () => g.ui.pop() },
-  );
-  const refresh = () => {
-    el.querySelector('[data-list]')!.innerHTML = render();
-    el.querySelector('[data-ash]')!.textContent = `${g.save.ash}`;
-    g.ui.refreshItems();
-    wire();
-  };
-  const wire = () => {
-    bind(el, '[data-w]', (b) => {
-      const hero = heroForWeapon(b.dataset.w as WeaponId);
-      if (!characterUnlocked(hero, g.save, g.level)) {
-        audio.play('deny');
-        return;
-      }
-      audio.play('boon');
-      g.selectCharacter(hero.id);
-      refresh();
-    });
-    bind(el, '[data-f]', (b) => {
-      const id = b.dataset.f as WeaponId;
-      const next = nextForge(g.save.forge[id] ?? 1);
-      if (!next || g.level < next.level || g.save.ash < next.cost) {
-        audio.play('deny');
-        return;
-      }
-      g.save.ash -= next.cost;
-      g.save.forge[id] = next.tier;
-      g.persist();
-      g.recomputeStats();
-      audio.play('boon');
-      g.ui.toast(`${WEAPON_INFO[id].name} forged to ${next.name}!`);
-      refresh();
-    });
-    bind(el, '[data-a]', (b) => (b.dataset.a === 'gear' ? gearScreen(g) : g.ui.pop()));
-  };
-  wire();
-}
-
-// ---------------------------------------------------------------- heroes & talents
+// ---------------------------------------------------------------- heroes
 
 const GUARD_LABEL: Record<GuardStyle, string> = {
   parry: 'Guard: blade parry',
   shield: 'Guard: tower shield (Attack while guarding to bash)',
   evade: 'Guard: evasive sidestep',
   catch: 'Guard: catch and counter',
-  mist: 'Guard: mist form (blocked hits become souls)',
+  mist: 'Guard: mist form (blocked hits become Echoes)',
 };
 
-export function heroes(g: Game): void {
+/** Choosing which hero to play (from the Hall of Heroes). */
+function heroPicker(g: Game, after: () => void): void {
   const render = () =>
     CHARACTERS.map((c) => {
       const open = characterUnlocked(c, g.save, g.level);
@@ -799,9 +736,14 @@ export function heroes(g: Game): void {
     `<div class="panel wide"><h2 class="title" style="color:#ff8a6e">Hall of Heroes</h2>
       <div class="subtitle">Each hero is a class: their own weapon, guard style, strengths and Wrath ultimate. More classes open as you rank up.</div>
       <div class="cards grid" data-list>${render()}</div>
-      <button class="btn" data-nav data-a="look">Customise appearance</button>
       <button class="btn" data-nav data-a="back">Back</button></div>`,
-    { onBack: () => g.ui.pop(), cols: 2 },
+    {
+      onBack: () => {
+        g.ui.pop();
+        after();
+      },
+      cols: 2,
+    },
   );
   const wire = () => {
     bind(el, '[data-c]', (b) => {
@@ -813,11 +755,73 @@ export function heroes(g: Game): void {
       }
       audio.play('boon');
       g.selectCharacter(id);
-      el.querySelector('[data-list]')!.innerHTML = render();
-      g.ui.refreshItems();
-      wire();
+      g.ui.pop();
+      after();
     });
-    bind(el, '[data-a]', (b) => (b.dataset.a === 'look' ? customise(g) : g.ui.pop()));
+    bind(el, '[data-a]', () => {
+      g.ui.pop();
+      after();
+    });
+  };
+  wire();
+}
+
+/**
+ * The Hall of Heroes: the hero you play, all in one place. Their class and
+ * Wrath, their weapon (forged at the Blacksmith), the armour they wear and
+ * their skill tree, with buttons to switch hero, change gear and customise.
+ */
+export function heroes(g: Game): void {
+  const render = () => {
+    const def = g.me.player.hero;
+    const info = WEAPON_INFO[def.weapon];
+    const tier = g.save.forge[def.weapon] ?? 1;
+    const forge = FORGE.find((f) => f.tier === tier)!;
+    const lv = heroLevelFromXp(g.save.heroXp[def.id] ?? 0);
+    const ranks = g.save.skills[def.id] ?? {};
+    const free = heroPoints(lv.level) - spentSkill(ranks);
+    const taken = HERO_TREES[def.id].nodes.filter((n) => (ranks[n.id] ?? 0) > 0);
+    const worn = GEAR_SLOTS.map((slot) => {
+      const item = g.save.gear.items.find((i) => i.uid === g.save.gear.equipped[slot]);
+      return item
+        ? `<li class="tier-${item.rarity}" style="--c:${GEAR_RARITY[item.rarity].color}"><b>${SLOT_GLYPH[slot]}</b> ${esc(item.name)} ${starsHtml(item.level)}</li>`
+        : `<li class="empty"><b>${SLOT_GLYPH[slot]}</b> ${SLOT_NAME[slot]}: empty</li>`;
+    }).join('');
+    const pct = lv.need ? Math.round((lv.into / lv.need) * 100) : 100;
+    return `<div class="hero-sheet" style="--c:${def.color}">
+      <div class="hero-head"><div><h3>${esc(def.name)}</h3><small>${esc(def.title)} · <b>${esc(def.role)}</b></small></div>
+        <div class="hero-level">Hero level ${lv.level}${lv.level >= HERO_MAX_LEVEL ? ' (max)' : ''}<span class="bar"><i style="width:${pct}%"></i></span></div></div>
+      <div class="mp-grid">
+        <section><h3>Class</h3><p class="small">${esc(def.blurb)}</p><ul class="perks">${def.perks.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+          <p class="small">${esc(GUARD_LABEL[def.guard])}</p><p class="small"><b>Wrath: ${esc(def.wrath.name)}</b>: ${esc(def.wrath.desc)}${g.stats.canWrath ? '' : ' (unlocks at level 10)'}</p></section>
+        <section><h3 style="color:${info.color}">${esc(info.name)} <span class="tierpip">${'★'.repeat(tier)}</span></h3><p class="small">${esc(info.blurb)}</p>
+          <p class="small"><b>${esc(forge.name)}</b>: ${esc(forge.desc)}. Forge it stronger at the Blacksmith.</p></section>
+        <section><h3>Armour</h3>${g.has('gear') ? `<ul class="worn">${worn}</ul><button class="btn" data-nav data-a="gear">Change gear</button>` : `<p class="small">Gear unlocks at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}.</p>`}</section>
+        <section><h3>Skills</h3>${taken.length ? `<ul class="worn">${taken.map((n) => `<li><b>${n.glyph}</b> ${esc(n.name)} <small>${ranks[n.id]}/${n.max}</small></li>`).join('')}</ul>` : '<p class="small">No skills yet.</p>'}
+          <p class="small">${free > 0 ? `<b>${free}</b> point${free === 1 ? '' : 's'} to spend.` : 'Play this hero to earn more skill points.'}</p><button class="btn" data-nav data-a="skills">Skill tree</button></section>
+      </div></div>`;
+  };
+  const el = g.ui.push(
+    'station',
+    `<div class="panel wide"><h2 class="title" style="color:#ff8a6e">Hall of Heroes</h2>
+      <div data-list>${render()}</div>
+      <div class="row-btns"><button class="btn primary" data-nav data-a="switch">Switch hero</button><button class="btn" data-nav data-a="look">Customise appearance</button><button class="btn" data-nav data-a="back">Back</button></div></div>`,
+    { onBack: () => g.ui.pop() },
+  );
+  const refresh = () => {
+    el.querySelector('[data-list]')!.innerHTML = render();
+    g.ui.refreshItems();
+    wire();
+  };
+  const wire = () => {
+    bind(el, '[data-a]', (b) => {
+      const a = b.dataset.a;
+      if (a === 'switch') heroPicker(g, refresh);
+      else if (a === 'look') customise(g);
+      else if (a === 'gear') gearScreen(g);
+      else if (a === 'skills') ascension(g);
+      else g.ui.pop();
+    });
   };
   wire();
 }
@@ -919,112 +923,6 @@ function drawPreview(g: Game, c: HTMLCanvasElement): void {
   }
 }
 
-export function talents(g: Game): void {
-  const render = () => {
-    const level = g.level;
-    const free = talentPoints(level) - spentPoints(g.save.talents);
-    const prog = levelFromXp(g.save.xp);
-    const head = `<div class="subtitle">Level <b>${level}</b> · <span style="color:${tierFor(level).color}">${tierFor(level).name}</span> · ${prog.need ? `${prog.into}/${prog.need} XP to next level` : 'Max level'} · <b>${free}</b> point${free === 1 ? '' : 's'} to spend</div>`;
-    const rows = TIERS.map((tier, ti) => {
-      const open = level >= tier.level;
-      const items = TALENTS.filter((t) => t.tier === ti)
-        .map((t) => {
-          const r = g.save.talents[t.id] ?? 0;
-          const can = canRaiseTalent(level, g.save.talents, t.id);
-          const pips = Array.from({ length: t.max }, (_, i) => `<i class="${i < r ? 'on' : ''}"></i>`).join('');
-          return `<button class="upg${can ? '' : ' disabled'}" data-nav data-tal="${t.id}">
-            <span class="glyph" style="color:${tier.color}">${t.glyph}</span>
-            <span class="uname">${esc(t.name)}<small>${esc(t.desc(Math.max(1, r)))}</small></span>
-            <span class="pips">${pips}</span>
-            <span class="cost">${r >= t.max ? 'MAX' : open ? '+1' : `Lv ${tier.level}`}</span></button>`;
-        })
-        .join('');
-      return `<h3 class="section" style="color:${open ? tier.color : '#6a5a68'}">${tier.name} <small>${open ? '' : `· unlocks at level ${tier.level}`}</small></h3><div class="upgrades">${items}</div>`;
-    }).join('');
-    return head + rows;
-  };
-  const el = g.ui.push(
-    'station',
-    `<div class="panel wide"><h2 class="title" style="color:#ffe68a">Ascension</h2>
-      <div data-list>${render()}</div>
-      <div class="row-btns"><button class="btn ghost" data-nav data-a="reset">Reset talents (free)</button><button class="btn" data-nav data-a="back">Back</button></div></div>`,
-    { onBack: () => g.ui.pop() },
-  );
-  const refresh = () => {
-    el.querySelector('[data-list]')!.innerHTML = render();
-    g.recomputeStats(true);
-    g.refreshHubPrompts();
-    g.persist();
-    g.ui.refreshItems();
-    wire();
-  };
-  const wire = () => {
-    bind(el, '[data-tal]', (b) => {
-      const id = b.dataset.tal!;
-      if (!canRaiseTalent(g.level, g.save.talents, id)) {
-        audio.play('deny');
-        return;
-      }
-      g.save.talents[id] = (g.save.talents[id] ?? 0) + 1;
-      audio.play('boon');
-      refresh();
-    });
-    bind(el, '[data-a]', (b) => {
-      if (b.dataset.a === 'reset') {
-        g.save.talents = {};
-        audio.play('select');
-        refresh();
-      } else g.ui.pop();
-    });
-  };
-  wire();
-}
-
-export function mirror(g: Game): void {
-  const render = () =>
-    UPGRADES.map((u) => {
-      const r = rank(g.save, u.id);
-      const cost = nextCost(g.save, u);
-      const pips = u.costs.map((_, i) => `<i class="${i < r ? 'on' : ''}"></i>`).join('');
-      const can = cost !== null && g.save.ash >= cost;
-      return `<button class="upg${can ? '' : ' disabled'}" data-nav data-u="${u.id}">
-        <span class="glyph">${u.glyph}</span>
-        <span class="uname">${esc(u.name)}<small>${esc(u.desc(Math.max(1, r)))}</small></span>
-        <span class="pips">${pips}</span>
-        <span class="cost">${cost === null ? 'MAX' : `${cost} ◆`}</span>
-      </button>`;
-    }).join('');
-  const el = g.ui.push(
-    'station',
-    `<div class="panel wide"><h2 class="title" style="color:#c8a8ff">Altar of Ashes</h2>
-      <div class="subtitle">Ash: <b data-ash>${g.save.ash}</b> ◆ — permanent strength for every escape.</div>
-      <div class="upgrades" data-list>${render()}</div>
-      <button class="btn" data-nav data-a="back">Back</button></div>`,
-    { onBack: () => g.ui.pop() },
-  );
-  const wire = () => {
-    bind(el, '[data-u]', (b) => {
-      const def = UPGRADES.find((u) => u.id === b.dataset.u)!;
-      const cost = nextCost(g.save, def);
-      if (cost === null || g.save.ash < cost) {
-        audio.play('deny');
-        return;
-      }
-      g.save.ash -= cost;
-      g.save.upgrades[def.id] = rank(g.save, def.id) + 1;
-      g.persist();
-      g.recomputeStats(true);
-      audio.play('boon');
-      el.querySelector('[data-list]')!.innerHTML = render();
-      el.querySelector('[data-ash]')!.textContent = `${g.save.ash}`;
-      g.ui.refreshItems();
-      wire();
-    });
-    bind(el, '[data-a]', () => g.ui.pop());
-  };
-  wire();
-}
-
 export function artifactLoadout(g: Game): void {
   const render = () =>
     ARTIFACTS.map((a) => {
@@ -1035,7 +933,7 @@ export function artifactLoadout(g: Game): void {
       return `<button class="card small${can ? '' : ' disabled'}" data-nav data-id="${a.id}" style="--c:${a.color}">
         <div class="card-icon">${a.glyph}</div>
         <div class="card-body"><div class="card-head"><span class="card-title">${esc(a.name)}</span><span class="card-tag" style="--t:${sel ? '#7dff8a' : a.color}">${esc(label)}</span></div>
-        <div class="card-desc">${esc(a.desc)} ${a.souls ? `(${a.souls} souls)` : `(${a.cooldown}s)`}</div></div></button>`;
+        <div class="card-desc">${esc(a.desc)} ${a.souls ? `(${a.souls} Echoes)` : `(${a.cooldown}s)`}</div></div></button>`;
     }).join('');
   const el = g.ui.push(
     'station',

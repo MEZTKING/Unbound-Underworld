@@ -638,8 +638,8 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       const hover = y - 10 + Math.sin(w.time * 4 + pk.x) * 3;
       // A soft beam marks gear so it isn't missed.
       if (l.gear) {
-        // Unique and Ghost pieces throw up a taller, pulsing beam.
-        const top = l.gear.rarity === 'ghost' || l.gear.rarity === 'unique';
+        // Legendary, Unique and Ghost pieces throw up a taller, pulsing beam.
+        const top = l.gear.rarity === 'ghost' || l.gear.rarity === 'unique' || l.gear.rarity === 'legendary';
         const bh = top ? 140 : 60;
         const bw = top ? 10 : 6;
         ctx.save();
@@ -659,6 +659,28 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.stroke();
+      // Special frames: a gilded double ring for Legendary, a circling spectral ring for Ghost.
+      if (l.gear?.rarity === 'legendary') {
+        ctx.strokeStyle = '#fff2c0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(pk.x, hover, size + 4, 0, TAU);
+        ctx.stroke();
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * TAU + w.time * 0.6;
+          ctx.fillStyle = '#ffe08a';
+          ctx.fillRect(pk.x + Math.cos(a) * (size + 4) - 2, hover + Math.sin(a) * (size + 4) - 2, 4, 4);
+        }
+      } else if (l.gear?.rarity === 'ghost') {
+        ctx.save();
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.5 + Math.sin(w.time * 6) * 0.3;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(pk.x, hover, size + 5, w.time * 2, w.time * 2 + TAU * 0.6);
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.fillStyle = color;
       ctx.font = `700 ${Math.round(size * 1.1)}px Georgia, serif`;
       ctx.textAlign = 'center';
@@ -826,21 +848,43 @@ function drawStation(ctx: CanvasRenderingContext2D, it: Interactable, t: number)
     ctx.fill();
     return;
   }
-  if (it.id === 'weapons') {
+  if (it.id === 'smith') {
+    // The Blacksmith's corner: a furnace glowing behind, an anvil, and the smith.
+    ctx.fillStyle = '#2a1e1a';
+    ctx.fillRect(-58, -92, 48, 92);
     ctx.fillStyle = '#3a2a24';
-    ctx.fillRect(-46, -70, 92, 10);
-    ctx.fillRect(-46, -20, 92, 8);
-    ctx.fillRect(-46, -76, 6, 76);
-    ctx.fillRect(40, -76, 6, 76);
-    const colors = ['#ff5a6a', '#ffb14a', '#8ad0ff'];
-    colors.forEach((c, i) => {
-      ctx.strokeStyle = c;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(-26 + i * 26, -12);
-      ctx.lineTo(-26 + i * 26, -90);
-      ctx.stroke();
-    });
+    ctx.fillRect(-62, -98, 56, 10);
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = ctx.createRadialGradient(-34, -30, 2, -34, -30, 34);
+    glow.addColorStop(0, `rgba(255,160,70,${0.75 + Math.sin(t * 6) * 0.15})`);
+    glow.addColorStop(1, 'rgba(255,80,20,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-70, -66, 72, 72);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#ff9a4a';
+    ctx.fillRect(-46, -40, 24, 18);
+    // Anvil
+    ctx.fillStyle = '#4a4a56';
+    ctx.fillRect(4, -30, 44, 10);
+    ctx.fillRect(16, -20, 20, 14);
+    ctx.fillRect(8, -6, 36, 6);
+    ctx.beginPath();
+    ctx.moveTo(48, -30);
+    ctx.lineTo(60, -26);
+    ctx.lineTo(48, -22);
+    ctx.fill();
+    // The smith
+    ctx.fillStyle = '#5a3a2a';
+    ctx.fillRect(48, -62, 22, 34);
+    ctx.fillStyle = '#d8a888';
+    ctx.fillRect(52, -78, 14, 14);
+    ctx.fillStyle = '#8a8a96';
+    ctx.save();
+    ctx.translate(46, -56);
+    ctx.rotate(-0.6 + Math.max(0, Math.sin(t * 3)) * 0.9);
+    ctx.fillRect(-2, -16, 4, 18);
+    ctx.fillRect(-6, -20, 12, 6);
+    ctx.restore();
     return;
   }
   if (it.id === 'artifacts') {

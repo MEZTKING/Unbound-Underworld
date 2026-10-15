@@ -193,7 +193,7 @@ export const ARTIFACTS: ArtifactDef[] = [
     name: 'Spirit Lantern',
     glyph: '♁',
     color: '#7fe8ff',
-    desc: 'Spend 30 souls: a lantern spirit fights at your side for 14 seconds.',
+    desc: 'Spend 30 Echoes: a lantern spirit fights at your side for 14 seconds.',
     cooldown: 4,
     souls: 30,
     unlock: 35,
@@ -206,10 +206,10 @@ export const ARTIFACTS: ArtifactDef[] = [
   },
   {
     id: 'soul_reaper',
-    name: 'Soul Reaper',
+    name: 'Echo Reaper',
     glyph: '☽',
     color: '#7fe8ff',
-    desc: 'Spend 40 souls: unleash a soul burst dealing 120 damage around you.',
+    desc: 'Spend 40 Echoes: unleash a burst of echoes dealing 120 damage around you.',
     cooldown: 2,
     souls: 40,
     unlock: 35,
@@ -227,7 +227,7 @@ export const ARTIFACTS: ArtifactDef[] = [
     name: 'Void Prism',
     glyph: '⌖',
     color: '#c86bff',
-    desc: 'Channel a searing soul beam toward your aim. Drains souls while active.',
+    desc: 'Channel a searing beam toward your aim. Drains Echoes while active.',
     cooldown: 1,
     souls: 10,
     unlock: 50,
@@ -257,7 +257,7 @@ export function useArtifact(w: World, slot: number): void {
   }
   if (def.souls && p.souls < def.souls) {
     audio.play('deny');
-    w.particles.text(p.x, p.y, 80, 'Not enough souls', '#7fe8ff', 14);
+    w.particles.text(p.x, p.y, 80, 'Not enough Echoes', '#7fe8ff', 14);
     return;
   }
   if (!def.use(w)) {

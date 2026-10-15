@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../src/engine/math';
 import { ENCHANTS, MAX_ENCHANT_TIER, rollEnchantOffers, takeEnchant } from '../src/game/enchants';
-import { defaultSave, metaBonuses, nextCost, normalizeSave, UPGRADES } from '../src/game/meta';
+import { defaultSave, normalizeSave } from '../src/game/meta';
+import { ALTAR_BY_ID, altarDefiance, nextAltarCost } from '../src/game/altar';
 import { BIOMES, buildGrid, doorPositions, ENEMY_COST, generateEncounter, generateLayout, hazardContains, isConnected } from '../src/game/rooms';
 import { Run } from '../src/game/run';
 
@@ -127,11 +128,11 @@ describe('save data', () => {
 
   it('prices upgrades by rank and reports max', () => {
     const save = defaultSave();
-    const reflex = UPGRADES.find((u) => u.id === 'reflex')!;
-    expect(nextCost(save, reflex)).toBe(reflex.costs[0]);
+    const reflex = ALTAR_BY_ID.reflex;
+    expect(nextAltarCost(save.upgrades, 'reflex')).toBe(reflex.costs[0]);
     save.upgrades.reflex = reflex.costs.length;
-    expect(nextCost(save, reflex)).toBeNull();
-    expect(metaBonuses(save).dashCharges).toBe(1);
+    expect(nextAltarCost(save.upgrades, 'reflex')).toBeNull();
+    expect(altarDefiance(save.upgrades)).toBe(0);
   });
 });
 

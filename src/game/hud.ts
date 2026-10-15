@@ -207,7 +207,7 @@ export function drawHUD(
       ctx.textAlign = 'left';
       ctx.fillStyle = '#7fe8ff';
       ctx.font = `700 11px ${FONT}`;
-      ctx.fillText(`SOULS ${Math.floor(p.souls)}`, hx, hy + 44);
+      ctx.fillText(`ECHOES ${Math.floor(p.souls)}`, hx, hy + 44);
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(hx + 80, hy + 37, bw - 80, 8);
       ctx.fillStyle = '#7fe8ff';
@@ -231,7 +231,7 @@ export function setPartnerShown(on: boolean): void {
 
 /**
  * Local co-op: the second player's own panel, bottom-right in their party
- * colour (health, wrath, cast shards, dash charges, potion and souls). Draw
+ * colour (health, wrath, cast shards, dash charges, potion and Echoes). Draw
  * it while that hero is the world's active one.
  */
 export function drawPartnerHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null, vw: number, vh: number, name: string, color: string): void {
@@ -282,7 +282,7 @@ export function drawPartnerHUD(ctx: CanvasRenderingContext2D, w: World, run: Run
     ctx.fillStyle = k >= 1 ? '#ffd04a' : '#c89a30';
     ctx.fillRect(hx, by + 17, bw * k, 4);
   }
-  // Shards, dash charges, potion and souls on one row.
+  // Shards, dash charges, potion and Echoes on one row.
   const ry = by + 38;
   ctx.font = `700 10px ${FONT}`;
   ctx.fillStyle = '#c8b8c0';
@@ -340,8 +340,8 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
   ctx.textAlign = 'left';
   ctx.fillStyle = '#7fe8ff';
   ctx.font = `700 11px ${FONT}`;
-  ctx.fillText(`SOULS ${Math.floor(p.souls)}`, sx, sy - 6);
-  tip(sx + 60, sy - 4, 62, 'Souls', `Slain foes drop souls (up to ${s.soulMax}). They fuel your artifacts: using one costs the souls shown on it. Each escape starts with a full gauge.`, '#7fe8ff');
+  ctx.fillText(`ECHOES ${Math.floor(p.souls)}`, sx, sy - 6);
+  tip(sx + 60, sy - 4, 62, 'Echoes', `Slain foes leave Echoes behind (up to ${s.soulMax}). They fuel your artifacts: using one costs the Echoes shown on it. The gauge starts empty each escape, so fight to fill it.`, '#7fe8ff');
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(sx, sy, 120, 8);
   ctx.fillStyle = '#7fe8ff';

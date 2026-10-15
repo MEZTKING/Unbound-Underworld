@@ -37,7 +37,7 @@ export interface HelloMsg {
   k: 'hello';
   name: string;
   character: CharacterId;
-  /** The player's save (JSON), for their upgrades, talents, gear and looks. */
+  /** The player's save (JSON), for their upgrades, skills, gear and looks. */
   profile: string;
 }
 

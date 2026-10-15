@@ -6,10 +6,13 @@ import { BOON_BY_ID, BOON_RARITY_BY_REGION, boonRarityOdds, BOONS, boonValue, GO
 import { CHARACTERS, heroForWeapon } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
 import { CHAINS, ECHO, ENCHANTS, MAX_ENCHANT_TIER, RADIANCE, RAMPAGING, STUNNING } from '../src/game/enchants';
-import { heatScale, UPGRADES, WEAPON_IDS } from '../src/game/meta';
+import { heatScale, WEAPON_IDS } from '../src/game/meta';
+import { ALTAR, ALTAR_BY_ID, altarTotal } from '../src/game/altar';
+import { HERO_MAX_LEVEL, HERO_TREES, heroPoints, heroXpForLevel, heroXpToNext, ROW_GATE } from '../src/game/herotree';
+import { SMITH_PARTS } from '../src/game/smith';
 import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
 import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, maxDropStars, minRoll, PERKS, RARITY_ORDER, regionMaterial, SLOT_NAME, starOdds, upgradeCost } from '../src/game/gear';
-import { FORGE, levelFromXp, MAX_LEVEL, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
+import { FORGE, levelBonus, levelFromXp, MAX_LEVEL, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
 import { BIOMES, ENEMY_COST } from '../src/game/rooms';
 import type { BossKind, EnemyKind, GodId, Rarity } from '../src/game/types';
@@ -38,13 +41,14 @@ line('## Contents');
 line();
 for (const [t, a] of [
   ['Progression: levels, ranks and unlocks', 'progression-levels-ranks-and-unlocks'],
-  ['Talents (Ascension)', 'talents-ascension'],
+  ['Hero skill trees (Ascension)', 'hero-skill-trees-ascension'],
   ['Heroes and Wrath', 'heroes-and-wrath'],
   ['Weapons, forging and anvil upgrades', 'weapons-forging-and-anvil-upgrades'],
   ['Gods and boons', 'gods-and-boons'],
   ['Enchantments', 'enchantments'],
   ['Artifacts', 'artifacts'],
-  ['Altar of Ashes (permanent upgrades)', 'altar-of-ashes-permanent-upgrades'],
+  ['Altar of Ashes (permanent upgrades for every hero)', 'altar-of-ashes-permanent-upgrades-for-every-hero'],
+  ['The Blacksmith', 'the-blacksmith'],
   ['Regions and guardians', 'regions-and-guardians'],
   ['Enemies', 'enemies'],
   ['Torment (difficulty)', 'torment-difficulty'],
@@ -56,7 +60,7 @@ line();
 // ---------------------------------------------------------------- progression
 line('## Progression: levels, ranks and unlocks');
 line();
-line(`Experience carries over between runs. Max level: **${MAX_LEVEL}**. One talent point per level after the first.`);
+line(`Experience carries over between runs. Max level: **${MAX_LEVEL}**. Every level gives every hero +1 max Health, and every fifth level +1% damage. Levels also open the Altar of Ashes' sections. The same experience raises the hero you play (see *Hero skill trees*).`);
 line();
 line('**Experience sources**');
 line();
@@ -70,13 +74,13 @@ table(
     ['Escape (final guardian)', XP.escape],
   ],
 );
-line('**Rank tiers** — each opens a new row of talents.');
+line('**Rank names**');
 line();
 table(['Rank', 'From level'], TIERS.map((t) => [t.name, t.level]));
 line('**Levels**');
 line();
 table(
-  ['Level', 'XP to next', 'Total XP', 'Rank', 'Talent points', 'Unlocks'],
+  ['Level', 'XP to next', 'Total XP', 'Rank', 'Bonus for every hero', 'Unlocks'],
   Array.from({ length: MAX_LEVEL }, (_, i) => {
     const lv = i + 1;
     const un = UNLOCKS.filter((u) => u.level === lv).map((u) => u.title);
@@ -85,8 +89,10 @@ table(
       ...CHARACTERS.filter((ch) => ch.unlock?.kind === 'level' && ch.unlock.n === lv).map((ch) => `Hero: ${ch.name}`),
       ...WEAPON_IDS.filter((w) => WEAPON_LEVEL[w] === lv && lv > 1).map((w) => `Weapon: ${WEAPON_INFO[w].name}`),
       ...FORGE.filter((f) => f.level === lv && f.tier > 1).map((f) => `Forge: ${f.name}`),
+      ...ALTAR.flatMap((t) => t.sections.filter((sec) => sec.level === lv && lv > 1).map((sec) => `Altar: ${sec.name} (with ${sec.spend} Ash spent above)`)),
     ];
-    return [lv, lv < MAX_LEVEL ? xpToNext(lv) : '—', xpForLevel(lv), tierFor(lv).name, talentPoints(lv), extra.join(', ') || ''];
+    const b = levelBonus(lv);
+    return [lv, lv < MAX_LEVEL ? xpToNext(lv) : '—', xpForLevel(lv), tierFor(lv).name, `+${b.hp} HP${b.dmg ? `, +${Math.round(b.dmg * 100)}% dmg` : ''}`, extra.join(', ') || ''];
   }),
 );
 // Sanity: the table above uses the same functions the game does.
@@ -98,15 +104,21 @@ table(
   UNLOCKS.map((u) => [u.level, u.title, u.desc + (u.feature === 'jump' ? ' Also unlocks after slaying the final guardian.' : ''), u.keys ? `${u.keys.pc} / ${u.keys.touch}` : '']),
 );
 
-// ---------------------------------------------------------------- talents
-line('## Talents (Ascension)');
+// ---------------------------------------------------------------- hero skill trees
+line('## Hero skill trees (Ascension)');
 line();
-line('Spend one point per level at the *Ascension* stone in the Hall of Shades. Resetting is free.');
+line(`Each hero has their own tree at the *Ascension* stone. Experience earned while playing a hero raises their hero level (max ${HERO_MAX_LEVEL}); each level after the first gives one skill point for that hero only (${heroPoints(HERO_MAX_LEVEL)} at most, about ${heroXpForLevel(HERO_MAX_LEVEL)} experience). Rows cost 1, 1, 2 and 3 points per rank; a row opens once ${ROW_GATE.slice(1).join(', ')} points sit in the rows above it in that branch. Resetting is free.`);
 line();
-table(
-  ['Row (rank)', 'Talent', 'Max rank', 'Per rank', 'At max rank'],
-  TALENTS.map((t) => [`${TIERS[t.tier].name} (Lv ${TIERS[t.tier].level})`, `${t.glyph} ${t.name}`, t.max, t.desc(1), t.desc(t.max)]),
-);
+table(['Hero level', 'XP to next'], Array.from({ length: HERO_MAX_LEVEL - 1 }, (_, i) => [i + 1, heroXpToNext(i + 1)]));
+for (const h of CHARACTERS) {
+  const t = HERO_TREES[h.id];
+  line(`*${h.name}*: ${t.branches.join(' · ')}`);
+  line();
+  table(
+    ['Branch', 'Row', 'Skill', 'Ranks × points', 'At max rank'],
+    t.nodes.map((n) => [t.branches[n.branch], n.row + 1, `${n.glyph} ${n.name}`, `${n.max} × ${n.cost}`, n.desc(n.max)]),
+  );
+}
 
 // ---------------------------------------------------------------- heroes
 line('## Heroes and Wrath');
@@ -117,7 +129,7 @@ table(
   ['Hero', 'Class', 'Weapon', 'Guard', 'Unlock', 'Perks', 'Wrath', 'Wrath effect'],
   CHARACTERS.map((h) => [`${h.name}, ${h.title}`, h.role, WEAPON_INFO[h.weapon].name, h.guard, h.unlock?.text ?? 'Start', h.perks.join('; '), h.wrath.name, h.wrath.desc]),
 );
-line('Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes souls).');
+line('Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes Echoes).');
 line();
 
 // ---------------------------------------------------------------- weapons
@@ -129,7 +141,7 @@ table(
   ['Weapon', 'Id', 'Class', 'Hero', 'Description'],
   WEAPON_IDS.map((w) => [WEAPON_INFO[w].name, w, heroForWeapon(w).role, heroForWeapon(w).name, WEAPON_INFO[w].blurb]),
 );
-line('**Forge tiers** (per weapon, at the Armory)');
+line('**Forge tiers** (per weapon, at the Blacksmith once he has his Whetstone)');
 line();
 table(['Tier', 'Ash', 'Level needed', 'Effect'], FORGE.map((f) => [f.name, f.cost || '—', f.level, f.desc]));
 line("**Hephaestus' Anvil upgrades** (one per anvil, per run)");
@@ -181,14 +193,26 @@ line('## Artifacts');
 line();
 table(
   ['Artifact', 'Uses', 'Starting-artifact unlock (Ash)', 'Effect'],
-  ARTIFACTS.map((a) => [`${a.glyph} ${a.name}`, a.souls ? `${a.souls} souls` : `${a.cooldown}s cooldown`, a.unlock || 'Owned', a.desc]),
+  ARTIFACTS.map((a) => [`${a.glyph} ${a.name}`, a.souls ? `${a.souls} Echoes` : `${a.cooldown}s cooldown`, a.unlock || 'Owned', a.desc]),
 );
-line('## Altar of Ashes (permanent upgrades)');
+line('## Altar of Ashes (permanent upgrades for every hero)');
 line();
-table(
-  ['Upgrade', 'Ranks', 'Ash per rank', 'At max rank'],
-  UPGRADES.map((u) => [`${u.glyph} ${u.name}`, u.costs.length, u.costs.join(' / '), u.desc(u.costs.length)]),
-);
+line(`Bought with Ash. Each table runs from its weakest upgrades (section I) to its strongest; a section opens at its level once enough Ash has been spent on the sections above it. The Deep Altar opens when every upgrade on the Altar of Ashes is complete. Everything costs ${altarTotal()} Ash in all.`);
+line();
+for (const t of ALTAR) {
+  line(`**${t.name}**`);
+  line();
+  table(
+    ['Section', 'Opens at', 'Upgrade', 'Ranks', 'Ash per rank', 'At max rank'],
+    t.sections.flatMap((sec, si) => sec.ups.map((u) => [`${['I', 'II', 'III', 'IV', 'V'][si]} ${sec.name}`, `Lv ${sec.level}${sec.spend ? `, ${sec.spend} Ash spent above` : ''}`, `${u.glyph} ${u.name}`, u.costs.length, u.costs.join(' / '), u.desc(u.costs.length)])),
+  );
+}
+
+line('## The Blacksmith');
+line();
+line('He stars up, reforges and salvages gear in the Hall from the start of the game (starring up needs only materials). Each forge part he gets back lets him do more:');
+line();
+table(['Part', 'Found', 'Unlocks'], SMITH_PARTS.map((p) => [`${p.glyph} ${p.name}`, p.from, p.unlocks]));
 
 // ---------------------------------------------------------------- loot & gear
 line('## Loot and gear');
@@ -325,7 +349,7 @@ line();
 line('Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike; deeper regions raise the odds. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon.');
 line();
 const rar = (o: { common: number; rare: number; epic: number; heroic: number }) => [pc(o.common), pc(o.rare), pc(o.epic), pc(o.heroic)];
-const favorMax = UPGRADES.find((u) => u.id === 'favor')?.costs.length ?? 3;
+const favorMax = ALTAR_BY_ID.favor.costs.length;
 table(
   ['When', 'Common', 'Rare', 'Epic', 'Heroic'],
   [
@@ -356,7 +380,7 @@ table(
   ['Drop', 'Foe', 'Elite foe', 'Guardian'],
   [
     ['Obols (gold)', pc(D.gold), pc(D.gold), pc(D.gold)],
-    ['Souls', `1, +1 at ${pc(D.extraSoul)}`, '4', '25'],
+    ['Echoes', `1, +1 at ${pc(D.extraSoul)}`, '4', '25'],
     [`${MATERIALS.bone.glyph} ${MATERIALS.bone.name}`, `${pc(D.bone)} (×2 at ${pc(D.extraBone)})`, `${pc(D.bone * D.eliteMult)} (×2 at ${pc(D.extraBone)})`, `${pc(Math.min(1, D.bone * D.guardianMult))} (×10)`],
     [`Region material (${regionMats})`, pc(D.regional), pc(D.regional * D.eliteMult), `${pc(Math.min(1, D.regional * D.guardianMult))} (×6)`],
     [`${MATERIALS.scale.glyph} ${MATERIALS.scale.name}`, '—', pc(D.eliteScale), '100% (×3–5)'],
@@ -364,7 +388,7 @@ table(
     ['Ghost gear', pc(GHOST_CHANCE), pc(GHOST_CHANCE), pc(GHOST_CHANCE)],
   ],
 );
-line('Breaking a pot: ' + `${pc(POT.gold)} obols (1–5), else ${pc(POT.souls)} two souls: ${pc((1 - POT.gold) * POT.souls)} overall, nothing ${pc((1 - POT.gold) * (1 - POT.souls))}.`);
+line('Breaking a pot: ' + `${pc(POT.gold)} obols (1–5), else ${pc(POT.souls)} two Echoes: ${pc((1 - POT.gold) * POT.souls)} overall, nothing ${pc((1 - POT.gold) * (1 - POT.souls))}.`);
 line();
 
 line('### Treasure chests');
@@ -374,7 +398,7 @@ table(
   [
     ['A combat chamber holds a chest', `${pc(CHEST.spawn)} (+10% per Treasure Sense tier)`],
     ['The chest is a Mimic (combat chambers); slaying it always drops a Unique piece', pc(CHEST.mimic)],
-    ['Always inside', '15–35 obols, 6 souls, 3 Bone Dust'],
+    ['Always inside', '15–35 obols, 6 Echoes, 3 Bone Dust'],
     ['Also a piece of gear', pc(CHEST.gear)],
     ['An artifact pops out', `${pc(CHEST.artifact)} (artifacts unlocked, one left to find)`],
     ['Otherwise an enchantment', `${pc(CHEST.enchant - CHEST.artifact)} (${pc(CHEST.enchant)} when no artifact is left)`],
@@ -432,7 +456,7 @@ table(
     [nameOf('stunning'), 'Hit stuns for 1.5s', ...tiers.map((t) => pc(STUNNING[t - 1]))],
     [nameOf('radiance'), 'Hit blooms a healing circle', ...tiers.map((t) => pc(RADIANCE[t - 1]))],
     [nameOf('rampaging'), 'Kill grants +50% attack speed', ...tiers.map((t) => pc(RAMPAGING[t - 1]))],
-    [nameOf('siphon'), 'Hit grants souls', ...tiers.map(() => pc(SIPHON))],
+    [nameOf('siphon'), 'Hit grants Echoes', ...tiers.map(() => pc(SIPHON))],
   ],
 );
 line('Critical hits come only from boons and riposte (a riposte is always critical).');

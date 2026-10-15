@@ -519,6 +519,7 @@ export class NetClient implements NetSession {
       s.bestiary[gr.kill] = (s.bestiary[gr.kill] ?? 0) + 1;
     }
     if (gr.boss) s.stats.bossesSlain++;
+    if (gr.guardian) g.awardPart(gr.guardian, gr.heat ?? 0);
     if (gr.escape) s.stats.escapes++;
     if (gr.run === 'start') s.stats.runs++;
     if (gr.run === 'death') s.stats.deaths++;
