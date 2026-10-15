@@ -20,6 +20,11 @@ const DASH_SPEED = 1080;
 const DASH_TIME = 0.16;
 const JUMP_TIME = 0.52;
 const JUMP_HEIGHT = 58;
+/** Share of walking speed kept while acting (see the action state). */
+const BASIC_MOVE = 0.85;
+const CAST_MOVE = 0.7;
+const SKILL_MOVE = 0.45;
+const HOLD_MOVE = 0.6;
 const BUFFER = 0.2;
 
 type PlayerState = 'free' | 'dash' | 'action' | 'slam' | 'falling' | 'dead';
@@ -90,6 +95,8 @@ export class Player extends Actor {
   private attackCount = 0;
   hero: CharacterDef;
   private noAmmoMsgT = -10;
+  /** Distance run since the last footstep puff. */
+  private stride = 0;
 
   /** The hero's colours and headwear, with the player's customisation applied. */
   get palette(): Palette {
@@ -283,8 +290,10 @@ export class Player extends Actor {
             a.t = def.windup + def.active;
             a.fired = true;
           }
-          vx = mv.x * speed * def.hold.moveMult;
-          vy = mv.y * speed * def.hold.moveMult;
+          // Drawing a bow or charging a spin: you can still walk.
+          const holdMove = Math.max(def.hold.moveMult, HOLD_MOVE);
+          vx = mv.x * speed * holdMove;
+          vy = mv.y * speed * holdMove;
           if (!def.lockAim) a.aim = this.aim;
           break;
         }
@@ -295,8 +304,12 @@ export class Player extends Actor {
         }
         def.update?.(this, w, dt, a.t);
         const total = def.windup + def.active + def.recover;
-        let move = def.moveMult;
-        if (def.lunge && a.t < def.windup + def.active) {
+        // Movement stays free while fighting: basic attack chains keep most of
+        // your speed and never push you forward; only kit moves (dash-strikes,
+        // specials like Meteor Fist) lunge.
+        const basic = def.slot === 'attack' && !!def.combo;
+        let move = basic ? Math.max(def.moveMult, BASIC_MOVE) : def.slot === 'cast' ? Math.max(def.moveMult, CAST_MOVE) : def.lunge ? def.moveMult : Math.max(def.moveMult, SKILL_MOVE);
+        if (def.lunge && !basic && a.t < def.windup + def.active) {
           const lv = def.lunge / Math.max(0.05, def.windup + def.active);
           vx += Math.cos(a.aim) * lv;
           vy += Math.sin(a.aim) * lv;
@@ -352,7 +365,30 @@ export class Player extends Actor {
       this.vx = vx;
       this.vy = vy;
     }
-    if (len(mv) > 0.1 && this.state === 'free') this.walk += dt * 10;
+    // The stride follows actual speed (so it also animates while attacking),
+    // and running on the ground kicks up dust.
+    const sp = Math.hypot(this.vx, this.vy);
+    if (sp > 20 && this.state !== 'dash') this.walk += dt * Math.min(sp, 420) * 0.036;
+    if (this.z <= 0 && sp > 150 && this.state !== 'dash') {
+      this.stride += sp * dt;
+      if (this.stride > 62) {
+        this.stride = 0;
+        w.particles.spawn({
+          kind: 'smoke',
+          x: this.x - (this.vx / sp) * 6 + fx.range(-4, 4),
+          y: this.y - (this.vy / sp) * 6 + fx.range(-3, 3),
+          vx: -this.vx * 0.08,
+          vy: -this.vy * 0.08,
+          vz: 18,
+          size: fx.range(4, 6),
+          size2: 11,
+          color: '#8a7a80',
+          life: 0.4,
+          drag: 4,
+          additive: false,
+        });
+      }
+    } else this.stride = 40;
     w.moveActor(this, dt);
 
     // ---- ground hazards
@@ -596,10 +632,13 @@ export class Player extends Actor {
     const face = this.facing;
     const fxDir = Math.cos(face);
     const back = Math.sin(face) < -0.2;
-    const bob = this.state === 'free' && len(this.moveDir) > 0.1 ? Math.sin(this.walk) * 2 : Math.sin(this.t * 3) * 0.8;
-    const lean = this.state === 'dash' ? 0.25 * Math.sign(this.dashDir.x || 1) : 0;
+    const spd = Math.hypot(this.vx, this.vy);
+    const moving = spd > 30 && this.state !== 'dash' && !this.airborne;
+    const run = Math.min(1, spd / 260);
+    // Two bumps a stride while running; a slow breath when standing.
+    const bob = moving ? -Math.abs(Math.cos(this.walk)) * (1 + run * 2) : Math.sin(this.t * 3) * 0.8;
+    const lean = this.state === 'dash' ? 0.25 * Math.sign(this.dashDir.x || 1) : moving ? clamp(this.vx / MOVE_SPEED, -1, 1) * 0.1 : 0;
     const white = this.flash > 0;
-
     if (!back) this.weapon.draw(ctx, this, w, true);
     ctx.save();
     ctx.rotate(lean);
@@ -634,15 +673,30 @@ export class Player extends Actor {
     ctx.moveTo(-14, -2);
     ctx.quadraticCurveTo(-17, -24 + bob, -10, -38 + bob);
     ctx.lineTo(10, -38 + bob);
+    const sway = moving ? Math.sin(this.walk * 2) * 2.5 : 0;
     ctx.quadraticCurveTo(17, -24 + bob, 14, -2);
-    ctx.quadraticCurveTo(0, 3, -14, -2);
+    ctx.quadraticCurveTo(sway, 3, -14, -2);
     ctx.fill();
     ctx.strokeStyle = trim;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(-14, -2);
-    ctx.quadraticCurveTo(0, 3, 14, -2);
+    ctx.quadraticCurveTo(sway, 3, 14, -2);
     ctx.stroke();
+    // Feet peek out under the cloak and stride along the way you run.
+    if (!falling) {
+      const ux = spd > 1 ? this.vx / spd : 0;
+      const uy = spd > 1 ? this.vy / spd : 0;
+      ctx.fillStyle = white ? '#fff' : '#2a1e1a';
+      for (const side of [-1, 1]) {
+        const ph = this.walk + (side > 0 ? Math.PI : 0);
+        const step = moving ? Math.sin(ph) * (5 + run * 4) : 0;
+        const lift = moving ? Math.max(0, -Math.cos(ph)) * (2 + run * 3) : 0;
+        const air = this.airborne ? (side > 0 ? 4 : 2) : 0;
+        ctx.fillRect(side * 5 - ux * step - 3, -1 - uy * step * 0.5 - lift - air, 6, 5);
+      }
+    }
+
     // Tunic / chest
     ctx.fillStyle = white ? '#fff' : pal.tunic;
     ctx.beginPath();

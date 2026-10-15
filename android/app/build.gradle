@@ -34,6 +34,18 @@ android {
             }
         }
     }
+    // "sideload": the APK on GitHub, which can download and install its own updates.
+    // "play": the Google Play bundle, which leaves updates to the store (and so
+    // doesn't ask for permission to install packages).
+    flavorDimensions = ["store"]
+    productFlavors {
+        sideload {
+            dimension = "store"
+        }
+        play {
+            dimension = "store"
+        }
+    }
     buildTypes {
         release {
             if (keystorePath) signingConfig signingConfigs.release

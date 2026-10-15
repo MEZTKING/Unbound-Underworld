@@ -2,7 +2,7 @@
   "name": "unbound-underworld",
   "productName": "Unbound Underworld",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "A Hades-inspired action roguelike with Minecraft Dungeons-style artifacts, enchantments and jump attacks.",
   "author": "MEZTKING",
   "homepage": "https://github.com/MEZTKING/Unbound-Underworld",
@@ -18,7 +18,7 @@
     "desktop": "vite build && electron .",
     "dist:desktop": "vite build && electron-builder --publish never",
     "android:sync": "vite build && cap sync android",
-    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleSideloadDebug",
     "docs": "tsx scripts/gen-docs.ts"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../src/engine/math';
-import { AFFIXES, applyGear, equippedItems, GEAR_RARITY, GEAR_SLOTS, normalizeGear, rollGear, salvageValue, spendMaterials, upgradeCost } from '../src/game/gear';
+import { AFFIXES, applyGear, equippedItems, GEAR_RARITY, GEAR_SLOTS, gearStars, levelMult, MAX_GEAR_LEVEL, normalizeGear, PERKS, RARITY_ORDER, rarityOdds, rollGear, salvageValue, spendMaterials, upgradeCost } from '../src/game/gear';
 import { baseStats } from '../src/game/stats';
 
 describe('gear', () => {
@@ -16,7 +16,49 @@ describe('gear', () => {
         if (slots) expect(slots).toContain(g.slot);
       }
     }
-    expect(rollGear(rng, 0, 'boots', 'epic').rarity).toMatch(/epic|legendary/);
+    expect(rollGear(rng, 0, 'boots', 'epic').rarity).toMatch(/epic|legendary|unique|ghost/);
+  });
+
+  it('has seven tiers, with Ghost the rarest whatever the luck', () => {
+    expect(RARITY_ORDER).toEqual(['common', 'uncommon', 'rare', 'epic', 'legendary', 'unique', 'ghost']);
+    for (const luck of [0, 0.3, 0.6, 1]) {
+      const o = rarityOdds(luck);
+      const total = Object.values(o).reduce((a, b) => a + b, 0);
+      expect(total).toBeCloseTo(1, 6);
+      for (const k of RARITY_ORDER) if (k !== 'ghost') expect(o.ghost).toBeLessThan(o[k] || 1);
+      expect(o.ghost).toBeLessThanOrEqual(0.01);
+    }
+    // Power and bonus count never drop as tiers rise.
+    RARITY_ORDER.slice(1).forEach((k, i) => {
+      expect(GEAR_RARITY[k].power).toBeGreaterThan(GEAR_RARITY[RARITY_ORDER[i]].power);
+      expect(GEAR_RARITY[k].affixes).toBeGreaterThanOrEqual(GEAR_RARITY[RARITY_ORDER[i]].affixes);
+    });
+  });
+
+  it('gives Unique and Ghost pieces a perk of their tier', () => {
+    const rng = new Rng(11);
+    const u = rollGear(rng, 0, undefined, 'unique');
+    const gh = rollGear(rng, 0, undefined, 'ghost');
+    expect(u.rarity).toMatch(/unique|ghost/);
+    expect(gh.rarity).toBe('ghost');
+    expect(gh.perk && PERKS[gh.perk].ghost).toBe(true);
+    expect(gh.name).toMatch(/^Ghostly /);
+    const s = baseStats();
+    applyGear([{ ...gh, affixes: [] }], s);
+    expect(JSON.stringify({ ...s, duos: 0, hammers: 0 })).not.toBe(JSON.stringify({ ...baseStats(), duos: 0, hammers: 0 }));
+  });
+
+  it('shows gold stars to five, then turns them purple up to ten', () => {
+    expect(MAX_GEAR_LEVEL).toBe(10);
+    expect(gearStars(1)).toEqual({ gold: 1, purple: 0 });
+    expect(gearStars(5)).toEqual({ gold: 5, purple: 0 });
+    expect(gearStars(7)).toEqual({ gold: 3, purple: 2 });
+    expect(gearStars(10)).toEqual({ gold: 0, purple: 5 });
+    for (let l = 2; l <= 10; l++) expect(levelMult(l)).toBeGreaterThan(levelMult(l - 1));
+    // Purple stars need Titan Scales.
+    const item = rollGear(new Rng(5), 0, 'boots', 'common');
+    item.level = 6;
+    expect(upgradeCost(item).scale).toBeGreaterThan(0);
   });
 
   it('applies equipped bonuses to stats, stronger when upgraded', () => {
@@ -47,5 +89,8 @@ describe('gear', () => {
     expect(g.items).toHaveLength(1);
     expect(g.equipped).toEqual({ helmet: good.uid });
     expect(equippedItems(g)).toEqual([good]);
+    const old = normalizeGear({ items: [{ ...good, level: 99, perk: 'nope' }], equipped: {} });
+    expect(old.items[0].level).toBe(10);
+    expect(old.items[0].perk).toBeUndefined();
   });
 });

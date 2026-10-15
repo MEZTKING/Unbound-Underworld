@@ -35,6 +35,9 @@ export type Sfx =
 export type Mood = 'silent' | 'title' | 'hub' | 'explore' | 'combat' | 'boss';
 
 const SCALE = [0, 3, 5, 7, 10, 12, 15]; // minor pentatonic-ish
+/** Flute phrases: scale degrees per step, -1 holds the note, undefined rests. */
+const FLUTE_EXPLORE = [4, -1, -1, 5, 4, -1, 2, -1, 1, -1, 2, -1, 0, -1, -1, -1];
+const FLUTE_HUB = [2, -1, 4, -1, 5, -1, -1, 4, 2, -1, -1, -1, 1, 2, 0, -1];
 
 /** A guardian's battle theme. Patterns are 16 steps (eighth notes); -1 is a rest. */
 interface BossTheme {
@@ -51,13 +54,19 @@ interface BossTheme {
   bass: number[];
   kick: number[];
   snare: number[];
-  /** Metallic clank on these steps (an anvil for Talos). */
+  /** Metallic clank on these steps (an anvil for Aurex). */
   clank?: number[];
+  /** Low toms on these steps. */
+  toms?: number[];
+  /** Bell strikes (scale degrees) on these steps. */
+  bells?: Record<number, number>;
+  /** A choir joins in phase 2. */
+  choir?: boolean;
   droneCutoff: number;
 }
 
 const BOSS_THEMES: BossTheme[] = [
-  // Campe, Tartarus: driving Phrygian, saw lead, double kicks.
+  // Vexa, the Shackled Deep: driving Phrygian, saw lead, double kicks.
   {
     bpm: 138,
     root: 0,
@@ -68,9 +77,11 @@ const BOSS_THEMES: BossTheme[] = [
     bass: [0, -1, 0, 0, -1, 0, 0, -1, 0, -1, 0, 0, -1, 1, 0, -1],
     kick: [0, 3, 4, 8, 11, 12],
     snare: [4, 12, 15],
+    toms: [14],
+    choir: true,
     droneCutoff: 800,
   },
-  // The Hydra, Asphodel: swaying harmonic minor in threes, toms.
+  // The Many-Maw, the Ember Fields: swaying harmonic minor in threes, toms.
   {
     bpm: 118,
     root: -2,
@@ -81,9 +92,10 @@ const BOSS_THEMES: BossTheme[] = [
     bass: [0, -1, -1, 4, -1, -1, 0, -1, -1, 4, -1, -1, 3, -1, 6, -1],
     kick: [0, 6, 12],
     snare: [3, 9, 15],
+    toms: [5, 10, 11],
     droneCutoff: 600,
   },
-  // Talos, Elysium: bright Dorian, square lead and anvil strikes.
+  // Aurex, the Gilded Groves: bright Dorian, square lead and anvil strikes.
   {
     bpm: 126,
     root: 3,
@@ -95,9 +107,11 @@ const BOSS_THEMES: BossTheme[] = [
     kick: [0, 4, 8, 12],
     snare: [4, 12],
     clank: [2, 7, 10, 14],
+    bells: { 0: 7, 8: 9 },
+    choir: true,
     droneCutoff: 900,
   },
-  // Cerberus, the Styx: fast, dark and relentless sixteenth-note bass.
+  // Threefang, the Last Gate: fast, dark and relentless sixteenth-note bass.
   {
     bpm: 150,
     root: -5,
@@ -108,6 +122,8 @@ const BOSS_THEMES: BossTheme[] = [
     bass: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 1, 0, 1],
     kick: [0, 2, 4, 6, 8, 10, 12, 14],
     snare: [4, 12],
+    toms: [13, 15],
+    choir: true,
     droneCutoff: 1000,
   },
 ];
@@ -147,6 +163,12 @@ export class AudioEngine {
     this.sfxBus.connect(this.master);
     this.musicBus = this.ctx.createGain();
     this.musicBus.connect(this.master);
+    // A touch of hall reverb on the music: a decaying noise impulse.
+    const verb = this.ctx.createConvolver();
+    verb.buffer = this.impulse(2.4);
+    const wet = this.ctx.createGain();
+    wet.gain.value = 0.3;
+    this.musicBus.connect(verb).connect(wet).connect(this.master);
     const len = this.ctx.sampleRate;
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0);
@@ -155,6 +177,17 @@ export class AudioEngine {
     const m = this.mood;
     this.mood = 'silent';
     this.setMood(m);
+  }
+
+  private impulse(seconds: number): AudioBuffer {
+    const c = this.ctx!;
+    const len = Math.floor(c.sampleRate * seconds);
+    const buf = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+    }
+    return buf;
   }
 
   suspend(): void {
@@ -455,9 +488,161 @@ export class AudioEngine {
     o.stop(t + dur + 0.05);
   }
 
-  private drum(t: number, kind: 'kick' | 'snare' | 'hat' | 'clank', gain = 1): void {
+  // ---------------------------------------------------------------- instruments
+
+  private hz(midi: number): number {
+    return 440 * 2 ** ((midi - 69) / 12);
+  }
+
+  /** An attack–hold–release envelope into the music bus. */
+  private env(t: number, dur: number, gain: number, attack: number, hold = 0.7): GainNode {
+    const g = this.ctx!.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + attack);
+    g.gain.setValueAtTime(gain, t + Math.max(attack, dur * hold));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(this.musicBus!);
+    return g;
+  }
+
+  private osc(t: number, dur: number, type: OscillatorType, freq: number, to: AudioNode, detune = 0): OscillatorNode {
+    const o = this.ctx!.createOscillator();
+    o.type = type;
+    o.frequency.value = freq;
+    o.detune.value = detune;
+    o.connect(to);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+    return o;
+  }
+
+  /** Bowed strings: a slow swell of detuned saws that opens up as it sustains. */
+  private strings(t: number, midis: number[], dur: number, gain: number): void {
+    const c = this.ctx!;
+    const g = this.env(t, dur, gain, Math.min(0.6, dur * 0.3));
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(600, t);
+    f.frequency.linearRampToValueAtTime(1500, t + dur * 0.5);
+    f.connect(g);
+    for (const m of midis) for (const det of [-9, 8]) this.osc(t, dur, 'sawtooth', this.hz(m), f, det);
+  }
+
+  /** A breathy flute: sine with a soft overtone, a chiff of breath and vibrato that blooms. */
+  private flute(t: number, midi: number, dur: number, gain: number): void {
+    const c = this.ctx!;
+    const f0 = this.hz(midi);
+    const g = this.env(t, dur, gain, 0.07, 0.75);
+    const o = this.osc(t, dur, 'sine', f0, g);
+    const over = c.createGain();
+    over.gain.value = 0.15;
+    over.connect(g);
+    this.osc(t, dur, 'triangle', f0 * 2, over);
+    const depth = c.createGain();
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.linearRampToValueAtTime(f0 * 0.007, t + Math.min(0.4, dur * 0.6));
+    depth.connect(o.frequency);
+    this.osc(t, dur, 'sine', 5.3, depth);
+    const n = c.createBufferSource();
+    n.buffer = this.noiseBuf;
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = f0 * 2;
+    bp.Q.value = 6;
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(gain * 0.9, t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    n.connect(bp).connect(ng).connect(this.musicBus!);
+    n.start(t, Math.random() * 0.5, 0.16);
+  }
+
+  /** A struck bell: FM with an inharmonic ratio, brightness fading as it rings. */
+  private bell(t: number, midi: number, gain: number, dur = 2.6): void {
+    const c = this.ctx!;
+    const f0 = this.hz(midi);
+    const g = this.env(t, dur, gain, 0.004, 0);
+    const car = this.osc(t, dur, 'sine', f0, g);
+    const idx = c.createGain();
+    idx.gain.setValueAtTime(f0 * 2.4, t);
+    idx.gain.exponentialRampToValueAtTime(f0 * 0.05, t + dur * 0.7);
+    idx.connect(car.frequency);
+    this.osc(t, dur, 'sine', f0 * 3.51, idx);
+  }
+
+  /** A plucked lyre string: a bright saw whose filter closes as it decays. */
+  private lyre(t: number, midi: number, gain: number, dur = 1.3): void {
+    const c = this.ctx!;
+    const g = this.env(t, dur, gain, 0.004, 0);
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.Q.value = 3;
+    f.frequency.setValueAtTime(3200, t);
+    f.frequency.exponentialRampToValueAtTime(380, t + 0.35);
+    f.connect(g);
+    this.osc(t, dur, 'sawtooth', this.hz(midi), f);
+    const ring = c.createGain();
+    ring.gain.value = 0.35;
+    ring.connect(g);
+    this.osc(t, dur, 'sine', this.hz(midi + 12), ring);
+  }
+
+  /** A wordless choir: buzzy voices through two vowel formants ("ah"), with vibrato. */
+  private choir(t: number, midis: number[], dur: number, gain: number): void {
+    const c = this.ctx!;
+    const g = this.env(t, dur, gain, Math.min(0.8, dur * 0.35));
+    const vib = c.createGain();
+    vib.gain.value = 6;
+    this.osc(t, dur, 'sine', 4.6, vib);
+    for (const [freq, q, k] of [
+      [760, 7, 1],
+      [1180, 9, 0.6],
+      [2600, 10, 0.25],
+    ]) {
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = freq;
+      bp.Q.value = q;
+      const fg = c.createGain();
+      fg.gain.value = k;
+      bp.connect(fg).connect(g);
+      for (const m of midis)
+        for (const det of [-11, 0, 12]) {
+          const o = this.osc(t, dur, 'sawtooth', this.hz(m), bp, det);
+          vib.connect(o.detune);
+        }
+    }
+  }
+
+  private drum(t: number, kind: 'kick' | 'snare' | 'hat' | 'clank' | 'tom' | 'shaker', gain = 1): void {
     const c = this.ctx!;
     const bus = this.musicBus!;
+    if (kind === 'tom') {
+      const o = c.createOscillator();
+      o.frequency.setValueAtTime(175, t);
+      o.frequency.exponentialRampToValueAtTime(82, t + 0.28);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.5 * gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+      o.connect(g).connect(bus);
+      o.start(t);
+      o.stop(t + 0.42);
+      return;
+    }
+    if (kind === 'shaker') {
+      const src = c.createBufferSource();
+      src.buffer = this.noiseBuf;
+      const f = c.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 5200;
+      f.Q.value = 1.4;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.15 * gain, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      src.connect(f).connect(g).connect(bus);
+      src.start(t, Math.random() * 0.5, 0.1);
+      return;
+    }
     if (kind === 'kick') {
       const o = c.createOscillator();
       o.frequency.setValueAtTime(110, t);
@@ -512,10 +697,16 @@ export class AudioEngine {
     if (th.kick.includes(s)) this.drum(t, 'kick');
     if (th.snare.includes(s)) this.drum(t, 'snare');
     if (th.clank?.includes(s)) this.drum(t, 'clank');
-    // Phase 2: hats on every step and a doubled lead an octave up.
+    if (th.toms?.includes(s)) this.drum(t, 'tom', 0.8);
+    const bell = th.bells?.[s];
+    if (bell !== undefined) this.bell(t, base + 24 + deg(bell), 0.07);
+    // Strings hold the bar's chord underneath.
+    if (s === 0) this.strings(t, [base, base + deg(4), base + 12 + deg(2)], stepDur * 16, 0.016);
+    // Phase 2: hats on every step, a doubled lead an octave up, and the choir.
     if (this.intensity > 0) {
       this.drum(t, 'hat', this.intensity);
       if (lead >= 0 && s % 2 === 0) this.note(t, base + 36 + deg(lead), stepDur, 'triangle', 0.05 * this.intensity);
+      if (th.choir && s === 0) this.choir(t, [base + 12, base + 12 + deg(2), base + 12 + deg(4)], stepDur * 16, 0.09 * this.intensity);
     }
   }
 
@@ -529,11 +720,40 @@ export class AudioEngine {
     const bar = Math.floor(step / 16) % 4;
     const chordShift = [0, -4, -2, -5][bar];
     const s = step % 16;
-    const fighting = this.mood === 'combat';
-    // Plucked arpeggio
+    const mood = this.mood;
+    const fighting = mood === 'combat';
+    const chord = this.root + 12 + chordShift;
+    const deg = (d: number) => SCALE[((d % SCALE.length) + SCALE.length) % SCALE.length] + Math.floor(d / SCALE.length) * 12;
+    // Strings (and on the title, a choir) hold each bar's chord.
+    if (s === 0) {
+      this.strings(t, [chord - 12, chord - 5, chord + 3], stepDur * 16, fighting ? 0.012 : 0.016);
+      if (mood === 'title') this.choir(t, [chord, chord + 3, chord + 7], stepDur * 16, 0.07);
+    }
+    // Bells mark the turn of every other bar.
+    if ((mood === 'title' || mood === 'explore') && s === 0 && bar % 2 === 0) this.bell(t, chord + 24 + deg(bar === 0 ? 4 : 2), 0.05);
+    if (mood === 'title' && s === 10) this.bell(t, chord + 24 + deg(5), 0.035);
+    // A flute sings a phrase on alternate bars while exploring and in the hall.
+    if ((mood === 'explore' && bar % 2 === 1) || (mood === 'hub' && bar === 3)) {
+      const phrase = mood === 'hub' ? FLUTE_HUB : FLUTE_EXPLORE;
+      const d = phrase[s];
+      if (d !== undefined && d >= 0) {
+        let len = 1;
+        while (s + len < 16 && phrase[s + len] === -1) len++;
+        this.flute(t, chord + 12 + deg(d), stepDur * len * 0.95, 0.042);
+      }
+    }
+    // The hall has a soft shaker; fights a driving one and tom fills.
+    if (mood === 'hub' && s % 2 === 1) this.drum(t, 'shaker', 0.45);
+    if (fighting) {
+      if (s % 2 === 1) this.drum(t, 'shaker', s % 4 === 3 ? 0.9 : 0.55);
+      if (bar === 3 && s >= 12) this.drum(t, 'tom', 0.5 + (s - 12) * 0.12);
+    }
+    // Plucked arpeggio (a lyre in the hall and on the title)
     const pattern = fighting ? [0, 2, 4, 2, 5, 4, 2, 1] : [0, -1, 2, -1, 4, -1, 2, -1];
     const idx = pattern[s % pattern.length];
-    if (idx >= 0 && (fighting || Math.random() < 0.75)) {
+    if (idx >= 0 && (mood === 'hub' || mood === 'title')) {
+      if (Math.random() < 0.8) this.lyre(t, chord + SCALE[idx % SCALE.length], 0.11);
+    } else if (idx >= 0 && (fighting || Math.random() < 0.75)) {
       const note = this.root + 12 + chordShift + SCALE[idx % SCALE.length];
       const f = 440 * 2 ** ((note - 69) / 12);
       const o = c.createOscillator();

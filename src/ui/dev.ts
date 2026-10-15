@@ -37,7 +37,7 @@ export function devMenu(g: Game): void {
       <div class="swatches"><button class="btn mini${g.godMode ? ' on' : ''}" data-nav data-a="god">God mode: ${g.godMode ? 'On' : 'Off'}</button>
         <button class="btn mini" data-nav data-a="ash">+5000 Ash</button>
         <button class="btn mini" data-nav data-a="unlock">Unlock all weapons, artifacts &amp; heroes</button>
-        <button class="btn mini" data-nav data-a="loot">+200 of each material &amp; 6 gear pieces</button></div>
+        <button class="btn mini" data-nav data-a="loot">+200 of each material &amp; 8 gear pieces</button></div>
       <h3 class="section">Play at level</h3>
       <div class="swatches">${[0, 1, 5, 10, 20, 30].map(levelBtn).join('')}</div>
       <h3 class="section">Test chambers (starts a new escape)</h3>
@@ -134,6 +134,8 @@ export function devMenu(g: Game): void {
           for (const k of MATERIAL_IDS) g.save.materials[k] = (g.save.materials[k] ?? 0) + 200;
           const rng = new Rng(Date.now() & 0x7fffffff);
           for (let i = 0; i < 6 && g.save.gear.items.length < INVENTORY_SIZE; i++) g.save.gear.items.push(rollGear(rng, 0.5));
+          // One of each top tier, to try perks and stars.
+          for (const min of ['unique', 'ghost'] as const) if (g.save.gear.items.length < INVENTORY_SIZE) g.save.gear.items.push(rollGear(rng, 1, undefined, min));
           done('Materials and gear added (gear needs level 10 to use)');
           return;
         }

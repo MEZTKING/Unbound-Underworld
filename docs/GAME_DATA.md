@@ -380,17 +380,36 @@ Unlocks at level 10. Foes drop materials; gear drops from foes (1.2%), enchanted
 | Material | Source |
 |---|---|
 | ☗ Bone Dust | Dropped by foes everywhere. The basic crafting material. |
-| ♦ Ember Shard | Dropped by foes in Tartarus and Asphodel. |
-| ✹ Golden Ichor | Dropped by foes in Elysium. |
-| ● Styx Pearl | Dropped by foes at the Gates of the Styx. |
+| ♦ Ember Shard | Dropped by foes in the Shackled Deep and the Ember Fields. |
+| ✹ Golden Ichor | Dropped by foes in the Gilded Groves. |
+| ● Gate Pearl | Dropped by foes at the Last Gate. |
 | ⬢ Titan Scale | Dropped by guardians and enchanted foes. Rare. |
 
-| Rarity | Bonuses | Bonus strength × |
+| Tier | Bonuses | Bonus strength × | Chance (foe) | Chance (guardian luck) | Perk |
+|---|---|---|---|---|---|
+| Common | 1 | 1 | 37% | 22% | — |
+| Uncommon | 2 | 1.15 | 27% | 26% | — |
+| Rare | 2 | 1.3 | 20% | 19% | — |
+| Epic | 3 | 1.55 | 10% | 10% | — |
+| Legendary | 4 | 1.85 | 5% | 19% | — |
+| Unique | 4 | 2.1 | 2% | 3% | One Unique perk |
+| Ghost | 5 | 2.5 | 0.3% | 0.7% | One Ghost perk |
+
+Guardians always drop Rare or better (lower tiers roll up to Rare).
+
+| Perk | Tier | Effect |
 |---|---|---|
-| Common | 1 | 1 |
-| Rare | 2 | 1.3 |
-| Epic | 3 | 1.6 |
-| Legendary | 4 | 2 |
+| Second Breath | Unique | +1 Death Defiance each escape. |
+| Fleetfoot | Unique | +1 dash charge. |
+| Leech | Unique | Heal 2 health for every foe slain. |
+| Giantbane | Unique | +25% damage to guardians and enchanted foes. |
+| Deep Quiver | Unique | +1 cast shard. |
+| Keen Edge | Unique | Critical hits deal +50% more damage. |
+| Artificer | Unique | Artifacts recharge 20% faster. |
+| Phantom Step | Ghost | +1 dash charge and dashes recharge 25% faster. |
+| Wraithblood | Ghost | Heal 4 health for every foe slain, and +15% damage. |
+| Revenant | Ghost | +1 Death Defiance and +20 max health. |
+| Spectral Ward | Ghost | Take 15% less damage and move 10% faster. |
 
 | Bonus | Common, level 1 (typical) | Slots |
 |---|---|---|
@@ -405,41 +424,55 @@ Unlocks at level 10. Foes drop materials; gear drops from foes (1.2%), enchanted
 | +6% Wrath gain | 6% | Helmet |
 | +6% potion healing | 6% | Armor |
 
-Each upgrade level adds 15% to every bonus (max level 5). Upgrades cost Bone Dust, plus Ember Shards (Rare), Golden Ichor and Titan Scales (Epic) or Styx Pearls and Titan Scales (Legendary).
+Pieces are starred up from 1 to 10 stars. The first five stars are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.
+
+| Stars | Bonus × | Next star (Common) | Next star (Epic) | Next star (Ghost) |
+|---|---|---|---|---|
+| ★ gold | 1.00 | 6 ☗ | 6 ☗ · 2 ✹ · 1 ⬢ | 6 ☗ · 2 ● · 1 ⬢ |
+| ★★ gold | 1.15 | 12 ☗ | 12 ☗ · 4 ✹ · 2 ⬢ | 12 ☗ · 4 ● · 2 ⬢ |
+| ★★★ gold | 1.30 | 18 ☗ | 18 ☗ · 6 ✹ · 3 ⬢ | 18 ☗ · 6 ● · 3 ⬢ |
+| ★★★★ gold | 1.45 | 24 ☗ | 24 ☗ · 8 ✹ · 4 ⬢ | 24 ☗ · 8 ● · 4 ⬢ |
+| ★★★★★ gold | 1.60 | 30 ☗ · 1 ⬢ | 30 ☗ · 10 ✹ · 6 ⬢ | 30 ☗ · 10 ● · 6 ⬢ |
+| ★ purple + ★★★★ gold | 1.80 | 36 ☗ · 2 ⬢ | 36 ☗ · 12 ✹ · 8 ⬢ | 36 ☗ · 12 ● · 8 ⬢ |
+| ★★ purple + ★★★ gold | 2.00 | 42 ☗ · 3 ⬢ | 42 ☗ · 14 ✹ · 10 ⬢ | 42 ☗ · 14 ● · 10 ⬢ |
+| ★★★ purple + ★★ gold | 2.20 | 48 ☗ · 4 ⬢ | 48 ☗ · 16 ✹ · 12 ⬢ | 48 ☗ · 16 ● · 12 ⬢ |
+| ★★★★ purple + ★ gold | 2.40 | 54 ☗ · 5 ⬢ | 54 ☗ · 18 ✹ · 14 ⬢ | 54 ☗ · 18 ● · 14 ⬢ |
+| ★★★★★ purple +  gold | 2.60 | — | — | — |
 
 | Recipe | Rarity | Cost |
 |---|---|---|
 | Craft a piece | Common or better | 25 ☗ · 6 ♦ |
 | Craft a fine piece | Rare or better | 40 ☗ · 6 ✹ |
 | Craft a grand piece | Epic or better | 60 ☗ · 6 ● · 3 ⬢ |
+| Craft a masterwork | Legendary or better | 120 ☗ · 14 ● · 10 ⬢ |
 
 
 ## Regions and guardians
 
 | # | Region | Subtitle | Combat chambers | Hazard | Foe Health × | Foe damage × | Guardian |
 |---|---|---|---|---|---|---|---|
-| 1 | Tartarus | The Pit of the Damned | 5 | spikes | 1 | 1 | Campe, Jailer of Tartarus |
-| 2 | Asphodel | The Burning Meadows | 5 | lava | 1.35 | 1.2 | The Hydra, Many-Headed Terror of Lerna |
-| 3 | Elysium | Fields of the Blessed | 5 | pits | 1.75 | 1.4 | Talos, the Bronze Colossus |
-| 4 | Gates of the Styx | Where the Warden Waits | 0 | none | 2 | 1.6 | Cerberus, Warden of the Gate |
+| 1 | The Shackled Deep | Where the Damned Are Chained | 5 | spikes | 1 | 1 | Vexa, Warden of Chains |
+| 2 | The Ember Fields | Meadows of Cinder and Ash | 5 | lava | 1.35 | 1.2 | The Many-Maw, Coiled Terror of the Fields |
+| 3 | The Gilded Groves | Gardens of the Honored Dead | 5 | pits | 1.75 | 1.4 | Aurex, the Gilded Colossus |
+| 4 | The Last Gate | Where the Hound Keeps Watch | 0 | none | 2 | 1.6 | Threefang, Hound of the Last Gate |
 
 **Enemy pools** (spawn weights per region)
 
 | Region | Foes (weight) |
 |---|---|
-| Tartarus | Ghoul (5), Numbling (4), Wisp (2), Hissling (2), Brute (1) |
-| Asphodel | Numbling (3), Lobber (3), Sentinel (2), Brute (2), Hissling (3), Wisp (2), Weaver (2) |
-| Elysium | Gilded Hoplite (3), Gorgehorn (3), Wisp (2), Sentinel (2), Bonecaller (1), Weaver (2), Ghoul (2) |
-| Gates of the Styx | Ghoul (1), Wisp (1) |
+| The Shackled Deep | Ghoul (5), Numbling (4), Wisp (2), Hissling (2), Brute (1) |
+| The Ember Fields | Numbling (3), Lobber (3), Sentinel (2), Brute (2), Hissling (3), Wisp (2), Weaver (2) |
+| The Gilded Groves | Gilded Hoplite (3), Gorgehorn (3), Wisp (2), Sentinel (2), Bonecaller (1), Weaver (2), Ghoul (2) |
+| The Last Gate | Ghoul (1), Wisp (1) |
 
 **Guardians** (base values; see DESIGN.md for their attacks)
 
 | Guardian | Title | Health | Armor | Contact damage |
 |---|---|---|---|---|
-| Campe | Jailer of Tartarus | 2400 | — | 13 |
-| The Hydra | Many-Headed Terror of Lerna | 3400 | — | 18 |
-| Talos | the Bronze Colossus | 4200 | 800 | 20 |
-| Cerberus | Warden of the Gate | 5600 | — | 22 |
+| Vexa | Warden of Chains | 2400 | — | 13 |
+| The Many-Maw | Coiled Terror of the Fields | 3400 | — | 18 |
+| Aurex | the Gilded Colossus | 4200 | 800 | 20 |
+| Threefang | Hound of the Last Gate | 5600 | — | 22 |
 
 ## Enemies
 

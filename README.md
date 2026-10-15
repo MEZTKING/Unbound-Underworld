@@ -2,12 +2,12 @@
 
 A fast, top-down action roguelike for desktop, phones and the browser. You fight your way out of the realm of the dead, one chamber at a time. The core loop is modeled on **Hades**, and it adds systems inspired by **Minecraft Dungeons II**: jump attacks, cooldown artifacts, enchantments, loot chests and enchanted foes.
 
-![Combat in Tartarus](docs/combat.png)
+![Combat in the Shackled Deep](docs/combat.png)
 
 | | |
 |---|---|
 | ![Title](docs/title.png) | ![Choosing a boon](docs/boons.png) |
-| ![Talos, the Bronze Colossus](docs/boss.png) | |
+| ![Aurex, the Gilded Colossus](docs/boss.png) | |
 
 ## Download
 
@@ -39,7 +39,8 @@ In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progre
 When a new version comes out, the title screen shows **Update now**. You can also check under *Settings → Check for updates*. Your progress carries over.
 
 - **Windows (installer) and Linux:** one press downloads the update, and the game restarts on the new version.
-- **Windows (portable), macOS and Android:** the button downloads the new version for you. Open the file to install it over the old one.
+- **Android (from 0.6.0):** one press downloads the update inside the game and opens Android's installer; tap *Update* there and you're done. The first time, Android asks you to allow installs from Unbound Underworld. (Versions before 0.6.0 open the download in the browser instead.)
+- **Windows (portable) and macOS:** the button downloads the new version for you. Open the file to install it over the old one.
 - **Web version:** the game picks up the new version on its own. If it's open while you update the site, it offers *Restart to update*.
 
 ### iPhone and iPad (the web version)
@@ -82,12 +83,16 @@ To try the touch controls on a computer, open the browser's device toolbar (phon
 | Dash (brief invulnerability) | `Space` | `A` |
 | Jump (attack mid-air to **Slam**) | `Shift` or `C` | `B` |
 | Artifacts | `1` `2` `3` | `RT` · `LT` · `L3` |
-| Healing potion | `R` | `LB` |
-| Wrath (ultimate, when the gauge is full) | `F` | `R3` |
+| Healing potion | `R` or `4` | `LB` |
+| Wrath (ultimate, when the gauge is full) | `F` or `5` | `R3` |
 | Interact | `E` | `Select` / `R3` |
 | Pause · Mute | `Esc` · `M` | `Start` |
 
 Menus work with the mouse, arrow keys with `Enter`/`Space`, or the D-pad with `A`/`B`. Number keys pick cards directly.
+
+Every keyboard key can be changed under *Settings → Controls → Key bindings* (arrows, `Enter` and `Esc` always keep working in menus).
+
+You can walk while you fight: basic attacks keep most of your speed and never push you forward, and only moves that are meant to (dash-strikes, some specials) lunge.
 
 New players start with just Attack, Special and Dash. The other controls unlock as you level up (see below), and the HUD, the touch buttons and the in-game control lists only show what you've unlocked.
 
@@ -100,7 +105,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Weapon forging.** At the Armory, spend Ash to forge each weapon from Tier I up to Tier V (Mythic) for more damage. From Tier III (Awakened), every fourth Attack also unleashes an arcane wave. The waves grow at Tier IV, and at Tier V they split in three and the weapon blazes.
 - **Heroes.** Six heroes, each with their own look, perks and **Wrath** ultimate. You choose them in the Hall of Heroes. *Kael* (Inferno Nova), *Lyra* (Moonfall) and *Doran* (Titan's Quake) are available from the start. *Ione* (Tidal Surge) unlocks at level 8, *Erebos* (Eclipse) after slaying 2 guardians, and *Selene* (Starfall) after your first escape.
 - **Wrath.** A golden gauge that fills as you deal and take damage. When it's full, press `F` to unleash your hero's screen-clearing ultimate.
-- **Loot and gear** (level 10). Foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Styx Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots in four rarities with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Manage it in *Gear & Inventory* (at the Armory or in the pause menu): equip, upgrade with materials, salvage, or craft new pieces.
+- **Loot and gear** (level 10). Foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Gate Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Gear comes in seven tiers: Common, Uncommon, Rare, Epic, Legendary, Unique and the very rare Ghost. Unique and Ghost pieces carry a perk of their own (an extra dash, Death Defiance, healing on kills…). Star a piece up from 1 to 5 gold stars, then on to 10, as the stars turn purple one by one. Manage it in *Gear & Inventory* (at the Armory or in the pause menu): equip, star up with materials, salvage, or craft new pieces.
 - **Save slots.** Four independent journeys; switch on the title screen.
 - **Map.** The pause menu shows every region's chambers, where you are, the guardian ahead and your best run.
 - **Late-game weapons.** *Titan Gauntlets* (level 8): rapid punch combos and a rocketing Meteor Fist. *Reaper's Crescent* (level 14): wide sweeps and spectral scythes that orbit you. Each comes with its own anvil upgrades.
@@ -109,8 +114,8 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Combat.** Each weapon has a combo, a dash-strike and a special. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
 - **Five weapons.** *Nightblade* (sword: combo plus Nova Smash), *Thornspear* (thrusts, a charged spin, and a spear you throw and recall) and *Moonbow* (charged shots with a perfect-timing Power Shot, plus a volley), followed later by the *Titan Gauntlets* and *Reaper's Crescent*. Each weapon has its own anvil upgrades.
 - **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity. There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
-- **The run.** Tartarus, then Asphodel, then Elysium, then the Gates of the Styx: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
-- **Four guardians.** *Campe*, Jailer of Tartarus. *The Hydra*, which grows extra heads. *Talos, the Bronze Colossus*: break his armor and he overheats, leaving him open. *Cerberus*, Warden of the Gate, who charges, breathes fire and leap-slams.
+- **The run.** The Shackled Deep, then the Ember Fields, then the Gilded Groves, then the Last Gate: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
+- **Four guardians.** *Vexa*, Warden of Chains. *The Many-Maw*, which grows extra heads. *Aurex, the Gilded Colossus*: break his armor and he overheats, leaving him open. *Threefang*, Hound of the Last Gate, who charges, breathes fire and leap-slams.
 - **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your records, the **bestiary** (each foe stays a black silhouette until you slay it) and **achievements** in the Chronicle, customise your hero's colours and headwear, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
 
 ### Inspired by Minecraft Dungeons II
@@ -129,7 +134,9 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus **UI size**, a **window mode** on desktop (Windowed, Borderless or Fullscreen), screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 
-On PC, point at a HUD icon (boons, enchantments, artifacts, potion) to see what it does. Each guardian has its own battle music, which intensifies in phase 2.
+On PC, point at a HUD icon (boons, enchantments, artifacts, potion) to see what it does. The synthesized score uses strings, flute, bells, a lyre, a choir and drums; each guardian has its own battle theme, which intensifies (and brings in the choir) in phase 2.
+
+**Autosave.** The game saves at the start of every chamber (a small *Saved* mark appears at the top of the screen), whenever you pick up loot or change something in the hub, and whenever you switch away from it.
 
 **Developer options.** A hidden test menu: tap the version number in Settings seven times (or add `?dev` to the address). It has god mode, play-at-level, +Ash, unlock everything, test chambers for every region and room type, and in-run tools (boons, artifacts, obols, Wrath, spawning foes and guardians). Using it switches achievements off until the game restarts.
 

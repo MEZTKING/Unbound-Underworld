@@ -12,6 +12,7 @@ import type { WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
 import { CAN_EXIT, exitGame, getWindowMode, HAS_WINDOW_MODES, setWindowMode, type WindowMode } from '../platform';
 import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
+import { BINDABLE, keyLabel, type Action } from '../engine/input';
 import { devMenu } from './dev';
 import { gearScreen } from './gear';
 import { mapScreen } from './map';
@@ -24,13 +25,14 @@ const WINDOW_LABEL: Record<WindowMode, string> = { windowed: 'Windowed', borderl
 /** Control reference listing only what you've unlocked. */
 function keyControls(g: Game): string {
   const st = g.stats;
+  const k = (a: Action) => g.input.keysFor(a).map((c) => `<kbd>${esc(keyLabel(c))}</kbd>`).join('/');
   const rows = [
     '<div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>',
     '<div><kbd>LMB</kbd>/<kbd>J</kbd> Attack</div><div><kbd>RMB</kbd>/<kbd>K</kbd> Special</div>',
     `<div><kbd>Space</kbd> Dash</div><div>${st.canCast ? '<kbd>Q</kbd> Cast shard' : '<kbd>E</kbd> Interact'}</div>`,
     st.canJump ? '<div><kbd>Shift</kbd>/<kbd>C</kbd> Jump</div><div>Attack mid-air: <b>Slam</b></div>' : '',
-    st.canPotion || st.artifactSlots ? `<div>${st.artifactSlots ? `<kbd>1</kbd>${st.artifactSlots > 1 ? '<kbd>2</kbd>' : ''}${st.artifactSlots > 2 ? '<kbd>3</kbd>' : ''} Artifacts` : ''}</div><div>${st.canPotion ? '<kbd>R</kbd> Potion' : ''}</div>` : '',
-    st.canWrath ? '<div><kbd>F</kbd> Wrath (when full)</div><div></div>' : '',
+    st.canPotion || st.artifactSlots ? `<div>${st.artifactSlots ? `<kbd>1</kbd>${st.artifactSlots > 1 ? '<kbd>2</kbd>' : ''}${st.artifactSlots > 2 ? '<kbd>3</kbd>' : ''} Artifacts` : ''}</div><div>${st.canPotion ? `${k('potion')} Potion` : ''}</div>` : '',
+    st.canWrath ? `<div>${k('wrath')} Wrath (when full)</div><div></div>` : '',
     `<div>${st.canCast ? '<kbd>E</kbd> Interact' : ''}</div><div><kbd>Esc</kbd> Pause · <kbd>M</kbd> Mute</div>`,
   ];
   return `<div class="controls">${rows.join('')}</div>
@@ -71,10 +73,10 @@ function updateBox(g: Game, screen: HTMLElement, box: HTMLElement, inSettings: b
     let note = '';
     let button = '';
     if (s.kind === 'available') {
-      note = s.version ? `Version ${esc(s.version)} is out!` : 'A new version is ready.';
+      note = s.hint ? esc(s.hint) : s.version ? `Version ${esc(s.version)} is out!` : 'A new version is ready.';
       button = `<button class="btn primary" data-nav data-update="apply">${action(s)}</button>`;
     } else if (s.kind === 'downloading') {
-      note = `Downloading version ${esc(s.version)}… The game restarts when it's done.`;
+      note = s.android ? `Downloading version ${esc(s.version)}… Android will ask you to install it.` : `Downloading version ${esc(s.version)}… The game restarts when it's done.`;
       button = `<button class="btn disabled" data-nav>Downloading ${Math.floor(s.percent)}%</button>`;
     } else if (s.kind === 'opened') {
       note = `Open the downloaded file to install version ${esc(s.version)}.`;
@@ -101,7 +103,7 @@ function updateBox(g: Game, screen: HTMLElement, box: HTMLElement, inSettings: b
 
 // ---------------------------------------------------------------- title
 
-/** "Asphodel · Chamber 3" for a saved escape. */
+/** "The Ember Fields · Chamber 3" for a saved escape. */
 function savedRunLabel(g: Game): string | null {
   const snap = g.savedRun();
   if (!snap) return null;
@@ -111,14 +113,61 @@ function savedRunLabel(g: Game): string | null {
   return `${biome} · ${where}`;
 }
 
+/**
+ * The title emblem (original art): a broken shackle ringed with laurels,
+ * a flame burning at its heart and the chain snapping apart beneath.
+ */
+function emblem(): string {
+  const leaves = (side: 1 | -1) =>
+    Array.from({ length: 7 }, (_, i) => {
+      const a = ((100 + i * 19) * Math.PI) / 180;
+      const x = Math.cos(a) * 47 * side;
+      const y = Math.sin(a) * 47 - 4;
+      const rot = ((a * 180) / Math.PI) * side + (side > 0 ? 90 : -90) - 35 * side;
+      return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="3.4" ry="8" transform="rotate(${rot.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+    }).join('');
+  return `<svg class="emblem" viewBox="-62 -62 124 124" aria-hidden="true">
+    <defs>
+      <linearGradient id="emb-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1c0"/><stop offset="0.5" stop-color="#e8b24a"/><stop offset="1" stop-color="#7a4a14"/></linearGradient>
+      <radialGradient id="emb-fire" cx="0.5" cy="0.85" r="0.85"><stop offset="0" stop-color="#fff6d0"/><stop offset="0.35" stop-color="#ffb040"/><stop offset="0.75" stop-color="#ff3a2a"/><stop offset="1" stop-color="#ff3a2a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="emb-glow"><stop offset="0" stop-color="#ff5a3a" stop-opacity="0.55"/><stop offset="1" stop-color="#ff5a3a" stop-opacity="0"/></radialGradient>
+    </defs>
+    <circle class="emb-glow" r="40" fill="url(#emb-glow)"/>
+    <g class="emb-laurel" fill="url(#emb-gold)">${leaves(1)}${leaves(-1)}</g>
+    <g class="emb-ring" fill="none" stroke="url(#emb-gold)">
+      <path d="M -10 -35.5 A 37 37 0 1 0 10 -35.5" stroke-width="5" stroke-linecap="round"/>
+      <circle r="29" stroke-width="1.2" stroke-dasharray="3 5" class="emb-runes"/>
+    </g>
+    <g class="emb-flame">
+      <path d="M0 24 C -17 12 -14 -4 -5 -16 C -5 -6 1 -6 1 -14 C 1 -22 6 -28 4 -34 C 14 -22 19 -6 13 8 C 10 16 6 21 0 24 Z" fill="url(#emb-fire)"/>
+      <path d="M0 22 C -7 15 -6 5 -1 -2 C 0 4 3 4 4 0 C 8 8 7 16 0 22 Z" fill="#fff3c8" opacity="0.85"/>
+    </g>
+    <g class="emb-chain" fill="none" stroke="url(#emb-gold)" stroke-width="3.5">
+      <rect class="emb-link-l" x="-27" y="38" width="16" height="10" rx="5"/>
+      <rect class="emb-link-r" x="11" y="38" width="16" height="10" rx="5"/>
+    </g>
+  </svg>`;
+}
+
+/** Embers drifting up the title screen. */
+function embers(n = 26): string {
+  return `<div class="embers" aria-hidden="true">${Array.from({ length: n }, (_, i) => {
+    const r = (k: number) => ((Math.sin((i + 1) * 12.9898 * k) * 43758.5453) % 1 + 1) % 1;
+    return `<i style="left:${(r(1) * 100).toFixed(1)}%;--s:${(2 + r(2) * 4).toFixed(1)}px;--d:${(7 + r(3) * 9).toFixed(1)}s;--delay:-${(r(4) * 16).toFixed(1)}s;--x:${((r(5) - 0.5) * 160).toFixed(0)}px"></i>`;
+  }).join('')}</div>`;
+}
+
+const letters = (word: string, from = 0) => [...word].map((ch, i) => `<i style="--i:${from + i}">${ch}</i>`).join('');
+
 export function title(g: Game): void {
   const saved = savedRunLabel(g);
   const el = g.ui.push(
     'title-screen',
-    `<div class="update-box update-banner" data-box></div>
+    `${embers()}<div class="update-box update-banner" data-box></div>
     <div class="title-wrap">
       <div class="title-head">
-        <div class="logo">UNBOUND<span>UNDERWORLD</span></div>
+        ${emblem()}
+        <div class="logo"><span class="logo-word">${letters('UNBOUND')}</span><span>${letters('UNDERWORLD', 7)}</span></div>
         <div class="tagline">Fight your way out of the realm of the dead.</div>
       </div>
       <div class="menu">
@@ -157,6 +206,60 @@ export function title(g: Game): void {
     else if (a === 'quit') exitGame();
     else settings(g);
   });
+}
+
+/** Rebind keyboard keys. Arrows, Enter and Esc always keep working in menus. */
+export function keyBindings(g: Game): void {
+  const st = g.save.settings;
+  const rows = () =>
+    BINDABLE.map(({ action, label }) => {
+      const keys = g.input.keysFor(action).map(keyLabel).join(' / ') || '—';
+      return `<button class="btn toggle" data-nav data-bind="${action}"><span>${esc(label)}</span><b>${esc(keys)}</b></button>`;
+    }).join('');
+  const el = g.ui.push(
+    'station',
+    `<div class="panel wide"><h2 class="title">Key Bindings</h2>
+      <div class="subtitle">Pick an action, then press its new key (Esc cancels). Mouse: left Attack, right Special, middle Cast.</div>
+      <div class="keybinds" data-list>${rows()}</div>
+      <div class="row-btns"><button class="btn" data-nav data-a="reset">Reset to defaults</button><button class="btn primary" data-nav data-a="back">Done</button></div></div>`,
+    { onBack: () => g.ui.pop(), cols: 2 },
+  );
+  const refresh = () => {
+    el.querySelector('[data-list]')!.innerHTML = rows();
+    g.ui.refreshItems();
+    wire();
+  };
+  const wire = () => {
+    bind(el, '[data-bind]', (b) => {
+      const action = b.dataset.bind as Action;
+      b.querySelector('b')!.textContent = 'Press a key…';
+      audio.play('select');
+      g.input.captureKey = (code) => {
+        if (code !== 'Escape') {
+          // A key does one game action: take it off any other action first.
+          for (const other of BINDABLE.map((x) => x.action)) {
+            if (other === action) continue;
+            const ks = g.input.keysFor(other);
+            if (ks.includes(code)) st.keys[other] = ks.filter((k) => k !== code);
+          }
+          st.keys[action] = [code];
+          g.applySettings();
+          g.persist();
+        }
+        refresh();
+      };
+    });
+    bind(el, '[data-a]', (b) => {
+      g.input.captureKey = null;
+      if (b.dataset.a === 'reset') {
+        st.keys = {};
+        g.applySettings();
+        g.persist();
+        refresh();
+      } else g.ui.pop();
+    });
+  };
+  wire();
 }
 
 /** Four independent save slots. Switching reloads the game into the chosen slot. */
@@ -277,6 +380,7 @@ export function settings(g: Game): void {
       ${toggle('damageNumbers')}
       ${toggle('hints')}
       ${document.body.classList.contains('touch') ? toggle('doorInfo') : ''}
+      ${document.body.classList.contains('touch') ? '' : '<h3 class="section">Controls</h3><button class="btn toggle" data-nav data-a="keys"><span>Key bindings</span><b>⌨</b></button>'}
       <h3 class="section">Display</h3>
       ${toggle('view3d')}
       ${slider('uiSize', 'UI size', 0.75, 1.5, 0.05)}
@@ -348,6 +452,7 @@ export function settings(g: Game): void {
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
     if (a === 'dev') devMenu(g);
+    else if (a === 'keys') keyBindings(g);
     else if (a === 'window') {
       // Windowed → Borderless → Fullscreen. Borderless reopens the window, so save first.
       const order: WindowMode[] = ['windowed', 'borderless', 'fullscreen'];

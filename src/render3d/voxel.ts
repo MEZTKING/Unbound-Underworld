@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { Camera } from '../engine/camera';
+import { angleDiff } from '../engine/math';
 import type { Actor } from '../game/actor';
 import type { Ally } from '../game/artifacts';
 import type { Enemy } from '../game/enemies/enemy';
@@ -81,6 +82,10 @@ interface Rig {
   root: THREE.Group;
   body: THREE.Group;
   legs: THREE.Object3D[];
+  /** Lower legs (hero only): bend at the knee while striding. */
+  knees: THREE.Object3D[];
+  /** Turns the legs toward the way you run when it differs from facing. */
+  hips: THREE.Object3D | null;
   arms: THREE.Object3D[];
   head: THREE.Object3D | null;
   /** Parts that animate on their own (flames, fuses, lids, orbiting motes). */
@@ -90,6 +95,9 @@ interface Rig {
   unit: number;
   kind: Look['kind'];
   walk: number;
+  /** Smoothed hip turn and time (for breathing while idle). */
+  turn: number;
+  idle: number;
   seen: number;
   weapon: string;
   /** The hero palette this rig was built with (rebuilt when it changes). */
@@ -130,11 +138,11 @@ const LOOKS: Record<string, Look> = {
   Bonecaller: { kind: 'humanoid', body: '#1e2a30', head: '#d8d0c0', limb: '#d8d0c0', eye: '#7dff8a', robe: true, staff: '#7dff8a' },
   Mimic: { kind: 'chest', body: '#6a4020', accent: '#d8a040', eye: '#ff3a3a' },
   'Old Bones': { kind: 'dummy', body: '#6a5040', head: '#e8e0d0', eye: '#2a1a1a' },
-  'Hydra Head': { kind: 'serpent', body: '#6a3a1a', head: '#7a4a24', eye: '#ff8a2a' },
-  'The Hydra': { kind: 'hydra', body: '#5a3a20', head: '#6a4428', eye: '#ffe04a' },
-  Campe: { kind: 'humanoid', body: '#2a0e1c', head: '#5a1a2e', limb: '#5a1a2e', accent: '#c8a0a8', eye: '#ff6a8a', bulk: 1.4, tail: true, horns: true },
-  Talos: { kind: 'humanoid', body: '#6a4a2a', head: '#8a5a2a', limb: '#5a3a1a', accent: '#c88a3a', eye: '#ff6a2a', bulk: 1.5 },
-  Cerberus: { kind: 'quad', body: '#3a2c4a', head: '#4a3a5e', limb: '#241c30', accent: '#ff7a3a', eye: '#ff4a2a', heads: 3, tail: true },
+  'Maw Head': { kind: 'serpent', body: '#6a3a1a', head: '#7a4a24', eye: '#ff8a2a' },
+  'The Many-Maw': { kind: 'hydra', body: '#5a3a20', head: '#6a4428', eye: '#ffe04a' },
+  Vexa: { kind: 'humanoid', body: '#2a0e1c', head: '#5a1a2e', limb: '#5a1a2e', accent: '#c8a0a8', eye: '#ff6a8a', bulk: 1.4, tail: true, horns: true },
+  Aurex: { kind: 'humanoid', body: '#6a4a2a', head: '#8a5a2a', limb: '#5a3a1a', accent: '#c88a3a', eye: '#ff6a2a', bulk: 1.5 },
+  Threefang: { kind: 'quad', body: '#3a2c4a', head: '#4a3a5e', limb: '#241c30', accent: '#ff7a3a', eye: '#ff4a2a', heads: 3, tail: true },
 };
 const DEFAULT_LOOK: Look = { kind: 'humanoid', body: '#4a4050', head: '#6a6070', eye: '#ffd04a' };
 const UNIT: Record<Look['kind'], number> = { humanoid: 56, quad: 30, floater: 50, blob: 34, spider: 26, serpent: 70, chest: 40, dummy: 56, hydra: 120 };
@@ -194,7 +202,7 @@ function newRig(kind: Look['kind'], unit: number, b: RigBuilder, shadowMat: THRE
   root.add(body);
   const shadow = new THREE.Mesh(DISC, shadowMat);
   shadow.renderOrder = -1;
-  return { root, body, legs: [], arms: [], head: null, bits: {}, mats: b.mats, shadow, unit, kind, walk: 0, seen: 0, weapon: '' };
+  return { root, body, legs: [], knees: [], hips: null, arms: [], head: null, bits: {}, mats: b.mats, shadow, unit, kind, walk: 0, turn: 0, idle: 0, seen: 0, weapon: '' };
 }
 
 function buildEnemyRig(look: Look, b: RigBuilder, shadowMat: THREE.Material): Rig {
@@ -401,15 +409,33 @@ function buildHeroRig(p: Player, b: RigBuilder, shadowMat: THREE.Material): Rig 
   const pal = p.palette;
   const rig = newRig('humanoid', 56, b, shadowMat);
   const g = rig.body;
-  rig.legs.push(b.limb(g, pal.tunic, 6, 16, 7, -4, 16, 0), b.limb(g, pal.tunic, 6, 16, 7, 4, 16, 0));
+  // Legs: a thigh and a shin with a boot, jointed at the knee, on hips that
+  // turn toward the way you run.
+  const hips = new THREE.Group();
+  hips.position.y = 16;
+  g.add(hips);
+  rig.hips = hips;
+  const boot = shadeHex(pal.tunic, 0.55);
+  for (const x of [-4, 4]) {
+    const thigh = b.limb(hips, pal.tunic, 6, 8.5, 7, x, 0, 0);
+    const knee = b.limb(thigh, pal.tunic, 5.6, 8, 6.6, 0, -8, 0);
+    b.box(knee, boot, 6.2, 3, 8.6, 0, -6.5, 1);
+    rig.legs.push(thigh);
+    rig.knees.push(knee);
+  }
   const torso = new THREE.Group();
   torso.position.y = 16;
   g.add(torso);
+  rig.bits.torso = torso;
   b.box(torso, pal.tunic, 15, 18, 9, 0, 9, 0);
   b.box(torso, pal.trim, 15.5, 2.5, 9.5, 0, 2, 0);
-  // Cape
-  b.box(torso, pal.cloak, 17, 26, 3, 0, 6, -6);
-  b.box(torso, pal.trim, 17.5, 2.5, 3.5, 0, -6, -6);
+  // Cape: hangs from the shoulders and streams out behind you when you run.
+  const cape = new THREE.Group();
+  cape.position.set(0, 19, -6);
+  torso.add(cape);
+  rig.bits.cape = cape;
+  b.box(cape, pal.cloak, 17, 26, 3, 0, -13, 0);
+  b.box(cape, pal.trim, 17.5, 2.5, 3.5, 0, -25, 0);
   b.box(torso, pal.cloak, 18, 4, 11, 0, 17, -0.5);
   rig.arms.push(b.limb(torso, pal.skin, 5, 16, 5, -10.5, 17, 0), b.limb(torso, pal.skin, 5, 16, 5, 10.5, 17, 0));
   const h = new THREE.Group();
@@ -690,7 +716,9 @@ export class VoxelRenderer {
     }
 
     // Walls: tall to the north and sides, a low ledge to the south.
-    const doorGap = (x: number) => w.doors.some((d) => Math.abs(x - d.x) < DOOR_W / 2);
+    // A wall block is left out if any part of it would reach into a doorway; the
+    // door's posts fill the rest of the gap.
+    const doorGap = (x: number) => w.doors.some((d) => Math.abs(x - d.x) < DOOR_W / 2 + B / 2);
     const wallCol = (x: number, z: number, rowsUp: number, cap: boolean) => {
       for (let k = 0; k < rowsUp; k++) {
         const tint = 0.85 + hash(Math.round(x), Math.round(z) + k * 13, seed) * 0.3;
@@ -813,23 +841,27 @@ export class VoxelRenderer {
       const frame = new THREE.MeshLambertMaterial({ color: capStone(1.2) });
       const trimM = new THREE.MeshBasicMaterial({ color: bio.trim });
       const half = DOOR_W / 2;
+      // Posts and lintel stand 6 units proud of the wall, so no face of theirs
+      // lies flat on a wall face (shared faces flicker).
+      const postW = B + 14;
+      const depth = 2 * B + 6;
       for (const s of [-1, 1]) {
         const post = new THREE.Mesh(BOX, frame);
-        post.scale.set(14, 150, 2 * B);
-        post.position.set(s * (half + 7), 75, 0);
+        post.scale.set(postW, 150, depth);
+        post.position.set(s * (half + postW / 2), 75, 3);
         post.castShadow = high;
         g.add(post);
         const tr = new THREE.Mesh(BOX, trimM);
         tr.scale.set(3, 120, 2);
-        tr.position.set(s * (half - 1.5), 61, B + 1.2);
+        tr.position.set(s * (half - 1.5), 61, B + 7.5);
         g.add(tr);
       }
       const lintel = new THREE.Mesh(BOX, frame);
-      lintel.scale.set(DOOR_W + 28, 26, 2 * B);
-      lintel.position.set(0, 150, 0);
+      lintel.scale.set(DOOR_W + 2 * postW, 26, depth);
+      lintel.position.set(0, 150, 3);
       g.add(lintel);
       const dark = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#050307' }));
-      dark.scale.set(DOOR_W, 140, 4);
+      dark.scale.set(DOOR_W - 2, 140, 4);
       dark.position.set(0, 68, -B + 2);
       g.add(dark);
       const glow = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -1065,16 +1097,24 @@ export class VoxelRenderer {
     rig.body.position.set(0, 0, 0);
     rig.body.rotation.set(0, 0, 0);
     const speed = Math.hypot(a.vx, a.vy);
-    rig.walk += dt * Math.min(speed, 400) * 0.055;
-    const amp = Math.min(1, speed / 120) * 0.7;
-    rig.legs.forEach((l, i) => {
-      if (rig.kind === 'spider') l.rotation.x = Math.sin(rig.walk * 1.5 + i) * amp * 0.5;
-      else l.rotation.x = Math.sin(rig.walk + (i % 2 ? Math.PI : 0) + (i >= 2 ? Math.PI : 0)) * amp;
-    });
-    rig.arms.forEach((l, i) => {
-      l.rotation.set(Math.sin(rig.walk + (i ? 0 : Math.PI)) * amp * 0.8, 0, 0);
-    });
-    if (speed > 20) rig.body.position.y = Math.abs(Math.sin(rig.walk)) * 1.5;
+    rig.idle += dt;
+    if (rig.knees.length) this.stride(rig, a, dt, speed);
+    else {
+      rig.walk += dt * Math.min(speed, 400) * 0.055;
+      const amp = Math.min(1, speed / 120) * 0.7;
+      rig.legs.forEach((l, i) => {
+        if (rig.kind === 'spider') l.rotation.x = Math.sin(rig.walk * 1.5 + i) * amp * 0.5;
+        else l.rotation.x = Math.sin(rig.walk + (i % 2 ? Math.PI : 0) + (i >= 2 ? Math.PI : 0)) * amp;
+      });
+      rig.arms.forEach((l, i) => {
+        l.rotation.set(Math.sin(rig.walk + (i ? 0 : Math.PI)) * amp * 0.8, 0, 0);
+      });
+      if (speed > 20) {
+        // Two bumps a stride, and a lean into the run for upright walkers.
+        rig.body.position.y = Math.abs(Math.cos(rig.walk)) * 2 * amp;
+        if (rig.kind === 'humanoid') rig.body.rotation.x = 0.12 * amp;
+      }
+    }
     const f = a.flash > 0 && !a.dead ? 1 : 0;
     for (const m of rig.mats) {
       if (f) m.emissive.setRGB(1, 1, 1);
@@ -1083,6 +1123,53 @@ export class VoxelRenderer {
     }
     rig.shadow.position.set(a.x, 0.6, a.y);
     rig.shadow.scale.setScalar(a.r * 1.15);
+  }
+
+  /**
+   * The hero's stride: thighs swing, knees fold on the back-swing, the hips
+   * turn toward the way you run (backpedalling when it's behind you), and the
+   * body leans in, bobs twice a step and twists against the legs. Idle, the
+   * hero breathes.
+   */
+  private stride(rig: Rig, a: Actor, dt: number, speed: number): void {
+    const run = Math.min(1, speed / 260);
+    const amp = Math.min(1, speed / 90);
+    // Which way the legs go relative to where the hero faces.
+    let rel = speed > 20 ? angleDiff(a.facing, Math.atan2(a.vy, a.vx)) : 0;
+    let dir = 1;
+    if (rel > Math.PI / 2) (rel -= Math.PI), (dir = -1);
+    else if (rel < -Math.PI / 2) (rel += Math.PI), (dir = -1);
+    rig.turn += (-rel - rig.turn) * Math.min(1, dt * 14);
+    if (rig.hips) rig.hips.rotation.y = rig.turn;
+    rig.walk += dt * Math.min(speed, 420) * 0.042 * dir;
+    const ph = rig.walk;
+    const reach = 0.5 + run * 0.3;
+    rig.legs.forEach((l, i) => {
+      const p = ph + (i ? Math.PI : 0);
+      l.rotation.set(Math.sin(p) * reach * amp, 0, 0);
+      // Knees fold as the foot lifts and swings through, and give a little on landing.
+      const lift = Math.max(0, -Math.cos(p));
+      rig.knees[i].rotation.set((lift * (0.5 + run * 0.6) + 0.06) * amp, 0, 0);
+    });
+    rig.arms.forEach((l, i) => {
+      l.rotation.set(Math.sin(ph + (i ? 0 : Math.PI)) * (0.45 + run * 0.35) * amp, 0, i ? 0.08 : -0.08);
+    });
+    const torso = rig.bits.torso;
+    if (torso) {
+      torso.rotation.set(0, Math.sin(ph) * 0.14 * amp, 0);
+      torso.scale.set(1, 1, 1);
+    }
+    const cape = rig.bits.cape;
+    if (speed > 20) {
+      rig.body.position.y = Math.abs(Math.cos(ph)) * (0.8 + run * 1.2) * amp;
+      rig.body.rotation.x = (0.04 + run * 0.08) * amp * Math.cos(rel) * (dir > 0 ? 1 : -0.5);
+      if (cape) cape.rotation.x = (0.1 + run * 0.25) * amp + Math.sin(ph * 2) * 0.05 * amp;
+    } else {
+      const b = Math.sin(rig.idle * 2.2);
+      if (torso) torso.scale.set(1 + b * 0.012, 1 + b * 0.018, 1 + b * 0.012);
+      rig.arms.forEach((l, i) => (l.rotation.z = (i ? 1 : -1) * (0.06 + b * 0.03)));
+      if (cape) cape.rotation.x = 0.04 + Math.sin(rig.idle * 1.3) * 0.03;
+    }
   }
 
   private poseEnemy(rig: Rig, e: Enemy, dt: number, t: number): void {
@@ -1181,7 +1268,9 @@ export class VoxelRenderer {
       case 'dash':
         rig.body.rotation.x = 0.45;
         rig.legs.forEach((l, i) => (l.rotation.x = i ? 0.8 : -0.4));
+        rig.knees.forEach((k, i) => (k.rotation.x = i ? 0.9 : 0.3));
         rig.arms.forEach((a) => (a.rotation.x = 0.9));
+        if (rig.bits.cape) rig.bits.cape.rotation.x = 1.1;
         break;
       case 'slam':
         rig.arms.forEach((a) => (a.rotation.x = -2.8));
@@ -1198,7 +1287,8 @@ export class VoxelRenderer {
         break;
     }
     if (p.airborne && p.state !== 'slam') {
-      rig.legs.forEach((l, i) => (l.rotation.x = i ? -0.6 : 0.3));
+      rig.legs.forEach((l, i) => (l.rotation.x = i ? -0.7 : 0.2));
+      rig.knees.forEach((k, i) => (k.rotation.x = i ? 1.1 : 0.7));
     }
     rig.shadow.scale.setScalar(17 * (1 - Math.min(0.5, p.z / 120)));
   }
@@ -1362,7 +1452,8 @@ export class VoxelRenderer {
         .map((s) => ({ s, d: Math.hypot(s.x - tx, s.y - tz) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, 4);
-      for (const { s } of near) put(s.x, s.y, s.z, s.color, s.r, s.k * (0.9 + Math.sin(t * 9 + s.x) * 0.1));
+      // A gentle, slow flicker: fast changes in light read as glitches.
+      for (const { s } of near) put(s.x, s.y, s.z, s.color, s.r, s.k * (0.95 + Math.sin(t * 3 + s.x) * 0.05));
       for (const e of w.enemies) if (e.isBoss && !e.dead) put(e.x, e.y, e.height * 0.6, '#ff5a5a', 320, 1.2);
       const fl = [...w.flashes].sort((a, b) => b.r - a.r);
       for (const f of fl) put(f.x, f.y, 40, f.color, f.r * 1.2, 2.5 * (1 - f.t / f.dur));

@@ -92,11 +92,11 @@ export abstract class Boss extends Enemy {
   }
 }
 
-// ================================================================ Campe, Jailer of Tartarus
+// ================================================================ Vexa, Warden of Chains (first guardian)
 
 export class Campe extends Boss {
-  readonly name = 'Campe';
-  readonly title = 'Jailer of Tartarus';
+  readonly name = 'Vexa';
+  readonly title = 'Warden of Chains';
   private dashDir = { x: 0, y: 0 };
   private lashes = 0;
   private aim = 0;
@@ -267,10 +267,10 @@ export class Campe extends Boss {
   }
 }
 
-// ================================================================ The Hydra of Lerna
+// ================================================================ The Many-Maw (second guardian)
 
 export class HydraHead extends Enemy {
-  readonly name = 'Hydra Head';
+  readonly name = 'Maw Head';
   constructor(x: number, y: number, s = 1) {
     super(x, y, { hp: 260, speed: 0, r: 26, height: 70, damage: 9, knockResist: 1, gold: [0, 0] }, s);
     this.cd = 1.5;
@@ -341,8 +341,8 @@ function drawSerpentHead(ctx: CanvasRenderingContext2D, t: number, facing: numbe
 }
 
 export class Hydra extends Boss {
-  readonly name = 'The Hydra';
-  readonly title = 'Many-Headed Terror of Lerna';
+  readonly name = 'The Many-Maw';
+  readonly title = 'Coiled Terror of the Fields';
   private heads = 0;
   private bite = { x: 0, y: 0 };
   private lunge = 0;
@@ -473,11 +473,11 @@ export class Hydra extends Boss {
   }
 }
 
-// ================================================================ Talos, the Bronze Colossus
+// ================================================================ Aurex, the Gilded Colossus (third guardian)
 
 export class Talos extends Boss {
-  readonly name = 'Talos';
-  readonly title = 'the Bronze Colossus';
+  readonly name = 'Aurex';
+  readonly title = 'the Gilded Colossus';
   private aim = 0;
   private sweep = 0;
   private tick = 0;
@@ -692,11 +692,11 @@ export class Talos extends Boss {
   }
 }
 
-// ================================================================ Cerberus, Warden of the Gate
+// ================================================================ Threefang, Hound of the Last Gate (final guardian)
 
 export class Cerberus extends Boss {
-  readonly name = 'Cerberus';
-  readonly title = 'Warden of the Gate';
+  readonly name = 'Threefang';
+  readonly title = 'Hound of the Last Gate';
   private dir = { x: 0, y: 0 };
   private leap = { sx: 0, sy: 0, tx: 0, ty: 0 };
   z = 0;

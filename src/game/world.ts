@@ -161,6 +161,8 @@ export class World {
   encounter: Encounter | null = null;
   boss: Enemy | null = null;
   banner: { title: string; sub: string; t: number } | null = null;
+  /** Behind the title screen the camera drifts slowly around the hall. */
+  titleDrift = false;
   hurtFlash = 0;
   /** Darkness from Erebos' Eclipse. */
   eclipseT = 0;
@@ -812,6 +814,10 @@ export class World {
       const k = Math.min(d * 0.35, 240) / d;
       lead.x += dx * k;
       lead.y += dy * k;
+    }
+    if (this.titleDrift) {
+      lead.x += Math.sin(this.time * 0.11) * 150;
+      lead.y += Math.sin(this.time * 0.07 + 1) * 90 - 40;
     }
     this.camera.follow({ x: p.x, y: p.y - 30 }, rawDt, this.room, lead);
   }

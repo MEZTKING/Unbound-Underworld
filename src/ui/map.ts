@@ -36,9 +36,9 @@ export function mapScreen(g: Game): void {
   const done = run ? run.roomsCleared : 0;
   const el = g.ui.push(
     'station',
-    `<div class="panel wide map-panel"><h2 class="title">Map of the Underworld</h2>
+    `<div class="panel wide map-panel"><h2 class="title">Chart of the Depths</h2>
       <div class="subtitle">${run ? `${done} chambers cleared of about ${total}` : 'No escape in progress'} · your best: ${best} chambers ★ · escapes: ${g.save.stats.escapes}</div>
-      <div class="map">${rows}<div class="map-row exit"><div class="map-head"><b>The Surface</b><small>${g.save.stats.escapes ? 'You have seen it.' : 'Freedom lies beyond Cerberus.'}</small></div></div></div>
+      <div class="map">${rows}<div class="map-row exit"><div class="map-head"><b>The Living World</b><small>${g.save.stats.escapes ? 'You have seen it.' : 'Freedom lies beyond Threefang.'}</small></div></div></div>
       <button class="btn primary" data-nav data-a="back">Close</button></div>`,
     { onBack: () => g.ui.pop() },
   );

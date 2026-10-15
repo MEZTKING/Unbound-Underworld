@@ -35,10 +35,10 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
 
 | Region | Chambers | Hazard | Guardian |
 |---|---|---|---|
-| Tartarus | 5 combat chambers, then the antechamber | Spike traps | Campe |
-| Asphodel | 5, then the antechamber | Lava | The Hydra |
-| Elysium | 5, then the antechamber | Chasms (pits) | Talos |
-| Gates of the Styx | Antechamber only | — | Cerberus (final) |
+| The Shackled Deep | 5 combat chambers, then the antechamber | Spike traps | Vexa |
+| The Ember Fields | 5, then the antechamber | Lava | The Many-Maw |
+| The Gilded Groves | 5, then the antechamber | Chasms (pits) | Aurex |
+| The Last Gate | Antechamber only | — | Threefang (final) |
 
 - **Chambers.** Each combat chamber spawns waves of foes, bought from an encounter budget that grows with depth and region. Clearing the room drops its reward, then the exit doors open.
 - **Doors.** Each exit door shows its reward and a one-line description ("No fight · buy with obols") on the floor in front of it, so you choose your path:
@@ -81,7 +81,8 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
   - Cast: a shard that lodges in foes; walk over it to pick it up again.
   - Dash: brief invulnerability. Attacking right after a dash gives a *Dash-Strike*.
   - Jump: attack mid-air to *Slam*.
-  - Potion, artifact slots 1–3, and Wrath.
+  - Potion, artifact slots 1–3, and Wrath. Keyboard keys can be rebound (`Settings.keys`, applied with `Input.setBindings`; menu keys always work).
+- **Moving while fighting** (`player.ts`, the `action` state): basic attack chains keep at least 85% of walking speed (`BASIC_MOVE`), casts 70%, other skills 45% and held charges 60%. Basic attacks never push the hero forward; only kit moves with a `lunge` (dash-strikes, some specials) do.
 - **Weapons** (5): each has a combo, a dash-strike, a special and a slam. See GAME_DATA.md → *Weapons* for names, costs and anvil upgrades.
 - **Forging** adds weapon damage per tier. **Awakened** (Tier III and above) fires an arcane crescent wave every 4th Attack; it grows at Tier IV, and at Tier V (**Mythic**) it splits into three and gives a weapon aura.
 - **Damage pipeline** (`combat.ts → damageEnemy`), applied in this order:
@@ -153,7 +154,7 @@ All guardians share these rules:
 - Below **50% health** they enter **phase 2**: 1.4s of invulnerability, then about 30% faster attacks and more projectiles.
 - When a guardian dies, every remaining foe in the room dies too.
 
-### Campe, Jailer of Tartarus (2400 HP)
+### Vexa, Warden of Chains (2400 HP)
 Circles you at mid range.
 - **Lash:** 2 whip lines (3 in phase 2).
 - **Dash:** a 700-long marked lane, then a fast dash for heavy damage.
@@ -161,7 +162,7 @@ Circles you at mid range.
 - **Phase 2:** also summons 3 Ghouls once.
 - *Counter:* step sideways off the dash lane; slip through the gaps in the rings.
 
-### The Hydra (3400 HP)
+### The Many-Maw (3400 HP)
 Doesn't move.
 - **Bite:** a circle on your position (0.85s telegraph).
 - **Spit:** lobbed globs that leave fire patches (4, or 6 in phase 2).
@@ -170,28 +171,30 @@ Doesn't move.
 - **Extra heads:** at **70% and 35%** health it grows 2 extra heads (up to 4). They spit fire bolts every 2s and die with the body.
 - *Counter:* clear heads if overwhelmed, otherwise focus the body; keep away from the bite circles.
 
-### Talos, the Bronze Colossus (4200 HP + 800 armor)
+### Aurex, the Gilded Colossus (4200 HP + 800 armor)
 - **Slam:** in front of him, sending out a **shockwave ring** (jump it). He slams twice in phase 2.
 - **Laser:** a sweeping laser after a 1s charge.
 - **Barrage:** a bomb barrage (6 bombs, or 9 in phase 2).
 - **Overheat:** breaking his armor makes him **overheat**: he is stunned for 3.2s and takes **+50% damage**. His armor returns 9s after it breaks.
 - *Counter:* strip the armor, then unload during the overheat.
 
-### Cerberus, Warden of the Gate (5600 HP), the final guardian
+### Threefang, Hound of the Last Gate (5600 HP), the final guardian
 - **Charge:** along a long marked lane. If he hits a wall he is stunned for 1.6s.
 - **Breath:** fire in 3 cones. In phase 2 it leaves fire patches.
 - **Leap:** a slam on your position plus a shockwave ring (jump both).
 - **Summons:** at **66% and 33%** health he summons 3 Hisslings.
 - *Counter:* bait the charges into walls; jump the leap shockwaves.
 
-Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amount of experience and unlocks Jump (if it isn't already) and the hero Selene.
+Slaying Threefang is an **escape**. It raises the Torment cap, gives a large amount of experience and unlocks Jump (if it isn't already) and the hero Selene.
 
 ## 8b. Loot and gear
 
 Unlocks at level 10 (`feature: 'gear'`). Numbers are in GAME_DATA.md → *Loot and gear*; the code is `src/game/gear.ts` (data) and `src/ui/gear.ts` (screen).
-- **Materials** drop from foes during escapes and are kept forever (`save.materials`): Bone Dust everywhere, a region material (Ember Shard, Golden Ichor, Styx Pearl), and Titan Scales from guardians and enchanted foes.
-- **Gear** has a slot (helmet, armor, leggings, boots), a rarity (1–4 random bonuses) and a level (1–5, +15% per level). It drops from foes (rarely), enchanted foes, chests and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
-- **Gear & Inventory** (Armory or pause menu): equip, upgrade, salvage for materials, or craft a random piece with one of three recipes.
+- **Materials** drop from foes during escapes and are kept forever (`save.materials`): Bone Dust everywhere, a region material (Ember Shard, Golden Ichor, Gate Pearl), and Titan Scales from guardians and enchanted foes.
+- **Gear** has a slot (helmet, armor, leggings, boots), one of seven tiers (Common, Uncommon, Rare, Epic, Legendary, Unique, Ghost: 1–5 random bonuses, stronger with each tier) and a star level. It drops from foes (rarely), enchanted foes, chests and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
+- **Tiers** (`rarityOdds`): Ghost is the rarest at any luck (0.3%, at most 1%); Unique is next. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
+- **Stars** (1–10): stars 1–5 are gold (+15% each), and stars 6–10 turn them purple one by one (+20% each, and they cost Titan Scales).
+- **Gear & Inventory** (Armory or pause menu): equip, star up, salvage for materials, or craft a random piece with one of four recipes.
 - Equipped bonuses are added in `Game.recomputeStats` after talents, hero and forge.
 
 ## 9. The Hall of Shades (hub)
@@ -212,7 +215,7 @@ Unlocks at level 10 (`feature: 'gear'`). Numbers are in GAME_DATA.md → *Loot a
 - **Platforms:**
   - Browser and installable web app (PWA, offline).
   - Desktop: Electron. Windows, macOS and Linux, with a one-button self-updater for the Windows installer and the Linux AppImage.
-  - Android: Capacitor APK, plus a Play Store bundle build.
+  - Android: Capacitor APK (the `sideload` flavour, which downloads its own updates and opens the system installer through `ApkUpdaterPlugin`), plus a Play Store bundle (the `play` flavour, which has no install permission and leaves updates to the store).
 - **Touch:** a floating joystick on the left and an action cluster on the right: Attack, Special above it, Dash beside it, Cast, Jump, Wrath, potion and artifacts. Buttons appear as their mechanics unlock.
 - **Views:** the 3D voxel view (default) renders the world with three.js, which is only loaded when this view is used. It has a Hades-style camera: the room is turned 45° and seen from about 40° up, so rooms show as diamonds with the doors on the far edges. Movement, sticks and mouse aim are turned to match, so up on the keyboard is up on screen. Effects, damage numbers, health bars, pickups and prompts are drawn by a 2D layer on top. That layer uses the same angle (`Camera.setAngle`), and heights go through `Camera.lift`, so the effects line up with the 3D scene. The classic 2D view looks straight down and draws everything on the canvas. On desktop the 3D view has shadows and point lights; phones get no shadows and a lower resolution.
 - **Scaling:** the HUD and menus scale with screen size (1 at 1280×760, up to ×3 on 4K). Phones get compact layouts: a narrower health panel and boon choices that fit without scrolling.
@@ -225,7 +228,9 @@ Unlocks at level 10 (`feature: 'gear'`). Numbers are in GAME_DATA.md → *Loot a
 - **Charon's wares** show what they do once you've bought that kind before (`save.shopSeen`); until then the text is blurred.
 - **Achievements** (`src/game/codex.ts`) are checked whenever the save is written. God mode or developer options switch them off for the session.
 - **Developer options** (`src/ui/dev.ts`): unlocked per device by tapping the version in Settings 7 times, or with `?dev`.
-- **Music:** each guardian has its own theme (`BOSS_THEMES` in `audio.ts`); phase 2 adds hi-hats and a high lead.
+- **Music:** all synthesized (`audio.ts`): a drone, plucked arpeggios, a lyre, bowed strings, a flute with vibrato, FM bells, a formant choir, kick, snare, hats, toms and a shaker, through a light reverb. Each mood (title, hall, exploring, fighting) has its own arrangement, and each guardian has its own theme (`BOSS_THEMES`); phase 2 adds hi-hats, a high lead and (for most guardians) the choir.
+- **Title screen:** an original emblem (a broken shackle in laurels with a flame), letters that rise in, a gold shine and drifting embers (CSS, with `prefers-reduced-motion` respected), over the hall with the camera slowly drifting (`World.titleDrift`).
+- **Autosave:** at the start of every chamber (with a *Saved* mark), on every save-data change, and when the game goes to the background.
 - **Settings:**
   - Audio.
   - Assist mode, aim assist, damage numbers, control hints, and door descriptions (every door, or only the nearest).

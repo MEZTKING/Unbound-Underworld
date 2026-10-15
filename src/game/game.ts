@@ -1,6 +1,6 @@
 import { audio, type Mood } from '../engine/audio';
 import { Camera } from '../engine/camera';
-import { Input } from '../engine/input';
+import { Input, keyLabel, type Action } from '../engine/input';
 import { clamp, fx, Rng } from '../engine/math';
 import { Particles } from '../engine/particles';
 import { UI } from '../ui/overlay';
@@ -26,9 +26,9 @@ import { createBoss } from './enemies';
 import type { Enemy } from './enemies/enemy';
 import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
-import { drawHUD, drawHudTooltip } from './hud';
+import { drawHUD, drawHudTooltip, drawSaveIcon, useKeyLabels } from './hud';
 import { newAchievements } from './codex';
-import { applyGear, costText, equippedItems, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollGear, salvageValue, SLOT_NAME, type MaterialId } from './gear';
+import { applyGear, costText, equippedItems, gearDefiance, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollGear, salvageValue, SLOT_NAME, type MaterialId } from './gear';
 import type { Loot } from './entities';
 import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, type SaveData } from './meta';
 import { Player, useHeroLooks } from './player';
@@ -46,6 +46,7 @@ import { World, type Door, type Interactable, type WorldHost } from './world';
 const STEP = 1 / 60;
 
 type Mode = 'title' | 'hub' | 'run' | 'over';
+const SAVE_MARK = 1.8;
 
 export interface RunSummary {
   victory: boolean;
@@ -175,11 +176,16 @@ export class Game implements WorldHost {
   /** Pause and go quiet when the tab or app is backgrounded. */
   private onVisibility(): void {
     if (document.hidden) {
+      // Autosave whenever the game goes to the background.
+      this.persist();
       this.touch.releaseAll();
       audio.suspend();
       if ((this.mode === 'hub' || this.mode === 'run') && !this.ui.open && this.player.state !== 'dead') screens.pause(this);
     } else audio.resume();
   }
+
+  /** Seconds left on the "Saved" mark shown after an autosave. */
+  private saveMark = 0;
 
   persist(): void {
     this.checkAchievements();
@@ -213,6 +219,12 @@ export class Game implements WorldHost {
     prefs.assist = st.assist;
     prefs.doorInfo = st.doorInfo;
     this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
+    this.input.setBindings(st.keys as Partial<Record<Action, string[]>>);
+    // The HUD shows the first key bound to each action (keyboard play only).
+    useKeyLabels((a) => {
+      const k = this.input.keysFor(a as Action)[0];
+      return k ? keyLabel(k) : '';
+    });
     this.updateUiScale();
     this.applyView();
   }
@@ -388,6 +400,8 @@ export class Game implements WorldHost {
       screens.pause(this);
       return;
     }
+    w.titleDrift = this.mode === 'title';
+    this.saveMark = Math.max(0, this.saveMark - dt);
     if (this.mode === 'title') {
       this.input.endStep();
       w.update(dt);
@@ -428,6 +442,7 @@ export class Game implements WorldHost {
         const k = this.dpr * this.uiScale;
         ctx.setTransform(k, 0, 0, k, 0, 0);
         drawHUD(ctx, w, this.run, this.save, this.camera.vw / this.uiScale, this.camera.vh / this.uiScale, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
+        if (this.saveMark > 0) drawSaveIcon(ctx, this.camera.vw / this.uiScale, 1 - this.saveMark / SAVE_MARK, performance.now() / 1000);
         if (!this.touch.enabled && this.input.mouseInside && !this.ui.open) {
           drawHudTooltip(ctx, this.input.mouse.x / this.uiScale, this.input.mouse.y / this.uiScale, this.camera.vw / this.uiScale);
         }
@@ -567,6 +582,7 @@ export class Game implements WorldHost {
     this.player = new Player(this.save.weapon, this.save.character);
     this.run.level = this.level;
     this.run.deathDefiance += this.save.talents.undying ?? 0;
+    if (this.has('gear')) this.run.deathDefiance += gearDefiance(equippedItems(this.save.gear));
     if (!this.has('artifacts')) this.run.artifacts[0] = null;
     this.recomputeStats(true);
     this.player.castAmmo = this.stats.castAmmo;
@@ -582,6 +598,7 @@ export class Game implements WorldHost {
     // Autosave at the start of every chamber, so Save & Quit (or closing the
     // app) resumes here.
     writeRun(run.snapshot(this.player.hp, this.player.souls));
+    this.saveMark = SAVE_MARK;
     this.particles.clear();
     const biome = run.biome;
     const layout = generateLayout(run.rng, biome, plan.kind, this.stats.chestChance);
@@ -830,7 +847,12 @@ export class Game implements WorldHost {
         this.ui.toast(`Inventory full: ${item.name} salvaged for ${costText(back)}`, 3000);
       } else {
         this.save.gear.items.push(item);
-        this.ui.toast(`Found ${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}: ${item.name}`, 2600);
+        const top = item.rarity === 'ghost' || item.rarity === 'unique';
+        this.ui.toast(`${top ? '✦ ' : ''}Found ${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}: ${item.name}`, top ? 4200 : 2600);
+        if (top) {
+          audio.play('boon');
+          w.particles.burst(p.x, p.y - 20, color, 30, 260, { kind: 'spark', life: 0.8 });
+        }
       }
       w.particles.text(p.x, p.y, 80, item.name, color, 18);
     }

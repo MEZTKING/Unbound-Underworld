@@ -7,7 +7,7 @@ import { CHARACTERS } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
 import { ENCHANTS, MAX_ENCHANT_TIER } from '../src/game/enchants';
 import { heatScale, UPGRADES, WEAPON_IDS } from '../src/game/meta';
-import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, SLOT_NAME } from '../src/game/gear';
+import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, PERKS, RARITY_ORDER, rarityOdds, SLOT_NAME, upgradeCost } from '../src/game/gear';
 import { FORGE, levelFromXp, MAX_LEVEL, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
 import { BIOMES, ENEMY_COST } from '../src/game/rooms';
@@ -191,16 +191,36 @@ table(
   ['Material', 'Source'],
   MATERIAL_IDS.map((k) => [`${MATERIALS[k].glyph} ${MATERIALS[k].name}`, MATERIALS[k].desc]),
 );
+const odds0 = rarityOdds(0);
+const oddsBoss = rarityOdds(0.6);
+const pc = (v: number) => `${(v * 100).toFixed(v < 0.01 ? 1 : 0)}%`;
 table(
-  ['Rarity', 'Bonuses', 'Bonus strength ×'],
-  Object.values(GEAR_RARITY).map((r) => [r.name, r.affixes, r.power]),
+  ['Tier', 'Bonuses', 'Bonus strength ×', 'Chance (foe)', 'Chance (guardian luck)', 'Perk'],
+  RARITY_ORDER.map((k) => [GEAR_RARITY[k].name, GEAR_RARITY[k].affixes, GEAR_RARITY[k].power, pc(odds0[k]), pc(oddsBoss[k]), k === 'unique' ? 'One Unique perk' : k === 'ghost' ? 'One Ghost perk' : '—']),
+);
+line('Guardians always drop Rare or better (lower tiers roll up to Rare).');
+line();
+table(
+  ['Perk', 'Tier', 'Effect'],
+  (Object.keys(PERKS) as (keyof typeof PERKS)[]).map((k) => [PERKS[k].name, PERKS[k].ghost ? 'Ghost' : 'Unique', PERKS[k].desc]),
 );
 table(
   ['Bonus', 'Common, level 1 (typical)', 'Slots'],
   (Object.keys(AFFIXES) as (keyof typeof AFFIXES)[]).map((k) => [AFFIXES[k].name(AFFIXES[k].base), AFFIXES[k].flat ? AFFIXES[k].base : `${Math.round(AFFIXES[k].base * 100)}%`, (AFFIXES[k].slots ?? GEAR_SLOTS).map((s) => SLOT_NAME[s]).join(', ')]),
 );
-line(`Each upgrade level adds 15% to every bonus (max level ${MAX_GEAR_LEVEL}). Upgrades cost Bone Dust, plus Ember Shards (Rare), Golden Ichor and Titan Scales (Epic) or Styx Pearls and Titan Scales (Legendary).`);
+line(`Pieces are starred up from 1 to ${MAX_GEAR_LEVEL} stars. The first five stars are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.`);
 line();
+const sample = (rarity: keyof typeof GEAR_RARITY, level: number) => costText(upgradeCost({ uid: '', slot: 'helmet', rarity, name: '', level, affixes: [] }));
+table(
+  ['Stars', 'Bonus ×', 'Next star (Common)', 'Next star (Epic)', 'Next star (Ghost)'],
+  Array.from({ length: MAX_GEAR_LEVEL }, (_, i) => i + 1).map((l) => [
+    l <= 5 ? `${'★'.repeat(l)} gold` : `${'★'.repeat(l - 5)} purple + ${'★'.repeat(10 - l)} gold`,
+    levelMult(l).toFixed(2),
+    l < MAX_GEAR_LEVEL ? sample('common', l) : '—',
+    l < MAX_GEAR_LEVEL ? sample('epic', l) : '—',
+    l < MAX_GEAR_LEVEL ? sample('ghost', l) : '—',
+  ]),
+);
 table(['Recipe', 'Rarity', 'Cost'], CRAFTS.map((c) => [c.name, `${GEAR_RARITY[c.min].name} or better`, costText(c.cost)]));
 line();
 

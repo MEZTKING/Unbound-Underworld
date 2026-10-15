@@ -1,11 +1,18 @@
 package io.github.meztking.unboundunderworld;
 
+import android.os.Bundle;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ApkUpdaterPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {

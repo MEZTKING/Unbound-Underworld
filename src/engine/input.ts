@@ -25,7 +25,8 @@ export type Action =
   | 'confirm'
   | 'back';
 
-const KEYMAP: Record<string, Action[]> = {
+/** The default keyboard layout. Game actions can be rebound (see `Input.setBindings`). */
+const DEFAULT_KEYMAP: Record<string, Action[]> = {
   KeyW: ['up'],
   ArrowUp: ['up', 'menuUp'],
   KeyS: ['down'],
@@ -42,6 +43,8 @@ const KEYMAP: Record<string, Action[]> = {
   Digit1: ['artifact1'],
   Digit2: ['artifact2'],
   Digit3: ['artifact3'],
+  Digit4: ['potion'],
+  Digit5: ['wrath'],
   Numpad1: ['artifact1'],
   Numpad2: ['artifact2'],
   Numpad3: ['artifact3'],
@@ -58,6 +61,42 @@ const KEYMAP: Record<string, Action[]> = {
   Enter: ['confirm'],
   NumpadEnter: ['confirm'],
 };
+
+/** Game actions the player can rebind, in the order the Controls screen lists them. */
+export const BINDABLE: { action: Action; label: string }[] = [
+  { action: 'up', label: 'Move up' },
+  { action: 'down', label: 'Move down' },
+  { action: 'left', label: 'Move left' },
+  { action: 'right', label: 'Move right' },
+  { action: 'attack', label: 'Attack' },
+  { action: 'special', label: 'Special' },
+  { action: 'cast', label: 'Cast' },
+  { action: 'dash', label: 'Dash' },
+  { action: 'jump', label: 'Jump' },
+  { action: 'interact', label: 'Interact' },
+  { action: 'potion', label: 'Potion' },
+  { action: 'artifact1', label: 'Artifact 1' },
+  { action: 'artifact2', label: 'Artifact 2' },
+  { action: 'artifact3', label: 'Artifact 3' },
+  { action: 'wrath', label: 'Wrath' },
+];
+
+/** Keys bound to an action in the default layout. */
+export function defaultKeysFor(a: Action): string[] {
+  return Object.entries(DEFAULT_KEYMAP)
+    .filter(([, acts]) => acts.includes(a))
+    .map(([k]) => k);
+}
+
+/** "KeyW" → "W", "Digit4" → "4", "ShiftLeft" → "Left Shift". */
+export function keyLabel(code: string): string {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Numpad')) return `Num ${code.slice(6)}`;
+  if (code.startsWith('Arrow')) return { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] ?? code;
+  const named: Record<string, string> = { ShiftLeft: 'Left Shift', ShiftRight: 'Right Shift', ControlLeft: 'Left Ctrl', ControlRight: 'Right Ctrl', AltLeft: 'Left Alt', AltRight: 'Right Alt', Space: 'Space', Tab: 'Tab', CapsLock: 'Caps Lock', Backquote: '`' };
+  return named[code] ?? code;
+}
 
 const MOUSEMAP: Record<number, Action> = { 0: 'attack', 1: 'cast', 2: 'special' };
 
@@ -104,19 +143,53 @@ export class Input {
   lastTouchUse = -Infinity;
   /** Listeners for raw key presses (used by menus). */
   onAction: ((a: Action) => void) | null = null;
+  /** When set, the next key press goes here instead (rebinding a key). */
+  captureKey: ((code: string) => void) | null = null;
+  private keymap: Record<string, Action[]> = { ...DEFAULT_KEYMAP };
+
+  /**
+   * Applies custom bindings: for each rebound action, its default keys are
+   * replaced by the chosen ones. Menu keys (arrows, Enter, Esc) always work.
+   */
+  setBindings(custom: Partial<Record<Action, string[]>>): void {
+    const map: Record<string, Action[]> = {};
+    for (const [code, acts] of Object.entries(DEFAULT_KEYMAP)) {
+      const kept = acts.filter((a) => !custom[a] || a.startsWith('menu') || a === 'confirm' || a === 'back' || a === 'pause');
+      if (kept.length) map[code] = [...kept];
+    }
+    for (const [a, codes] of Object.entries(custom) as [Action, string[]][]) {
+      for (const code of codes ?? []) (map[code] ??= []).includes(a) || map[code].push(a);
+    }
+    for (const a of [...this.held.keys()]) this.release(a);
+    this.keymap = map;
+  }
+
+  /** Keys currently bound to an action. */
+  keysFor(a: Action): string[] {
+    return Object.entries(this.keymap)
+      .filter(([, acts]) => acts.includes(a))
+      .map(([k]) => k);
+  }
 
   constructor(private target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
+      if (this.captureKey && !e.repeat) {
+        e.preventDefault();
+        const fn = this.captureKey;
+        this.captureKey = null;
+        fn(e.code);
+        return;
+      }
       if (PREVENT.has(e.code)) e.preventDefault();
       if (e.repeat) {
         // Repeats still drive menu navigation.
-        for (const a of KEYMAP[e.code] ?? []) if (a.startsWith('menu')) this.onAction?.(a);
+        for (const a of this.keymap[e.code] ?? []) if (a.startsWith('menu')) this.onAction?.(a);
         return;
       }
-      for (const a of KEYMAP[e.code] ?? []) this.press(a);
+      for (const a of this.keymap[e.code] ?? []) this.press(a);
     });
     window.addEventListener('keyup', (e) => {
-      for (const a of KEYMAP[e.code] ?? []) this.release(a);
+      for (const a of this.keymap[e.code] ?? []) this.release(a);
     });
     window.addEventListener('blur', () => {
       for (const a of [...this.held.keys()]) this.release(a);
