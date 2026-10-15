@@ -257,20 +257,20 @@ function pathShape(ctx: CanvasRenderingContext2D, s: Shape, k = 1): void {
 
 // ---------------------------------------------------------------- reward icons
 
-export const REWARD_INFO: Record<RewardSpec['kind'], { glyph: string; color: string; label: string }> = {
-  boon: { glyph: '✦', color: '#ffd890', label: 'Boon' },
-  pom: { glyph: '❂', color: '#ff4a5a', label: 'Pomegranate' },
-  gold: { glyph: '◎', color: '#ffd04a', label: 'Obols' },
-  heart: { glyph: '♥', color: '#ff3a4a', label: 'Titan Heart' },
-  ash: { glyph: '◆', color: '#c8a8ff', label: 'Ash' },
-  hammer: { glyph: '⚒', color: '#d8d8e8', label: "Hephaestus' Anvil" },
-  hermes: { glyph: '➶', color: '#e8e8ff', label: 'Hermes' },
-  shop: { glyph: '⚖', color: '#ffd890', label: "Charon's Wares" },
-  fountain: { glyph: '♒', color: '#7fd8ff', label: 'Fountain' },
-  boss: { glyph: '☠', color: '#ff3a4a', label: 'Guardian' },
-  antechamber: { glyph: '⌂', color: '#ffd890', label: 'Antechamber' },
-  enchant: { glyph: '✧', color: '#c98bff', label: 'Enchanting Tome' },
-  artifact: { glyph: '⚱', color: '#7fe8ff', label: 'Artifact Cache' },
+export const REWARD_INFO: Record<RewardSpec['kind'], { glyph: string; color: string; label: string; desc: string }> = {
+  boon: { glyph: '✦', color: '#ffd890', label: 'Boon', desc: 'Fight, then choose 1 of 3 boons' },
+  pom: { glyph: '❂', color: '#ff4a5a', label: 'Pomegranate', desc: 'Fight, then level up a boon' },
+  gold: { glyph: '◎', color: '#ffd04a', label: 'Obols', desc: "Fight for coins to spend at Charon's shop" },
+  heart: { glyph: '♥', color: '#ff3a4a', label: 'Titan Heart', desc: 'Fight for +25 max Health this run' },
+  ash: { glyph: '◆', color: '#c8a8ff', label: 'Ash', desc: 'Fight for Ash, kept after death' },
+  hammer: { glyph: '⚒', color: '#d8d8e8', label: "Hephaestus' Anvil", desc: 'Enchanted foes · upgrade your weapon' },
+  hermes: { glyph: '➶', color: '#e8e8ff', label: 'Hermes', desc: 'Fight, then pick a speed boon' },
+  shop: { glyph: '⚖', color: '#ffd890', label: "Charon's Wares", desc: 'No fight · buy with obols' },
+  fountain: { glyph: '♒', color: '#7fd8ff', label: 'Fountain', desc: 'No fight · restore health' },
+  boss: { glyph: '☠', color: '#ff3a4a', label: 'Guardian', desc: "This region's guardian" },
+  antechamber: { glyph: '⌂', color: '#ffd890', label: 'Antechamber', desc: 'Shop and fountain before the guardian' },
+  enchant: { glyph: '✧', color: '#c98bff', label: 'Enchanting Tome', desc: 'Fight, then add an enchantment' },
+  artifact: { glyph: '⚱', color: '#7fe8ff', label: 'Artifact Cache', desc: 'Enchanted foes · find an artifact' },
 };
 
 export function rewardColor(r: RewardSpec): string {
@@ -472,10 +472,40 @@ function drawDoors(ctx: CanvasRenderingContext2D, w: World): void {
 }
 
 function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
+  const p = w.player;
   for (const d of w.doors) {
     if (!d.reward) continue;
     const bob = Math.sin(w.time * 2 + d.x) * 4;
     drawRewardIcon(ctx, d.reward, d.x, -150 + bob, 22, w.time);
+    // What lies beyond: always (setting) or when you walk up to the door.
+    const near = Math.hypot(p.x - d.x, p.y) < 460;
+    if (!d.open || !(prefs.doorInfo || near)) continue;
+    const info = REWARD_INFO[d.reward.kind];
+    const title = d.reward.kind === 'boon' && d.reward.god ? `${GODS[d.reward.god].name}'s Boon` : info.label;
+    ctx.font = '700 15px "Cinzel", Georgia, serif';
+    const tw = ctx.measureText(title).width;
+    ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
+    const dw = ctx.measureText(info.desc).width;
+    const bw = Math.max(tw + 30, dw) + 24;
+    // On the floor just in front of the door, so it's on screen even on phones
+    // (the wall above the door can be out of view). Fades when you stand on it.
+    const y = 84;
+    const onIt = Math.abs(p.x - d.x) < bw / 2 + 10 && Math.abs(p.y - y) < 50;
+    ctx.globalAlpha = onIt ? 0.35 : near ? 1 : 0.85;
+    ctx.fillStyle = 'rgba(8,4,12,0.82)';
+    ctx.fillRect(d.x - bw / 2, y - 16, bw, 42);
+    ctx.strokeStyle = rewardColor(d.reward);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(d.x - bw / 2, y - 16, bw, 42);
+    drawRewardIcon(ctx, d.reward, d.x - tw / 2 - 6, y - 4, 9, w.time);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = rewardColor(d.reward);
+    ctx.font = '700 15px "Cinzel", Georgia, serif';
+    ctx.fillText(title, d.x + 10, y + 1);
+    ctx.fillStyle = '#d8c8c0';
+    ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
+    ctx.fillText(info.desc, d.x, y + 18);
+    ctx.globalAlpha = 1;
   }
 }
 

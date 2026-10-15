@@ -85,8 +85,8 @@ export interface Unlock {
 export const UNLOCKS: Unlock[] = [
   { level: 2, feature: 'potion', title: 'Healing Potion', desc: 'Drink to restore health. It refills over time.', keys: { pc: 'R', touch: '⚗' } },
   { level: 3, feature: 'cast', title: 'Cast', desc: 'Hurl a shard that lodges in foes. Walk over it to pick it up again.', keys: { pc: 'Q / Middle mouse', touch: '◆' } },
-  { level: 4, feature: 'jump', title: 'Jump & Slam', desc: 'Leap over lava, chasms and shockwaves. Attack mid-air to Slam the ground.', keys: { pc: 'Shift / C', touch: '⤒' } },
-  { level: 5, feature: 'artifacts', title: 'Artifacts', desc: 'One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf.', keys: { pc: '1', touch: 'the artifact button' } },
+  { level: 4, feature: 'artifacts', title: 'Artifacts', desc: 'One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf.', keys: { pc: '1', touch: 'the artifact button' } },
+  { level: 5, feature: 'jump', title: 'Jump & Slam', desc: 'Leap over lava, chasms and shockwaves. Attack mid-air to Slam the ground.', keys: { pc: 'Shift / C', touch: '⤒' } },
   { level: 6, feature: 'enchants', title: 'Enchantments', desc: 'Enchanting Tomes now appear behind doors and in chests.' },
   { level: 7, feature: 'anvil', title: "Hephaestus' Anvil", desc: 'Anvils that reforge your weapon now appear in the Underworld.' },
   { level: 8, feature: 'artifact2', title: 'Second Artifact Slot', desc: 'Carry two artifacts at once.', keys: { pc: '2', touch: 'the artifact button' } },
@@ -95,7 +95,12 @@ export const UNLOCKS: Unlock[] = [
   { level: 13, feature: 'forgeAwaken', title: 'Awakened Weapons', desc: 'Forge a weapon to Tier III at the Armory to awaken it.' },
 ];
 
-export function hasFeature(level: number, f: Feature): boolean {
+/**
+ * Whether a mechanic is available. Jump also unlocks early for anyone who has
+ * already slain the final guardian (`escaped`).
+ */
+export function hasFeature(level: number, f: Feature, escaped = false): boolean {
+  if (f === 'jump' && escaped) return true;
   const u = UNLOCKS.find((x) => x.feature === f);
   return !u || level >= u.level;
 }
@@ -109,10 +114,10 @@ export function artifactSlots(level: number): number {
 }
 
 /** Turns level-gated features on or off in a stat block. */
-export function applyFeatures(level: number, s: PlayerStats): void {
+export function applyFeatures(level: number, s: PlayerStats, escaped = false): void {
   s.canPotion = hasFeature(level, 'potion');
   s.canCast = hasFeature(level, 'cast');
-  s.canJump = hasFeature(level, 'jump');
+  s.canJump = hasFeature(level, 'jump', escaped);
   s.canWrath = hasFeature(level, 'wrath');
   s.artifactSlots = artifactSlots(level);
   if (!s.canCast) s.castAmmo = 0;

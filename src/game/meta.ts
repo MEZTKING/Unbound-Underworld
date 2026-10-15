@@ -22,6 +22,7 @@ export interface Settings {
   showFps: boolean;
   hints: boolean;
   assist: boolean;
+  doorInfo: boolean;
   /** Touch button scale (0.8..1.3). */
   touchSize: number;
   touchOpacity: number;
@@ -42,6 +43,7 @@ export function defaultSettings(): Settings {
     showFps: false,
     hints: true,
     assist: false,
+    doorInfo: true,
     touchSize: 1,
     touchOpacity: 0.9,
     leftHanded: false,

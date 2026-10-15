@@ -193,6 +193,8 @@ export class UI {
     onPick: (i: number) => void;
     skip?: { label: string; onSkip: () => void };
     quote?: string;
+    /** A corner button that opens another screen on top (e.g. your current boons). */
+    info?: { label: string; onOpen: () => void };
   }): void {
     const cards = opts.cards
       .map(
@@ -214,7 +216,8 @@ export class UI {
       .join('');
     const el = this.push(
       'choice',
-      `<div class="panel" style="--c:${opts.color}">
+      `<div class="panel choice-panel" style="--c:${opts.color}">
+        ${opts.info ? `<button class="btn corner" data-nav data-info>${esc(opts.info.label)}</button>` : ''}
         <h2 class="title" style="color:${opts.color}">${esc(opts.title)}</h2>
         ${opts.subtitle ? `<div class="subtitle">${esc(opts.subtitle)}</div>` : ''}
         ${opts.quote ? `<div class="quote">“${esc(opts.quote)}”</div>` : ''}
@@ -233,6 +236,13 @@ export class UI {
         this.finish(() => opts.onPick(Number(b.dataset.i)));
       };
     });
+    const info = el.querySelector<HTMLElement>('[data-info]');
+    if (info) {
+      info.onclick = () => {
+        audio.play('select');
+        opts.info!.onOpen();
+      };
+    }
     const skip = el.querySelector<HTMLElement>('[data-skip]');
     if (skip) skip.onclick = () => this.finish(opts.skip!.onSkip);
   }

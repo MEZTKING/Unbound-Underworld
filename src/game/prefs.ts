@@ -14,6 +14,8 @@ export const prefs = {
   hints: true,
   /** Assist mode: take half damage. */
   assist: false,
+  /** Show what's behind every door, not only the one you walk up to. */
+  doorInfo: true,
 };
 
 export type Prefs = typeof prefs;

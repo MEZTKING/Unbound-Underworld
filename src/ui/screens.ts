@@ -140,7 +140,7 @@ export function help(g: Game, intro = false): void {
       <p>Clear each chamber of foes, claim its reward, then choose your next door — each shows what lies beyond.
       The <b>gods of Olympus</b> grant <b>Boons</b> that empower your attacks.</p>
       <p>Every foe and chamber earns <b>experience</b>. Levelling up unlocks new skills one at a time — the Potion, Cast,
-      Jump, Artifacts, Enchantments and finally your hero's <b>Wrath</b> — and gives a talent point to spend at <b>Ascension</b>.</p>
+      Artifacts, Jump, Enchantments and finally your hero's <b>Wrath</b> — and gives a talent point to spend at <b>Ascension</b>.</p>
       <p>When you fall, you return to the Hall of Shades. <b>Ash</b> you gathered is kept — spend it at the Altar or the Armory.</p>
       ${document.body.classList.contains('touch') ? touchControls(g) : keyControls(g)}
       <button class="btn primary" data-nav data-a="ok">Got it</button>
@@ -152,7 +152,7 @@ export function help(g: Game, intro = false): void {
 
 export function settings(g: Game): void {
   const s = g.save.settings;
-  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration';
+  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration';
   type Slider = 'volume' | 'music' | 'shake' | 'flashes' | 'touchSize' | 'touchOpacity';
   const toggleLabel: Record<Toggle, string> = {
     muted: 'Sound',
@@ -160,6 +160,7 @@ export function settings(g: Game): void {
     aimAssist: 'Aim assist',
     damageNumbers: 'Damage numbers',
     hints: 'Control hints',
+    doorInfo: 'Show what every door leads to',
     hitstop: 'Hit-stop (impact pause)',
     showFps: 'Show FPS',
     leftHanded: 'Left-handed layout',
@@ -183,6 +184,7 @@ export function settings(g: Game): void {
       ${toggle('aimAssist')}
       ${toggle('damageNumbers')}
       ${toggle('hints')}
+      ${toggle('doorInfo')}
       <h3 class="section">Display</h3>
       ${slider('shake', 'Screen shake', 0, 1.5, 0.1)}
       ${slider('flashes', 'Flash intensity', 0, 1, 0.1)}
@@ -244,9 +246,10 @@ export function settings(g: Game): void {
 
 // ---------------------------------------------------------------- pause
 
-export function pause(g: Game): void {
+/** Everything collected this run: boons, anvil upgrades, enchantments, artifacts. */
+function buildList(g: Game): string {
   const run = g.run;
-  const build = run
+  return run
     ? [
         ...run.boons.map((b) => {
           const def = BOON_BY_ID[b.id];
@@ -266,6 +269,23 @@ export function pause(g: Game): void {
           }),
       ].join('') || '<p class="small">No boons yet. Clear chambers to earn them.</p>'
     : '<p class="small">You are in the Hall of Shades. Walk through the northern gate to begin an escape.</p>';
+}
+
+/** Your current build, opened from a boon (or other) choice. Back returns to the choice. */
+export function buildView(g: Game): void {
+  const el = g.ui.push(
+    'build-view',
+    `<div class="panel wide"><h2 class="title">Your Build</h2>
+      <div class="build">${buildList(g)}</div>
+      <button class="btn primary" data-nav data-a="back">Back to the choice</button></div>`,
+    { onBack: () => g.ui.pop() },
+  );
+  bind(el, '[data-a]', () => g.ui.pop());
+}
+
+export function pause(g: Game): void {
+  const run = g.run;
+  const build = buildList(g);
   const el = g.ui.push(
     'pause',
     `<div class="panel wide">
@@ -388,7 +408,7 @@ export function weapons(g: Game): void {
     }).join('');
   const el = g.ui.push(
     'station',
-    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Choose your weapon, and forge it stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards" data-list>${render()}</div><button class="btn" data-nav data-a="back">Back</button></div>`,
+    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Choose your weapon, and forge it stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards list" data-list>${render()}</div><button class="btn" data-nav data-a="back">Back</button></div>`,
     { onBack: () => g.ui.pop() },
   );
   const refresh = () => {
