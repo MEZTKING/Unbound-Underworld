@@ -1,5 +1,5 @@
 import type { MetaBonuses } from './boons';
-import { isCharacterId, type CharacterId } from './characters';
+import { isCharacterId, type CharacterId, type Palette } from './characters';
 import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
 import type { PlayerStats } from './stats';
@@ -30,6 +30,8 @@ export interface Settings {
   leftHanded: boolean;
   /** 3D voxel view; off draws the classic 2D view. */
   view3d: boolean;
+  /** HUD, menu and label size multiplier (0.75..1.5). */
+  uiSize: number;
 }
 
 export function defaultSettings(): Settings {
@@ -51,6 +53,7 @@ export function defaultSettings(): Settings {
     touchOpacity: 0.9,
     leftHanded: false,
     view3d: true,
+    uiSize: 1,
   };
 }
 
@@ -96,6 +99,7 @@ export interface SaveData {
     bestTime: number;
     totalAsh: number;
     bossesSlain: number;
+    shopBuys: number;
   };
   settings: Settings;
   seenIntro: boolean;
@@ -107,6 +111,22 @@ export interface SaveData {
   character: CharacterId;
   /** Forge tier per weapon (1..5). */
   forge: Partial<Record<WeaponId, number>>;
+  /** Foes slain, by name (the bestiary). */
+  bestiary: Record<string, number>;
+  /** Achievement ids earned. */
+  achievements: string[];
+  /** Kinds of Charon's wares bought at least once (their descriptions are revealed). */
+  shopSeen: string[];
+  /** Each hero's chosen colours and headwear. */
+  looks: Partial<Record<CharacterId, HeroLook>>;
+}
+
+/** A hero's customised appearance; anything unset uses the hero's default. */
+export interface HeroLook {
+  cloak?: string;
+  trim?: string;
+  hair?: string;
+  crown?: Palette['crown'];
 }
 
 const KEY = 'unbound-underworld-save-v1';
@@ -122,7 +142,7 @@ export function defaultSave(): SaveData {
     startArtifact: 'mending_totem',
     heat: 0,
     maxHeat: 0,
-    stats: { runs: 0, escapes: 0, deaths: 0, kills: 0, bestDepth: 0, bestTime: 0, totalAsh: 0, bossesSlain: 0 },
+    stats: { runs: 0, escapes: 0, deaths: 0, kills: 0, bestDepth: 0, bestTime: 0, totalAsh: 0, bossesSlain: 0, shopBuys: 0 },
     settings: defaultSettings(),
     seenIntro: false,
     xp: 0,
@@ -130,6 +150,10 @@ export function defaultSave(): SaveData {
     talents: {},
     character: 'kael',
     forge: {},
+    bestiary: {},
+    achievements: [],
+    shopSeen: [],
+    looks: {},
   };
 }
 
@@ -166,6 +190,10 @@ export function normalizeSave(raw: unknown): SaveData {
     talents: typeof r.talents === 'object' && r.talents ? { ...r.talents } : {},
     character: isCharacterId(r.character) ? r.character : 'kael',
     forge: typeof r.forge === 'object' && r.forge ? { ...r.forge } : {},
+    bestiary: typeof r.bestiary === 'object' && r.bestiary ? { ...r.bestiary } : {},
+    achievements: Array.isArray(r.achievements) ? r.achievements.filter((a) => typeof a === 'string') : [],
+    shopSeen: Array.isArray(r.shopSeen) ? r.shopSeen.filter((a) => typeof a === 'string') : [],
+    looks: typeof r.looks === 'object' && r.looks ? { ...r.looks } : {},
   };
 }
 

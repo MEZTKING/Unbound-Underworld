@@ -2,15 +2,17 @@ import { audio } from '../engine/audio';
 import { ARTIFACT_BY_ID, ARTIFACTS } from '../game/artifacts';
 import { BOON_BY_ID, describeBoon, GODS, HAMMER_BY_ID, RARITY_COLOR } from '../game/boons';
 import { BIOMES } from '../game/rooms';
+import { ACHIEVEMENTS, BESTIARY, foeRegions, type FoeEntry } from '../game/codex';
 import { ENCHANT_BY_ID } from '../game/enchants';
 import type { Game, RunSummary } from '../game/game';
-import { CHARACTERS, characterUnlocked, type CharacterId } from '../game/characters';
+import { CHARACTERS, characterUnlocked, type CharacterId, type Palette } from '../game/characters';
 import { clearSave, heatScale, nextCost, rank, UPGRADES, WEAPON_IDS } from '../game/meta';
 import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, WEAPON_LEVEL } from '../game/progression';
 import type { WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
 import { CAN_EXIT, exitGame } from '../platform';
 import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
+import { devMenu } from './dev';
 import { esc, type Card } from './overlay';
 
 export type CardData = Card;
@@ -170,7 +172,7 @@ export function help(g: Game, intro = false): void {
 export function settings(g: Game): void {
   const s = g.save.settings;
   type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration' | 'view3d';
-  type Slider = 'volume' | 'music' | 'shake' | 'flashes' | 'touchSize' | 'touchOpacity';
+  type Slider = 'volume' | 'music' | 'shake' | 'flashes' | 'touchSize' | 'touchOpacity' | 'uiSize';
   const toggleLabel: Record<Toggle, string> = {
     muted: 'Sound',
     assist: 'Assist mode (take half damage)',
@@ -202,9 +204,10 @@ export function settings(g: Game): void {
       ${toggle('aimAssist')}
       ${toggle('damageNumbers')}
       ${toggle('hints')}
-      ${toggle('doorInfo')}
+      ${document.body.classList.contains('touch') ? toggle('doorInfo') : ''}
       <h3 class="section">Display</h3>
       ${toggle('view3d')}
+      ${slider('uiSize', 'UI size', 0.75, 1.5, 0.05)}
       ${slider('shake', 'Screen shake', 0, 1.5, 0.1)}
       ${slider('flashes', 'Flash intensity', 0, 1, 0.1)}
       ${toggle('hitstop')}
@@ -217,8 +220,9 @@ export function settings(g: Game): void {
       ${toggle('vibration')}
       <h3 class="section">Data</h3>
       <button class="btn danger" data-nav data-a="reset">Erase save data</button>
+      ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
       <div class="update-box">
-        <div class="update-version">Version ${APP_VERSION}</div>
+        <div class="update-version" data-ver>Version ${APP_VERSION}</div>
         <div data-box></div>
       </div>
       <button class="btn primary" data-nav data-a="back">Back</button>
@@ -226,16 +230,31 @@ export function settings(g: Game): void {
     { onBack: () => g.ui.pop() },
   );
   if (updatesSupported) updateBox(g, el, el.querySelector<HTMLElement>('[data-box]')!, true);
+  // The secret way in to the developer options: tap the version seven times.
+  let taps = 0;
+  const ver = el.querySelector<HTMLElement>('[data-ver]');
+  if (ver)
+    ver.onclick = () => {
+      if (g.devUnlocked || ++taps < 7) return;
+      g.unlockDev();
+      audio.play('boon');
+      g.ui.toast('Developer options unlocked');
+      g.ui.pop();
+      settings(g);
+    };
   const apply = () => {
     g.applySettings();
     g.recomputeStats();
     g.persist();
   };
   el.querySelectorAll<HTMLInputElement>('input[type=range]').forEach((inp) => {
-    inp.oninput = () => {
+    const set = () => {
       (s as unknown as Record<Slider, number>)[inp.dataset.k as Slider] = Number(inp.value);
       apply();
     };
+    // Resizing the menu while dragging would move the slider away from the pointer.
+    if (inp.dataset.k === 'uiSize') inp.onchange = set;
+    else inp.oninput = set;
   });
   bind(el, '[data-t]', (b) => {
     const k = b.dataset.t as Toggle;
@@ -248,7 +267,8 @@ export function settings(g: Game): void {
   });
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
-    if (a === 'fullscreen') {
+    if (a === 'dev') devMenu(g);
+    else if (a === 'fullscreen') {
       if (document.fullscreenElement) void document.exitFullscreen?.();
       else void document.documentElement.requestFullscreen?.().catch(() => {});
     } else if (a === 'reset') {
@@ -313,7 +333,9 @@ export function pause(g: Game): void {
         <div class="menu">
           <button class="btn primary" data-nav data-a="resume">Resume</button>
           <button class="btn" data-nav data-a="help">Controls</button>
+          <button class="btn" data-nav data-a="codex">Bestiary &amp; Achievements</button>
           <button class="btn" data-nav data-a="settings">Settings</button>
+          ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
           ${run ? '<button class="btn" data-nav data-a="title">Save &amp; Quit to Title</button>' : '<button class="btn" data-nav data-a="title">Title Screen</button>'}
           ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit">${run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
@@ -328,6 +350,8 @@ export function pause(g: Game): void {
     const a = b.dataset.a;
     if (a === 'resume') g.ui.pop();
     else if (a === 'help') help(g);
+    else if (a === 'codex') codex(g);
+    else if (a === 'dev') devMenu(g);
     else if (a === 'settings') settings(g);
     else if (a === 'title') g.quitToTitle();
     else if (a === 'exit') {
@@ -492,6 +516,7 @@ export function heroes(g: Game): void {
     `<div class="panel wide"><h2 class="title" style="color:#ff8a6e">Hall of Heroes</h2>
       <div class="subtitle">Each hero has their own strengths and Wrath ultimate.</div>
       <div class="cards grid" data-list>${render()}</div>
+      <button class="btn" data-nav data-a="look">Customise appearance</button>
       <button class="btn" data-nav data-a="back">Back</button></div>`,
     { onBack: () => g.ui.pop(), cols: 2 },
   );
@@ -509,9 +534,98 @@ export function heroes(g: Game): void {
       g.ui.refreshItems();
       wire();
     });
-    bind(el, '[data-a]', () => g.ui.pop());
+    bind(el, '[data-a]', (b) => (b.dataset.a === 'look' ? customise(g) : g.ui.pop()));
   };
   wire();
+}
+
+const SWATCHES = ['#2b1830', '#10283a', '#1d2a1e', '#2a2016', '#140c1e', '#1a1830', '#3a0e14', '#e8e0d0', '#c2263a', '#ff7a2a', '#ffd04a', '#9dff9a', '#5ac8ff', '#c86bff', '#ff6ad0', '#1a0d14', '#d8d8f0', '#6a3a1a', '#8a8a9a', '#f0f0ff'];
+const CROWNS: { id: Palette['crown']; name: string }[] = [
+  { id: 'flame', name: 'Flame' },
+  { id: 'hood', name: 'Hood' },
+  { id: 'helm', name: 'Helm' },
+  { id: 'circlet', name: 'Circlet' },
+  { id: 'horns', name: 'Horns' },
+  { id: 'halo', name: 'Halo' },
+];
+
+/** Colours and headwear for the selected hero (saved per hero). */
+export function customise(g: Game): void {
+  const hero = g.player.hero;
+  const look = () => (g.save.looks[hero.id] ??= {});
+  const pal = () => g.player.palette;
+  const row = (key: 'cloak' | 'trim' | 'hair', label: string) =>
+    `<div class="look-row"><span>${label}</span><div class="swatches">${SWATCHES.map(
+      (c) => `<button class="swatch${pal()[key] === c ? ' on' : ''}" data-nav data-k="${key}" data-v="${c}" style="--s:${c}" aria-label="${c}"></button>`,
+    ).join('')}</div></div>`;
+  const render = () => `
+    <canvas class="look-preview" width="160" height="200"></canvas>
+    ${row('cloak', 'Cloak')}${row('trim', 'Trim')}${row('hair', 'Hair')}
+    <div class="look-row"><span>Headwear</span><div class="swatches">${CROWNS.map(
+      (c) => `<button class="btn mini${pal().crown === c.id ? ' on' : ''}" data-nav data-crown="${c.id}">${c.name}</button>`,
+    ).join('')}</div></div>`;
+  const el = g.ui.push(
+    'station',
+    `<div class="panel wide" style="--c:${hero.color}"><h2 class="title" style="color:${hero.color}">${esc(hero.name)}'s Appearance</h2>
+      <div data-body>${render()}</div>
+      <div class="row-btns"><button class="btn" data-nav data-a="reset">Reset to default</button><button class="btn primary" data-nav data-a="back">Done</button></div></div>`,
+    { onBack: () => g.ui.pop(), cols: 10 },
+  );
+  const refresh = () => {
+    el.querySelector('[data-body]')!.innerHTML = render();
+    g.ui.refreshItems();
+    wire();
+    drawPreview(g, el.querySelector('canvas')!);
+  };
+  const wire = () => {
+    bind(el, '[data-k]', (b) => {
+      look()[b.dataset.k as 'cloak' | 'trim' | 'hair'] = b.dataset.v!;
+      g.persist();
+      audio.play('select');
+      refresh();
+    });
+    bind(el, '[data-crown]', (b) => {
+      look().crown = b.dataset.crown as Palette['crown'];
+      g.persist();
+      audio.play('select');
+      refresh();
+    });
+    bind(el, '[data-a]', (b) => {
+      if (b.dataset.a === 'reset') {
+        delete g.save.looks[hero.id];
+        g.persist();
+        refresh();
+      } else g.ui.pop();
+    });
+  };
+  wire();
+  drawPreview(g, el.querySelector('canvas')!);
+}
+
+/** The hero as drawn by the 2D art, for the appearance screen. */
+function drawPreview(g: Game, c: HTMLCanvasElement): void {
+  const ctx = c.getContext('2d')!;
+  ctx.clearRect(0, 0, c.width, c.height);
+  const p = g.player;
+  const saved = { x: p.x, y: p.y, z: p.z, facing: p.facing, iframes: p.iframes, flash: p.flash, state: p.state };
+  try {
+    p.x = 0;
+    p.y = 0;
+    p.z = 0;
+    p.facing = 0.6;
+    p.iframes = 0;
+    p.flash = 0;
+    ctx.save();
+    ctx.translate(80, 190);
+    ctx.scale(2.2, 2.2);
+    const stub = { time: 0, stats: { forgeTier: 1, canWrath: false, holyShield: false }, player: p, camera: { lift: { x: 0, y: -1 } } };
+    p.draw(ctx, stub as unknown as Parameters<typeof p.draw>[1]);
+    ctx.restore();
+  } catch {
+    ctx.restore();
+  } finally {
+    Object.assign(p, saved);
+  }
 }
 
 export function talents(g: Game): void {
@@ -667,11 +781,15 @@ export function artifactLoadout(g: Game): void {
 }
 
 export function chronicle(g: Game): void {
+  codex(g, 'records');
+}
+
+type CodexTab = 'records' | 'bestiary' | 'achievements';
+
+/** Records, the bestiary (foes stay blacked out until slain) and achievements. */
+export function codex(g: Game, tab: CodexTab = 'bestiary'): void {
   const st = g.save.stats;
-  const el = g.ui.push(
-    'station',
-    `<div class="panel"><h2 class="title">Chronicle</h2>
-      <div class="stats">
+  const records = `<div class="stats">
         <div><span>Escape attempts</span><b>${st.runs}</b></div>
         <div><span>Escapes</span><b>${st.escapes}</b></div>
         <div><span>Deaths</span><b>${st.deaths}</b></div>
@@ -680,11 +798,74 @@ export function chronicle(g: Game): void {
         <div><span>Most chambers in one run</span><b>${st.bestDepth}</b></div>
         <div><span>Fastest escape</span><b>${st.bestTime ? fmtTime(st.bestTime) : '—'}</b></div>
         <div><span>Ash gathered (all time)</span><b>${st.totalAsh} ◆</b></div>
-      </div>
+        <div><span>Wares bought from Charon</span><b>${st.shopBuys}</b></div>
+      </div>`;
+  const known = BESTIARY.filter((e) => (g.save.bestiary[e.name] ?? 0) > 0).length;
+  const bestiary = `<div class="subtitle">${known} of ${BESTIARY.length} recorded. Slay a foe to fill in its page.</div>
+      <div class="bestiary">${BESTIARY.map((e) => {
+        const kills = g.save.bestiary[e.name] ?? 0;
+        const img = portrait(e, kills > 0);
+        if (!kills) return `<div class="beast locked"><img src="${img}" alt=""><div><b>???</b><small>${e.guardian ? 'An unknown guardian' : 'An unknown foe'}</small></div></div>`;
+        const f = e.make();
+        return `<div class="beast${e.guardian ? ' boss' : ''}"><img src="${img}" alt=""><div>
+          <b>${esc(e.name)}</b><small>${esc(foeRegions(e))} · ${Math.round(f.maxHp)} health${f.maxArmor ? ` + ${Math.round(f.maxArmor)} armor` : ''} · slain ${kills}</small>
+          <p>${esc(e.behaviour)}</p><p class="counter">${esc(e.counter)}</p></div></div>`;
+      }).join('')}</div>`;
+  const got = ACHIEVEMENTS.filter((a) => g.save.achievements.includes(a.id)).length;
+  const achievements = `<div class="subtitle">${got} of ${ACHIEVEMENTS.length} earned.${g.godMode ? ' <b class="blood">God mode is on: achievements are disabled.</b>' : ''}</div>
+      <div class="achievements">${ACHIEVEMENTS.map((a) => {
+        const on = g.save.achievements.includes(a.id);
+        return `<div class="ach${on ? ' on' : ''}"><span class="glyph">${on ? a.glyph : '?'}</span><div><b>${esc(a.name)}</b><small>${esc(a.desc)}</small></div></div>`;
+      }).join('')}</div>`;
+  const body = { records, bestiary, achievements }[tab];
+  const tabBtn = (t: CodexTab, label: string) => `<button class="btn tab${t === tab ? ' on' : ''}" data-nav data-tab="${t}">${label}</button>`;
+  const el = g.ui.push(
+    'station',
+    `<div class="panel wide codex"><h2 class="title">Chronicle</h2>
+      <div class="tabs">${tabBtn('records', 'Records')}${tabBtn('bestiary', 'Bestiary')}${tabBtn('achievements', 'Achievements')}</div>
+      <div class="codex-body">${body}</div>
       <button class="btn primary" data-nav data-a="back">Close</button></div>`,
     { onBack: () => g.ui.pop() },
   );
   bind(el, '[data-a]', () => g.ui.pop());
+  bind(el, '[data-tab]', (b) => {
+    audio.play('select');
+    g.ui.pop();
+    codex(g, b.dataset.tab as CodexTab);
+  });
+}
+
+const portraits = new Map<string, string>();
+
+/** A small picture of a foe (drawn with the 2D art); a black silhouette until slain. */
+function portrait(e: FoeEntry, known: boolean): string {
+  const key = `${e.name}:${known}`;
+  const hit = portraits.get(key);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d')!;
+  try {
+    const f = e.make();
+    f.spawnT = 0;
+    f.facing = 0.4;
+    const k = Math.min(1, 96 / (f.height + 30), 50 / f.r);
+    ctx.translate(64, 112);
+    ctx.scale(k, k);
+    f.x = 0;
+    f.y = 0;
+    if (!known) ctx.filter = 'brightness(0) drop-shadow(0 0 6px rgba(160,120,255,0.45))';
+    const stub = { time: 0, player: { x: 60, y: 200 }, camera: { lift: { x: 0, y: -1 } }, stats: {}, enemies: [] };
+    f.draw(ctx, stub as unknown as Parameters<typeof f.draw>[1]);
+  } catch {
+    ctx.fillStyle = known ? '#c8a8ff' : '#000';
+    ctx.font = '700 64px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText('☠', 64, 88);
+  }
+  const url = c.toDataURL();
+  portraits.set(key, url);
+  return url;
 }
 
 export function pact(g: Game): void {

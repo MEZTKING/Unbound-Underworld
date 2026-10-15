@@ -1,9 +1,10 @@
 import { audio } from '../engine/audio';
-import { angleOf, clamp, damp, fromAngle, fx, len, TAU } from '../engine/math';
+import { angleDiff, angleOf, clamp, damp, fromAngle, fx, len, TAU } from '../engine/math';
 import { Actor } from './actor';
 import { useArtifact } from './artifacts';
 import { GODS } from './boons';
-import { CHARACTER_BY_ID, type CharacterDef, type CharacterId } from './characters';
+import { CHARACTER_BY_ID, type CharacterDef, type CharacterId, type Palette } from './characters';
+import type { HeroLook } from './meta';
 import { castLanded, damageEnemy, dashTriggered, deflectProjectiles } from './combat';
 import type { Enemy } from './enemies/enemy';
 import { Pickup, Projectile } from './entities';
@@ -30,6 +31,13 @@ interface ActionRun {
   aim: number;
   holdT: number;
   released: boolean;
+}
+
+let heroLooks: Partial<Record<CharacterId, HeroLook>> = {};
+
+/** Points heroes at the save's customised looks (kept live: edits apply at once). */
+export function useHeroLooks(looks: Partial<Record<CharacterId, HeroLook>>): void {
+  heroLooks = looks;
 }
 
 export class Player extends Actor {
@@ -82,6 +90,12 @@ export class Player extends Actor {
   private attackCount = 0;
   hero: CharacterDef;
   private noAmmoMsgT = -10;
+
+  /** The hero's colours and headwear, with the player's customisation applied. */
+  get palette(): Palette {
+    const look = heroLooks[this.hero.id];
+    return look ? { ...this.hero.palette, ...look } : this.hero.palette;
+  }
 
   constructor(weapon: WeaponId, character: CharacterId = 'kael') {
     super();
@@ -385,10 +399,17 @@ export class Player extends Actor {
       const v = w.camera.screenDirToWorld(inp.stickAim());
       this.aim = Math.atan2(v.y, v.x);
     } else if (src === 'auto') {
-      // Touch play: lock onto the nearest foe, otherwise face where you move.
-      if (len(this.moveDir) > 0.2) this.aim = angleOf(this.moveDir);
-      const target = w.nearestEnemy(this.x, this.y, 600);
-      if (target) this.aim = Math.atan2(target.y - this.y, target.x - this.x);
+      // Touch play. The joystick wins: while moving, aim where you move, only
+      // nudged onto a foe roughly in that direction. Standing still, lock onto
+      // the nearest foe.
+      if (len(this.moveDir) > 0.2) {
+        this.aim = angleOf(this.moveDir);
+        const ahead = w.nearestEnemy(this.x, this.y, 520, (e) => Math.abs(angleDiff(Math.atan2(e.y - this.y, e.x - this.x), this.aim)) < 0.5);
+        if (ahead) this.aim = Math.atan2(ahead.y - this.y, ahead.x - this.x);
+      } else {
+        const target = w.nearestEnemy(this.x, this.y, 600);
+        if (target) this.aim = Math.atan2(target.y - this.y, target.x - this.x);
+      }
     } else {
       if (len(this.moveDir) > 0.2) this.aim = angleOf(this.moveDir);
       // Gentle auto-aim toward a nearby foe in front when not using a mouse.
@@ -582,7 +603,7 @@ export class Player extends Actor {
     if (!back) this.weapon.draw(ctx, this, w, true);
     ctx.save();
     ctx.rotate(lean);
-    const pal = this.hero.palette;
+    const pal = this.palette;
     // Mythic weapons (forge Tier V) wreathe the hero in their colour.
     if (w.stats.forgeTier >= 5) {
       ctx.globalCompositeOperation = 'lighter';

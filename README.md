@@ -106,9 +106,9 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Combat.** Each weapon has a combo, a dash-strike and a special. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
 - **Five weapons.** *Nightblade* (sword: combo plus Nova Smash), *Thornspear* (thrusts, a charged spin, and a spear you throw and recall) and *Moonbow* (charged shots with a perfect-timing Power Shot, plus a volley), followed later by the *Titan Gauntlets* and *Reaper's Crescent*. Each weapon has its own anvil upgrades.
 - **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity. There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
-- **The run.** Tartarus, then Asphodel, then Elysium, then the Gates of the Styx: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have. Charon sells wares, and an antechamber with a shop and a fountain comes before each guardian.
+- **The run.** Tartarus, then Asphodel, then Elysium, then the Gates of the Styx: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
 - **Four guardians.** *Campe*, Jailer of Tartarus. *The Hydra*, which grows extra heads. *Talos, the Bronze Colossus*: break his armor and he overheats, leaving him open. *Cerberus*, Warden of the Gate, who charges, breathes fire and leap-slams.
-- **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your stats in the Chronicle, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
+- **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your records, the **bestiary** (each foe stays a black silhouette until you slay it) and **achievements** in the Chronicle, customise your hero's colours and headwear, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
 
 ### Inspired by Minecraft Dungeons II
 - **Jump and Slam.** Hop over lava, chasms, spike traps and boss shockwaves. Attack mid-air for a weapon-specific ground slam.
@@ -122,9 +122,13 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 ### Settings
 *Settings* (on the title screen or in the pause menu) has:
 - **Audio:** sound and music volume, mute.
-- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints, and door descriptions for every door (or only the one you walk up to).
-- **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
+- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints, and (on phones) door descriptions for every door or only the one you walk up to.
+- **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus **UI size**, screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
+
+On PC, point at a HUD icon (boons, enchantments, artifacts, potion) to see what it does. Each guardian has its own battle music, which intensifies in phase 2.
+
+**Developer options.** A hidden test menu: tap the version number in Settings seven times (or add `?dev` to the address). It has god mode, play-at-level, +Ash, unlock everything, test chambers for every region and room type, and in-run tools (boons, artifacts, obols, Wrath, spawning foes and guardians). Using it switches achievements off until the game restarts.
 
 ## Development
 
@@ -186,6 +190,7 @@ These URL parameters are handy for testing:
 | `?weapon=sword\|spear\|bow\|fists\|scythe` | Try a weapon for this session |
 | `?level=12` | Play at that level for this session (unlocks everything up to it) |
 | `?seed=123` | Use a fixed run seed |
+| `?dev` | Show the developer options |
 | `?view=2d` | Use the classic 2D view for this session |
 | `?quality=high\|balanced` | Force the 3D view's quality (shadows on or off) |
 

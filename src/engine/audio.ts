@@ -36,6 +36,82 @@ export type Mood = 'silent' | 'title' | 'hub' | 'explore' | 'combat' | 'boss';
 
 const SCALE = [0, 3, 5, 7, 10, 12, 15]; // minor pentatonic-ish
 
+/** A guardian's battle theme. Patterns are 16 steps (eighth notes); -1 is a rest. */
+interface BossTheme {
+  bpm: number;
+  /** Semitones from the music root. */
+  root: number;
+  scale: number[];
+  /** Chord shift per bar (4 bars). */
+  chords: number[];
+  /** Lead notes: scale degrees per step. */
+  lead: number[];
+  leadWave: OscillatorType;
+  /** Bass: scale degrees per step. */
+  bass: number[];
+  kick: number[];
+  snare: number[];
+  /** Metallic clank on these steps (an anvil for Talos). */
+  clank?: number[];
+  droneCutoff: number;
+}
+
+const BOSS_THEMES: BossTheme[] = [
+  // Campe, Tartarus: driving Phrygian, saw lead, double kicks.
+  {
+    bpm: 138,
+    root: 0,
+    scale: [0, 1, 3, 5, 7, 8, 10, 12, 13, 15],
+    chords: [0, 1, -2, 1],
+    lead: [0, 4, 7, 4, 1, 4, 8, 7, 0, 4, 7, 4, 9, 8, 7, 4],
+    leadWave: 'sawtooth',
+    bass: [0, -1, 0, 0, -1, 0, 0, -1, 0, -1, 0, 0, -1, 1, 0, -1],
+    kick: [0, 3, 4, 8, 11, 12],
+    snare: [4, 12, 15],
+    droneCutoff: 800,
+  },
+  // The Hydra, Asphodel: swaying harmonic minor in threes, toms.
+  {
+    bpm: 118,
+    root: -2,
+    scale: [0, 2, 3, 5, 7, 8, 11, 12, 14, 15],
+    chords: [0, 5, 3, -1],
+    lead: [0, 2, 4, 7, 4, 2, 0, 2, 4, 6, 4, 2, 7, 6, 4, 2],
+    leadWave: 'triangle',
+    bass: [0, -1, -1, 4, -1, -1, 0, -1, -1, 4, -1, -1, 3, -1, 6, -1],
+    kick: [0, 6, 12],
+    snare: [3, 9, 15],
+    droneCutoff: 600,
+  },
+  // Talos, Elysium: bright Dorian, square lead and anvil strikes.
+  {
+    bpm: 126,
+    root: 3,
+    scale: [0, 2, 3, 5, 7, 9, 10, 12, 14, 15],
+    chords: [0, -2, 3, -4],
+    lead: [7, -1, 5, 4, 2, -1, 4, 5, 7, -1, 9, 7, 5, 4, 2, 0],
+    leadWave: 'square',
+    bass: [0, -1, 0, -1, 4, -1, 0, -1, 0, -1, 0, -1, 4, -1, 5, -1],
+    kick: [0, 4, 8, 12],
+    snare: [4, 12],
+    clank: [2, 7, 10, 14],
+    droneCutoff: 900,
+  },
+  // Cerberus, the Styx: fast, dark and relentless sixteenth-note bass.
+  {
+    bpm: 150,
+    root: -5,
+    scale: [0, 1, 3, 5, 6, 8, 10, 12, 13, 15],
+    chords: [0, 1, -1, 4],
+    lead: [0, 1, 4, 1, 0, 6, 4, 1, 0, 1, 4, 6, 7, 6, 4, 1],
+    leadWave: 'sawtooth',
+    bass: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 1, 0, 1],
+    kick: [0, 2, 4, 6, 8, 10, 12, 14],
+    snare: [4, 12],
+    droneCutoff: 1000,
+  },
+];
+
 export class AudioEngine {
   ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -47,6 +123,10 @@ export class AudioEngine {
   private _music = 0.5;
   private _muted = false;
   private mood: Mood = 'silent';
+  /** Which guardian's theme plays in the 'boss' mood (0..3). */
+  private bossTheme = 0;
+  /** 0..1: guardian music grows denser in phase 2. */
+  intensity = 0;
   private musicNodes: AudioNode[] = [];
   private nextNoteTime = 0;
   private step = 0;
@@ -275,9 +355,10 @@ export class AudioEngine {
 
   // ---------------------------------------------------------------- music
 
-  setMood(m: Mood): void {
-    if (m === this.mood) return;
+  setMood(m: Mood, bossTheme = 0): void {
+    if (m === this.mood && (m !== 'boss' || bossTheme === this.bossTheme)) return;
     this.mood = m;
+    this.bossTheme = bossTheme;
     if (!this.ctx) return;
     this.stopMusic();
     if (m === 'silent') return;
@@ -312,7 +393,7 @@ export class AudioEngine {
     g.gain.setTargetAtTime(this.mood === 'title' ? 0.5 : 0.35, c.currentTime, 1.5);
     const filt = c.createBiquadFilter();
     filt.type = 'lowpass';
-    filt.frequency.value = this.mood === 'boss' ? 700 : 420;
+    filt.frequency.value = this.mood === 'boss' ? this.theme.droneCutoff : 420;
     filt.Q.value = 2;
     const lfo = c.createOscillator();
     lfo.frequency.value = 0.07;
@@ -320,7 +401,8 @@ export class AudioEngine {
     lfoGain.gain.value = 180;
     lfo.connect(lfoGain).connect(filt.frequency);
     lfo.start();
-    const freqs = [this.root, this.root + 7, this.root + 12].map((n) => 440 * 2 ** ((n - 69) / 12));
+    const r = this.root + (this.mood === 'boss' ? this.theme.root : 0);
+    const freqs = [r, r + 7, r + 12].map((n) => 440 * 2 ** ((n - 69) / 12));
     const oscs = freqs.flatMap((f, i) =>
       [-6, 6].map((det) => {
         const o = c.createOscillator();
@@ -339,7 +421,7 @@ export class AudioEngine {
   private schedule(): void {
     const c = this.ctx;
     if (!c) return;
-    const bpm = this.mood === 'boss' ? 132 : this.mood === 'combat' ? 116 : 84;
+    const bpm = this.mood === 'boss' ? this.theme.bpm * (1 + this.intensity * 0.06) : this.mood === 'combat' ? 116 : 84;
     const stepDur = 60 / bpm / 2;
     while (this.nextNoteTime < c.currentTime + 0.2) {
       this.playStep(this.nextNoteTime, this.step, stepDur);
@@ -348,13 +430,106 @@ export class AudioEngine {
     }
   }
 
+  private get theme(): BossTheme {
+    return BOSS_THEMES[this.bossTheme % BOSS_THEMES.length];
+  }
+
+  private note(t: number, midi: number, dur: number, wave: OscillatorType, gain: number, cutoff = 0): void {
+    const c = this.ctx!;
+    const o = c.createOscillator();
+    o.type = wave;
+    o.frequency.value = 440 * 2 ** ((midi - 69) / 12);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let src: AudioNode = o;
+    if (cutoff) {
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = cutoff;
+      src = o.connect(f);
+    }
+    src.connect(g).connect(this.musicBus!);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+
+  private drum(t: number, kind: 'kick' | 'snare' | 'hat' | 'clank', gain = 1): void {
+    const c = this.ctx!;
+    const bus = this.musicBus!;
+    if (kind === 'kick') {
+      const o = c.createOscillator();
+      o.frequency.setValueAtTime(110, t);
+      o.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.6 * gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+      o.connect(g).connect(bus);
+      o.start(t);
+      o.stop(t + 0.25);
+      return;
+    }
+    if (kind === 'clank') {
+      // Two detuned square partials: a ringing anvil.
+      for (const f of [1180, 1730]) {
+        const o = c.createOscillator();
+        o.type = 'square';
+        o.frequency.value = f;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.05 * gain, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+        o.connect(g).connect(bus);
+        o.start(t);
+        o.stop(t + 0.4);
+      }
+      return;
+    }
+    const src = c.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = kind === 'hat' ? 6000 : 1500;
+    const g = c.createGain();
+    const len = kind === 'hat' ? 0.05 : 0.12;
+    g.gain.setValueAtTime((kind === 'hat' ? 0.1 : 0.25) * gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    src.connect(f).connect(g).connect(bus);
+    src.start(t, Math.random() * 0.5, len + 0.03);
+  }
+
+  /** One step of the current guardian's theme. */
+  private playBossStep(t: number, step: number, stepDur: number): void {
+    const th = this.theme;
+    const s = step % 16;
+    const shift = th.chords[Math.floor(step / 16) % th.chords.length];
+    const base = this.root + th.root + shift;
+    const deg = (d: number) => th.scale[((d % th.scale.length) + th.scale.length) % th.scale.length];
+    const lead = th.lead[s];
+    if (lead >= 0) this.note(t, base + 24 + deg(lead), stepDur * 1.6, th.leadWave, th.leadWave === 'square' ? 0.07 : 0.12, 2400);
+    const bass = th.bass[s];
+    if (bass >= 0) this.note(t, base - 12 + deg(bass), stepDur * 1.8, 'sawtooth', 0.3, 320);
+    if (th.kick.includes(s)) this.drum(t, 'kick');
+    if (th.snare.includes(s)) this.drum(t, 'snare');
+    if (th.clank?.includes(s)) this.drum(t, 'clank');
+    // Phase 2: hats on every step and a doubled lead an octave up.
+    if (this.intensity > 0) {
+      this.drum(t, 'hat', this.intensity);
+      if (lead >= 0 && s % 2 === 0) this.note(t, base + 36 + deg(lead), stepDur, 'triangle', 0.05 * this.intensity);
+    }
+  }
+
   private playStep(t: number, step: number, stepDur: number): void {
+    if (this.mood === 'boss') {
+      this.playBossStep(t, step, stepDur);
+      return;
+    }
     const c = this.ctx!;
     const bus = this.musicBus!;
     const bar = Math.floor(step / 16) % 4;
     const chordShift = [0, -4, -2, -5][bar];
     const s = step % 16;
-    const fighting = this.mood === 'combat' || this.mood === 'boss';
+    const fighting = this.mood === 'combat';
     // Plucked arpeggio
     const pattern = fighting ? [0, 2, 4, 2, 5, 4, 2, 1] : [0, -1, 2, -1, 4, -1, 2, -1];
     const idx = pattern[s % pattern.length];
@@ -385,7 +560,7 @@ export class AudioEngine {
         o.start(t);
         o.stop(t + 0.25);
       }
-      if (s % 8 === 4 || (this.mood === 'boss' && s % 8 === 7)) {
+      if (s % 8 === 4) {
         const src = c.createBufferSource();
         src.buffer = this.noiseBuf;
         const f = c.createBiquadFilter();

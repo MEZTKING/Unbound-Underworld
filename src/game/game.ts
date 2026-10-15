@@ -26,9 +26,10 @@ import { createBoss } from './enemies';
 import type { Enemy } from './enemies/enemy';
 import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
-import { drawHUD } from './hud';
+import { drawHUD, drawHudTooltip } from './hud';
+import { newAchievements } from './codex';
 import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, type SaveData } from './meta';
-import { Player } from './player';
+import { Player, useHeroLooks } from './player';
 import { prefs } from './prefs';
 import { applyFeatures, applyForge, applyTalents, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
 import { REWARD_INFO, renderOpts, renderOverlay } from './render';
@@ -58,6 +59,8 @@ export interface RunSummary {
 const VIEW_YAW = Math.PI / 4;
 const VIEW_PITCH = 0.7;
 
+const DEV_KEY = 'unbound-underworld-dev';
+
 const CHARON_LINES = ['Hrrrnnngh…', 'Mmmmhhhaaaah.', 'Hhhrrrraaaagh!', '…Hmmmm.'];
 
 export class Game implements WorldHost {
@@ -82,6 +85,8 @@ export class Game implements WorldHost {
   stats: PlayerStats;
   mode: Mode = 'title';
   godMode = false;
+  /** Developer options were used this session: achievements are off until restart. */
+  cheated = false;
   private hubArtifacts: (string | null)[] = [null, null, null];
   private pendingDoors: RoomPlan[] = [];
   private fade = 1;
@@ -116,6 +121,7 @@ export class Game implements WorldHost {
     const lv = Number(this.params.get('level'));
     if (lv > 0) this.debugLevel = Math.floor(lv);
     this.applySettings();
+    useHeroLooks(this.save.looks);
     this.player = new Player(this.save.weapon, this.save.character);
     this.stats = computeStats([], [], metaBonuses(this.save));
     const unlock = () => audio.unlock();
@@ -154,7 +160,13 @@ export class Game implements WorldHost {
     }
     // Grow the HUD and menus with the screen so they keep their proportions on
     // 1440p and 4K displays. Smaller screens keep the compact layouts.
-    this.uiScale = Math.max(1, Math.min(3, Math.min(w / 1280, h / 760)));
+    this.updateUiScale();
+  }
+
+  /** HUD and menu scale from the screen size and the UI size setting. */
+  private updateUiScale(): void {
+    const base = Math.max(1, Math.min(3, Math.min(window.innerWidth / 1280, window.innerHeight / 760)));
+    this.uiScale = base * (this.save?.settings.uiSize ?? 1);
     document.documentElement.style.setProperty('--ui', this.uiScale.toFixed(3));
   }
 
@@ -168,7 +180,18 @@ export class Game implements WorldHost {
   }
 
   persist(): void {
+    this.checkAchievements();
     writeSave(this.save);
+  }
+
+  /** Awards any achievements just earned. God mode (or developer cheats) disables them. */
+  checkAchievements(): void {
+    if (this.godMode || this.cheated) return;
+    for (const a of newAchievements(this.save)) {
+      this.save.achievements.push(a.id);
+      this.ui.toast(`${a.glyph} Achievement: ${a.name}`, 3200);
+      audio.play('boon');
+    }
   }
 
   /** Pushes saved settings into the audio, camera and gameplay systems. */
@@ -188,6 +211,7 @@ export class Game implements WorldHost {
     prefs.assist = st.assist;
     prefs.doorInfo = st.doorInfo;
     this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
+    this.updateUiScale();
     this.applyView();
   }
 
@@ -235,6 +259,33 @@ export class Game implements WorldHost {
       const up = cam.lift;
       this.particles.liftX = up.x;
       this.particles.liftY = up.y;
+    }
+  }
+
+  /** Developer options: play as if at this level (0 = your real level). */
+  setDebugLevel(level: number): void {
+    this.debugLevel = level;
+    this.recomputeStats();
+  }
+
+  get debugLevelValue(): number {
+    return this.debugLevel;
+  }
+
+  /** Developer options are unlocked on this device (secret: tap the version in Settings 7 times) or by ?dev. */
+  get devUnlocked(): boolean {
+    try {
+      return this.params.has('dev') || localStorage.getItem(DEV_KEY) === '1';
+    } catch {
+      return this.params.has('dev');
+    }
+  }
+
+  unlockDev(): void {
+    try {
+      localStorage.setItem(DEV_KEY, '1');
+    } catch {
+      /* private mode: ?dev still works */
     }
   }
 
@@ -351,26 +402,33 @@ export class Game implements WorldHost {
     if (this.mode === 'hub') mood = 'hub';
     else if (w.boss && !w.boss.dead) mood = 'boss';
     else if (w.encounter && !w.cleared) mood = 'combat';
-    audio.setMood(mood);
+    // Each guardian has its own theme; it grows denser in phase 2.
+    const theme = Math.max(0, BIOMES.findIndex((b) => b.id === w.biome.id));
+    audio.intensity = w.boss && !w.boss.dead && (w.boss as { phase?: number }).phase === 2 ? 1 : 0;
+    audio.setMood(mood, theme);
   }
 
   private render(): void {
     const ctx = this.ctx;
     const w = this.world;
     renderOpts.touch = this.touch.enabled;
+    renderOpts.shopSeen = this.save.shopSeen;
+    renderOpts.mouse = !this.touch.enabled && this.input.mouseInside && !this.ui.open ? this.input.mouse : null;
+    // Labels, prompts and floating text follow the UI size, not the camera zoom.
+    renderOpts.textScale = Math.max(this.camera.zoom, this.uiScale);
+    this.particles.uprightScale = renderOpts.textScale * this.dpr;
     if (w) {
       if (this.view3d && this.voxel) {
-        this.particles.uprightScale = this.camera.zoom * this.dpr;
         this.voxel.render(w, this.camera);
         renderOverlay(w, ctx, this.dpr);
-      } else {
-        this.particles.uprightScale = 0;
-        w.render(ctx, this.dpr);
-      }
+      } else w.render(ctx, this.dpr);
       if (this.mode !== 'title') {
         const k = this.dpr * this.uiScale;
         ctx.setTransform(k, 0, 0, k, 0, 0);
         drawHUD(ctx, w, this.run, this.save, this.camera.vw / this.uiScale, this.camera.vh / this.uiScale, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
+        if (!this.touch.enabled && this.input.mouseInside && !this.ui.open) {
+          drawHudTooltip(ctx, this.input.mouse.x / this.uiScale, this.input.mouse.y / this.uiScale, this.camera.vw / this.uiScale);
+        }
       }
       this.syncTouch(w);
     }
@@ -494,11 +552,12 @@ export class Game implements WorldHost {
 
   // ---------------------------------------------------------------- run flow
 
-  startRun(): void {
+  /** Starts an escape. `dev` (developer options) picks the region and first chamber. */
+  startRun(dev?: { biome: number; kind: RoomPlan['kind'] }): void {
     if (loadRun()) this.ui.toast('A new escape begins. The saved one was set aside.', 3000);
     const seedParam = this.params.get('seed');
     this.run = new Run(this.save, seedParam ? Number(seedParam) : undefined);
-    const biomeParam = Number(this.params.get('biome'));
+    const biomeParam = dev ? dev.biome : Number(this.params.get('biome'));
     if (biomeParam > 0) this.run.biomeIndex = clamp(Math.floor(biomeParam), 0, BIOMES.length - 1);
     this.save.stats.runs++;
     this.persist();
@@ -510,7 +569,7 @@ export class Game implements WorldHost {
     this.player.castAmmo = this.stats.castAmmo;
     this.player.dashCharges = this.stats.dashCharges;
     this.mode = 'run';
-    const plan = this.params.get('room') === 'boss' ? { kind: 'boss' as const, reward: null } : this.run.startPlan();
+    const plan = dev ? { kind: dev.kind, reward: dev.kind === 'combat' ? { kind: 'boon' as const } : null } : this.params.get('room') === 'boss' ? { kind: 'boss' as const, reward: null } : this.run.startPlan();
     this.goToRoom(plan);
   }
 
@@ -729,6 +788,8 @@ export class Game implements WorldHost {
   onEnemyKilled(w: World, e: Enemy): void {
     if (this.run) this.run.kills++;
     this.save.stats.kills++;
+    this.save.bestiary[e.name] = (this.save.bestiary[e.name] ?? 0) + 1;
+    this.checkAchievements();
     if (this.stats.lifeOnKill > 0) w.healPlayer(this.stats.lifeOnKill, false);
     if (this.run && !e.isBoss) this.gainXp(e.isElite ? XP.eliteKill : XP.kill);
   }
@@ -818,6 +879,10 @@ export class Game implements WorldHost {
     it.used = true;
     audio.play('gold');
     const [, kind, god] = it.id.split(':');
+    // Buying a kind of ware once reveals what it does from then on.
+    if (!this.save.shopSeen.includes(kind)) this.save.shopSeen.push(kind);
+    this.save.stats.shopBuys++;
+    this.persist();
     const spec: RewardSpec = { kind: kind as RewardSpec['kind'], god: (god || undefined) as GodId | undefined, bonus: true };
     if (spec.kind === 'fountain') {
       w.healPlayer(this.player.maxHp * 0.5, true);

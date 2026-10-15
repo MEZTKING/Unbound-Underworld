@@ -11,7 +11,24 @@ import { isSpear } from './weapons';
 const PAD = 90;
 
 /** Presentation switches set by the game each frame. */
-export const renderOpts = { touch: false };
+export const renderOpts: { touch: boolean; textScale: number; mouse: { x: number; y: number } | null; shopSeen: readonly string[] } = {
+  touch: false,
+  textScale: 1,
+  mouse: null,
+  shopSeen: [],
+};
+
+/** What each of Charon's wares does; shown once you've bought that kind before. */
+export const SHOP_INFO: Partial<Record<RewardSpec['kind'], string>> = {
+  boon: "Choose 1 of 3 of this god's boons.",
+  pom: 'Level up one of your boons.',
+  fountain: 'Restore half of your health.',
+  heart: '+25 max health for this escape.',
+  enchant: 'Choose an enchantment for your weapon.',
+  artifact: 'Choose an artifact for this escape.',
+  hammer: 'Choose an upgrade for your weapon.',
+  hermes: "Choose 1 of Hermes' speed boons.",
+};
 
 interface RoomCache {
   canvas: HTMLCanvasElement;
@@ -474,20 +491,16 @@ function drawDoors(ctx: CanvasRenderingContext2D, w: World): void {
 let overlayDpr = 1;
 
 /**
- * Draws `fn` unturned and unsquashed for the 3D view, so text, icons and
- * health bars stay upright. `fn` draws as if in the flat view around the point
- * (x, y - z); that point lands where the 3D scene shows height z above the
- * ground point (x, y). In the flat view it just draws.
+ * Draws `fn` unturned and unsquashed, at the UI text size, so labels, icons
+ * and health bars stay upright and readable. `fn` draws as if in the flat view
+ * around the point (x, y - z); that point lands where the view shows height z
+ * above the ground point (x, y).
  */
 function upright(ctx: CanvasRenderingContext2D, w: World, x: number, y: number, z: number, fn: () => void): void {
   const cam = w.camera;
-  if (cam.yScale === 1 && cam.yaw === 0) {
-    fn();
-    return;
-  }
   const up = cam.lift;
   const s = cam.worldToScreen({ x: x + up.x * z, y: y + up.y * z });
-  const k = cam.zoom * overlayDpr;
+  const k = renderOpts.textScale * overlayDpr;
   ctx.save();
   ctx.setTransform(k, 0, 0, k, s.x * overlayDpr - x * k, s.y * overlayDpr - (y - z) * k);
   fn();
@@ -502,43 +515,58 @@ function lifted(w: World, x: number, y: number, z: number): { x: number; y: numb
 
 function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
   const p = w.player;
+  const mouse = renderOpts.mouse;
   for (const d of w.doors) {
     if (!d.reward) continue;
     const reward = d.reward;
     const bob = Math.sin(w.time * 2 + d.x) * 4;
-    upright(ctx, w, d.x, 0, 150 - bob, () => drawRewardIcon(ctx, reward, d.x, -150 + bob, 22, w.time));
-    // What lies beyond: always (setting) or when you walk up to the door.
+    const iconZ = 150 - bob;
+    upright(ctx, w, d.x, 0, iconZ, () => drawRewardIcon(ctx, reward, d.x, -iconZ, 22, w.time));
+    if (!d.open) continue;
+    const info = REWARD_INFO[reward.kind];
+    const title = reward.kind === 'boon' && reward.god ? `${GODS[reward.god].name}'s Boon` : info.label;
     const near = Math.hypot(p.x - d.x, p.y) < 460;
-    if (!d.open || !(prefs.doorInfo || near)) continue;
-    const info = REWARD_INFO[d.reward.kind];
-    const title = d.reward.kind === 'boon' && d.reward.god ? `${GODS[d.reward.god].name}'s Boon` : info.label;
-    ctx.font = '700 15px "Cinzel", Georgia, serif';
-    const tw = ctx.measureText(title).width;
-    ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
-    const dw = ctx.measureText(info.desc).width;
-    const bw = Math.max(tw + 30, dw) + 24;
-    // On the floor just in front of the door, so it's on screen even on phones
-    // (the wall above the door can be out of view). Fades when you stand on it.
+    if (!renderOpts.touch) {
+      // Mouse play: the description pops up beside the icon when you point at it
+      // (or walk right up to the door).
+      const up = w.camera.lift;
+      const at = w.camera.worldToScreen({ x: d.x + up.x * iconZ, y: up.y * iconZ });
+      const hover = !!mouse && Math.hypot(mouse.x - at.x, mouse.y - at.y) < 26 * renderOpts.textScale;
+      if (hover || Math.hypot(p.x - d.x, p.y) < 170) upright(ctx, w, d.x, 0, iconZ, () => doorCard(ctx, w, reward, title, info.desc, d.x, -iconZ + 52, 1));
+      continue;
+    }
+    // Touch: on the floor just in front of the door, so it's on screen even on
+    // phones (the wall above the door can be out of view). Always (setting) or
+    // when you walk up to it; fades when you stand on it.
+    if (!(prefs.doorInfo || near)) continue;
     const y = 84;
-    const onIt = Math.abs(p.x - d.x) < bw / 2 + 10 && Math.abs(p.y - y) < 50;
-    upright(ctx, w, d.x, y, 0, () => {
-    ctx.globalAlpha = onIt ? 0.35 : near ? 1 : 0.85;
-    ctx.fillStyle = 'rgba(8,4,12,0.82)';
-    ctx.fillRect(d.x - bw / 2, y - 16, bw, 42);
-    ctx.strokeStyle = rewardColor(reward);
-    ctx.lineWidth = 1;
-    ctx.strokeRect(d.x - bw / 2, y - 16, bw, 42);
-    drawRewardIcon(ctx, reward, d.x - tw / 2 - 6, y - 4, 9, w.time);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = rewardColor(reward);
-    ctx.font = '700 15px "Cinzel", Georgia, serif';
-    ctx.fillText(title, d.x + 10, y + 1);
-    ctx.fillStyle = '#d8c8c0';
-    ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
-    ctx.fillText(info.desc, d.x, y + 18);
-    ctx.globalAlpha = 1;
-    });
+    const onIt = Math.abs(p.x - d.x) < 110 && Math.abs(p.y - y) < 50;
+    upright(ctx, w, d.x, y, 0, () => doorCard(ctx, w, reward, title, info.desc, d.x, y, onIt ? 0.35 : near ? 1 : 0.85));
   }
+}
+
+/** A door's "what lies beyond" plate, centred at (x, y). */
+function doorCard(ctx: CanvasRenderingContext2D, w: World, reward: RewardSpec, title: string, desc: string, x: number, y: number, alpha: number): void {
+  ctx.font = '700 15px "Cinzel", Georgia, serif';
+  const tw = ctx.measureText(title).width;
+  ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
+  const dw = ctx.measureText(desc).width;
+  const bw = Math.max(tw + 30, dw) + 24;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(8,4,12,0.88)';
+  ctx.fillRect(x - bw / 2, y - 16, bw, 42);
+  ctx.strokeStyle = rewardColor(reward);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - bw / 2, y - 16, bw, 42);
+  drawRewardIcon(ctx, reward, x - tw / 2 - 6, y - 4, 9, w.time);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = rewardColor(reward);
+  ctx.font = '700 15px "Cinzel", Georgia, serif';
+  ctx.fillText(title, x + 10, y + 1);
+  ctx.fillStyle = '#d8c8c0';
+  ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
+  ctx.fillText(desc, x, y + 18);
+  ctx.globalAlpha = 1;
 }
 
 function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'][number]): void {
@@ -1169,6 +1197,7 @@ function renderLights(w: World, ctx: CanvasRenderingContext2D, dpr: number): voi
 // ---------------------------------------------------------------- main entry
 
 export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number): void {
+  overlayDpr = dpr;
   const cam = w.camera;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
@@ -1249,7 +1278,30 @@ function drawPrompt(ctx: CanvasRenderingContext2D, w: World): void {
     ctx.strokeRect(f.x - tw / 2 - 40, y - 20, tw + 80, 30);
     ctx.fillStyle = '#ffd890';
     ctx.fillText(renderOpts.touch ? `${f.prompt}: ${label}` : `[E] ${f.prompt}: ${label}`, f.x, y);
+    if (f.kind === 'shop' && !f.used) drawWareInfo(ctx, f, y + 12);
   });
+}
+
+/** What a ware does, under its prompt; blurred until you've bought that kind once. */
+function drawWareInfo(ctx: CanvasRenderingContext2D, f: Interactable, top: number): void {
+  const kind = f.id.split(':')[1] as RewardSpec['kind'];
+  const desc = SHOP_INFO[kind];
+  if (!desc) return;
+  const known = renderOpts.shopSeen.includes(kind);
+  ctx.font = 'italic 14px "EB Garamond", Georgia, serif';
+  const dw = Math.max(ctx.measureText(desc).width, 200);
+  ctx.fillStyle = 'rgba(8,4,12,0.85)';
+  ctx.fillRect(f.x - dw / 2 - 12, top, dw + 24, known ? 26 : 42);
+  ctx.save();
+  if (!known) ctx.filter = 'blur(4px)';
+  ctx.fillStyle = '#e0d4cc';
+  ctx.fillText(desc, f.x, top + 18);
+  ctx.restore();
+  if (!known) {
+    ctx.fillStyle = '#b8a8a8';
+    ctx.font = '600 11px "Cinzel", Georgia, serif';
+    ctx.fillText('Buy one to learn what it does', f.x, top + 36);
+  }
 }
 
 /** Vignette, low-health pulse and Eclipse darkness, in screen space. */
