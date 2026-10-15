@@ -84,7 +84,7 @@ export interface Unlock {
 /** What each level opens up. The first runs only have Attack, Special and Dash. */
 export const UNLOCKS: Unlock[] = [
   { level: 2, feature: 'gear', title: 'Gear & Inventory', desc: 'Equip the helmets, armor, leggings and boots foes drop, and craft or star them up with materials, at the Armory or from the pause menu.' },
-  { level: 2, feature: 'guard', title: 'Guard & Parry', desc: 'Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped.', keys: { pc: 'V', touch: '⛨' } },
+  { level: 2, feature: 'guard', title: 'Guard & Parry', desc: 'Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped.', keys: { pc: 'F', touch: '⛨' } },
   { level: 2, feature: 'potion', title: 'Healing Potion', desc: 'Drink to restore health. It refills over time.', keys: { pc: 'R', touch: '⚗' } },
   { level: 3, feature: 'cast', title: 'Cast', desc: 'Hurl a shard that lodges in foes. Walk over it to pick it up again.', keys: { pc: 'Q / Middle mouse', touch: '◆' } },
   { level: 4, feature: 'artifacts', title: 'Artifacts', desc: 'One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf.', keys: { pc: '1', touch: 'the artifact button' } },
@@ -92,7 +92,7 @@ export const UNLOCKS: Unlock[] = [
   { level: 6, feature: 'enchants', title: 'Enchantments', desc: 'Enchanting Tomes now appear behind doors and in chests.' },
   { level: 7, feature: 'anvil', title: "Hephaestus' Anvil", desc: 'Anvils that reforge your weapon now appear in the Underworld.' },
   { level: 8, feature: 'artifact2', title: 'Second Artifact Slot', desc: 'Carry two artifacts at once.', keys: { pc: '2', touch: 'the artifact button' } },
-  { level: 10, feature: 'wrath', title: 'Wrath', desc: "Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate.", keys: { pc: 'F', touch: '☄' } },
+  { level: 10, feature: 'wrath', title: 'Wrath', desc: "Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate.", keys: { pc: 'V', touch: '☄' } },
 
   { level: 12, feature: 'artifact3', title: 'Third Artifact Slot', desc: 'Carry three artifacts at once.', keys: { pc: '3', touch: 'the artifact button' } },
   { level: 13, feature: 'forgeAwaken', title: 'Awakened Weapons', desc: 'Forge a weapon to Tier III at the Armory to awaken it.' },

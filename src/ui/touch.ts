@@ -13,6 +13,8 @@ export interface TouchHud {
   /** Wrath gauge 0..1, or null while Wrath is locked. */
   wrath: number | null;
   potionCd: number;
+  /** 0..1 of the dash cooldown left while no charge is ready. */
+  dashCd: number;
   castAmmo: number;
   interact: string | null;
 }
@@ -225,6 +227,7 @@ export class TouchControls {
     const potion = this.els.get('potion')!;
     potion.classList.toggle('gone', !hud.potion);
     potion.style.setProperty('--cd', `${hud.potionCd}`);
+    this.els.get('dash')!.style.setProperty('--cd', `${hud.dashCd}`);
     const cast = this.els.get('cast')!;
     cast.classList.toggle('gone', !hud.cast);
     cast.classList.toggle('dim', hud.castAmmo <= 0);

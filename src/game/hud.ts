@@ -1,10 +1,10 @@
-import { TAU } from '../engine/math';
+import { clamp, TAU } from '../engine/math';
 import { ARTIFACT_BY_ID } from './artifacts';
 import { BOON_BY_ID, describeBoon, GODS, RARITY_COLOR } from './boons';
 import { Boss } from './enemies';
 import { ENCHANT_BY_ID } from './enchants';
 import { prefs } from './prefs';
-import { levelFromXp, tierFor, WRATH_MAX } from './progression';
+import { levelFromXp, tierFor, TIERS, WRATH_MAX } from './progression';
 import type { Run } from './run';
 import type { SaveData } from './meta';
 import { LOOT_FEED_TIME, type World } from './world';
@@ -23,7 +23,7 @@ interface Tip {
 let tips: Tip[] = [];
 
 /** The key shown for an action ("R", "4"…); the game points this at the live bindings. */
-let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'F', guard: 'V', dash: 'Left Shift', jump: 'Space', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
+let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'V', guard: 'F', dash: 'Left Shift', jump: 'Space', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
 export function useKeyLabels(fn: (action: string) => string): void {
   keyOf = fn;
 }
@@ -187,10 +187,20 @@ export function drawHUD(
   const dx = touch ? 110 : 150;
   ctx.fillText('DASH', hx + dx, hy - 12);
   for (let i = 0; i < s.dashCharges; i++) {
+    const cx = hx + dx + 52 + i * 16;
     ctx.fillStyle = i < p.dashCharges ? '#ffd890' : 'rgba(255,255,255,0.15)';
     ctx.beginPath();
-    ctx.arc(hx + dx + 52 + i * 16, hy - 16, 5, 0, TAU);
+    ctx.arc(cx, hy - 16, 5, 0, TAU);
     ctx.fill();
+    // The charge coming back fills like a clock.
+    if (i === p.dashCharges && s.dashRecharge > 0) {
+      const k = clamp(1 - p.dashRechargeT / s.dashRecharge, 0, 1);
+      ctx.fillStyle = 'rgba(255,216,144,0.6)';
+      ctx.beginPath();
+      ctx.moveTo(cx, hy - 16);
+      ctx.arc(cx, hy - 16, 5, -Math.PI / 2, -Math.PI / 2 + k * TAU);
+      ctx.fill();
+    }
   }
   if (touch) {
     if (s.artifactSlots > 0) {
@@ -228,6 +238,7 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
   ctx.fillStyle = '#7fe8ff';
   ctx.font = `700 11px ${FONT}`;
   ctx.fillText(`SOULS ${Math.floor(p.souls)}`, sx, sy - 6);
+  tip(sx + 60, sy - 4, 62, 'Souls', `Slain foes drop souls (up to ${s.soulMax}). They fuel your artifacts: using one costs the souls shown on it. Each escape starts with a full gauge.`, '#7fe8ff');
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(sx, sy, 120, 8);
   ctx.fillStyle = '#7fe8ff';
@@ -414,7 +425,20 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
   const prog = levelFromXp(save.xp);
   ctx.font = `700 13px ${FONT}`;
   ctx.fillStyle = tier.color;
-  ctx.fillText(`Lv ${level} · ${tier.name}`, rx, ry);
+  const rankText = `Lv ${level} · ${tier.name}`;
+  ctx.fillText(rankText, rx, ry);
+  {
+    const tw = ctx.measureText(rankText).width;
+    const next = TIERS.find((t) => t.level > level);
+    tip(
+      ctx.textAlign === 'right' ? rx - tw / 2 : rx + tw / 2,
+      ry - 5,
+      Math.max(24, tw / 2),
+      `Rank: ${tier.name}`,
+      `Your level and rank (not a foe). Experience from foes, chambers, guardians and escapes raises your level; every 5 levels you rise a rank: ${TIERS.map((t) => t.name).join(', ')}.${next ? ` ${next.name} at level ${next.level}.` : ''}`,
+      tier.color,
+    );
+  }
   ry += 6;
   const bx = left ? rx : rx - 110;
   ctx.fillStyle = 'rgba(0,0,0,0.6)';

@@ -589,6 +589,112 @@ kbd {
   color: var(--c);
 }
 
+/* The organised build: four ability slots, blessings grouped by god, then
+   duos, weapon upgrades, enchantments and artifacts. */
+.build.organised {
+  display: block;
+  max-height: 64vh;
+  padding-right: 4px;
+  text-align: left;
+}
+.build-panel {
+  max-width: 1080px;
+}
+.build.organised .section {
+  margin: 14px 0 8px;
+}
+.build.organised .section:first-of-type {
+  margin-top: 4px;
+}
+.bsum {
+  margin: 0 0 4px;
+  text-align: center;
+}
+.bslots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+.bgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.bcard,
+.bchip {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  border-top: 3px solid var(--c);
+  border-radius: 4px;
+  padding: 8px 10px 9px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 10%, transparent), rgba(255, 255, 255, 0.02));
+  font-size: 14.5px;
+  line-height: 1.35;
+}
+.bcard.empty {
+  --c: rgba(255, 255, 255, 0.25);
+  border-style: dashed;
+  opacity: 0.6;
+}
+.bslot {
+  display: block;
+  font-family: var(--serif);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(232, 220, 200, 0.55);
+  margin-bottom: 2px;
+}
+.bhead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.bhead b,
+.bchip b {
+  font-family: var(--serif);
+  color: var(--c);
+  font-size: 16px;
+}
+.bglyph {
+  font-style: normal;
+  color: var(--c);
+  opacity: 0.85;
+}
+.bhead .tag {
+  margin-left: auto;
+}
+.bdesc,
+.bchip div {
+  color: #d8cfc6;
+}
+.bgod {
+  margin-bottom: 10px;
+}
+.bgod h4 {
+  margin: 0 0 6px;
+  font-family: var(--serif);
+  font-weight: 600;
+  color: var(--c);
+  letter-spacing: 1px;
+  border-bottom: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  padding-bottom: 3px;
+}
+.bgod h4 i {
+  font-style: normal;
+}
+.bgod h4 small {
+  color: rgba(232, 220, 200, 0.5);
+  font-size: 12px;
+}
+/* In the pause menu's side column everything stacks. */
+.build.organised.compact .bslots,
+.build.organised.compact .bgrid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
 .toast {
   zoom: var(--ui, 1);
   position: fixed;
@@ -1287,6 +1393,12 @@ h3.section small {
   height: 150px;
   background: radial-gradient(circle at 50% 80%, rgba(255, 216, 144, 0.12), transparent 70%);
 }
+.look-preview.voxel {
+  width: 160px;
+  height: 200px;
+  cursor: grab;
+  touch-action: none;
+}
 .look-row {
   display: flex;
   align-items: center;
@@ -1448,6 +1560,12 @@ h3.section small {
 .stars i.off {
   color: rgba(255, 255, 255, 0.14);
   text-shadow: none;
+}
+.stars.plain {
+  font-size: 10.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(232, 220, 200, 0.45);
 }
 /* The top tiers shimmer: Unique pulses, Ghost drifts like a spirit. */
 .gear-item.tier-unique,

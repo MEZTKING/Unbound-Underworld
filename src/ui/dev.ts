@@ -4,7 +4,7 @@
 
 import { audio } from '../engine/audio';
 import { fx, Rng } from '../engine/math';
-import { INVENTORY_SIZE, MATERIAL_IDS, rollGear } from '../game/gear';
+import { INVENTORY_SIZE, makeGear, MATERIAL_IDS, rollDrop } from '../game/gear';
 import { ARTIFACTS } from '../game/artifacts';
 import { availableGods, rollBoonOffers, takeBoon } from '../game/boons';
 import { createBoss } from '../game/enemies';
@@ -133,9 +133,9 @@ export function devMenu(g: Game): void {
         case 'loot': {
           for (const k of MATERIAL_IDS) g.save.materials[k] = (g.save.materials[k] ?? 0) + 200;
           const rng = new Rng(Date.now() & 0x7fffffff);
-          for (let i = 0; i < 6 && g.save.gear.items.length < INVENTORY_SIZE; i++) g.save.gear.items.push(rollGear(rng, 0.5));
+          for (let i = 0; i < 6 && g.save.gear.items.length < INVENTORY_SIZE; i++) g.save.gear.items.push(rollDrop(rng, i % 2 ? 'guardian' : 'elite', g.level));
           // One of each top tier, to try perks and stars.
-          for (const min of ['unique', 'ghost'] as const) if (g.save.gear.items.length < INVENTORY_SIZE) g.save.gear.items.push(rollGear(rng, 1, undefined, min));
+          for (const min of ['unique', 'ghost'] as const) if (g.save.gear.items.length < INVENTORY_SIZE) g.save.gear.items.push(makeGear(rng, min, 3));
           done('Materials and gear added (gear needs level 10 to use)');
           return;
         }

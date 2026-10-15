@@ -52,24 +52,24 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 2 | 108 | 60 | Shade | 1 | Gear & Inventory, Guard & Parry, Healing Potion |
 | 3 | 162 | 168 | Shade | 2 | Cast, Forge: Tier II · Tempered |
 | 4 | 222 | 330 | Shade | 3 | Artifacts |
-| 5 | 288 | 552 | Wraith | 4 | Jump & Slam, Hero: Gorran, Weapon: Titan Gauntlets |
+| 5 | 288 | 552 | Wraith | 4 | Jump & Slam, Weapon: Titan Gauntlets |
 | 6 | 360 | 840 | Wraith | 5 | Enchantments |
-| 7 | 438 | 1200 | Wraith | 6 | Hephaestus' Anvil |
-| 8 | 522 | 1638 | Wraith | 7 | Second Artifact Slot, Hero: Ione, Weapon: Riptide Chains |
+| 7 | 438 | 1200 | Wraith | 6 | Hephaestus' Anvil, Hero: Gorran |
+| 8 | 522 | 1638 | Wraith | 7 | Second Artifact Slot, Weapon: Riptide Chains |
 | 9 | 612 | 2160 | Wraith | 8 |  |
-| 10 | 708 | 2772 | Revenant | 9 | Wrath, Hero: Erebos, Weapon: Reaper's Crescent |
+| 10 | 708 | 2772 | Revenant | 9 | Wrath, Hero: Ione, Weapon: Reaper's Crescent |
 | 11 | 810 | 3480 | Revenant | 10 |  |
-| 12 | 918 | 4290 | Revenant | 11 | Third Artifact Slot, Hero: Rook, Weapon: Thunderbuss |
+| 12 | 918 | 4290 | Revenant | 11 | Third Artifact Slot, Weapon: Thunderbuss |
 | 13 | 1032 | 5208 | Revenant | 12 | Awakened Weapons, Forge: Tier III · Awakened |
-| 14 | 1152 | 6240 | Revenant | 13 |  |
-| 15 | 1278 | 7392 | Champion | 14 | Hero: Selene, Weapon: Starsplitter |
+| 14 | 1152 | 6240 | Revenant | 13 | Hero: Erebos |
+| 15 | 1278 | 7392 | Champion | 14 | Weapon: Starsplitter |
 | 16 | 1410 | 8670 | Champion | 15 | Forge: Tier IV · Exalted |
 | 17 | 1548 | 10080 | Champion | 16 |  |
-| 18 | 1692 | 11628 | Champion | 17 |  |
+| 18 | 1692 | 11628 | Champion | 17 | Hero: Rook |
 | 19 | 1842 | 13320 | Champion | 18 |  |
 | 20 | 1998 | 15162 | Unbound | 19 | Forge: Tier V · Mythic |
 | 21 | 2160 | 17160 | Unbound | 20 |  |
-| 22 | 2328 | 19320 | Unbound | 21 |  |
+| 22 | 2328 | 19320 | Unbound | 21 | Hero: Selene |
 | 23 | 2502 | 21648 | Unbound | 22 |  |
 | 24 | 2682 | 24150 | Unbound | 23 |  |
 | 25 | 2868 | 26832 | Unbound | 24 |  |
@@ -84,7 +84,7 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | Level | Unlock | What it does | Keys (PC / touch) |
 |---|---|---|---|
 | 2 | Gear & Inventory | Equip the helmets, armor, leggings and boots foes drop, and craft or star them up with materials, at the Armory or from the pause menu. |  |
-| 2 | Guard & Parry | Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped. | V / ⛨ |
+| 2 | Guard & Parry | Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped. | F / ⛨ |
 | 2 | Healing Potion | Drink to restore health. It refills over time. | R / ⚗ |
 | 3 | Cast | Hurl a shard that lodges in foes. Walk over it to pick it up again. | Q / Middle mouse / ◆ |
 | 4 | Artifacts | One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf. | 1 / the artifact button |
@@ -92,7 +92,7 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 6 | Enchantments | Enchanting Tomes now appear behind doors and in chests. |  |
 | 7 | Hephaestus' Anvil | Anvils that reforge your weapon now appear in the Underworld. |  |
 | 8 | Second Artifact Slot | Carry two artifacts at once. | 2 / the artifact button |
-| 10 | Wrath | Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate. | F / ☄ |
+| 10 | Wrath | Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate. | V / ☄ |
 | 12 | Third Artifact Slot | Carry three artifacts at once. | 3 / the artifact button |
 | 13 | Awakened Weapons | Forge a weapon to Tier III at the Armory to awaken it. |  |
 
@@ -126,11 +126,11 @@ Choose a hero in the *Hall of Heroes*. Wrath (unlocks at level 10) fills by 3.13
 | Kael, Prince of Embers | Warrior | Nightblade | parry | Start | Balanced: no strengths, no weaknesses; +10% Wrath gain | Inferno Nova | A ring of hellfire bursts outward three times, burning everything it touches. |
 | Lyra, Moon Huntress | Ranger | Moonbow | evade | Start | +12% move speed; +8% critical chance; −10 max Health | Moonfall | Beams of moonlight strike every foe in sight three times. |
 | Doran, The Bronze Wall | Vanguard | Thornspear | shield | Start | +30 max Health; Take 12% less damage; −8% move speed | Titan's Quake | Three quakes roll out from you, stunning and crushing foes. |
-| Gorran, The Unchained Fist | Brawler | Titan Gauntlets | catch | Reach level 5 | Combo meter builds twice as fast; +20 max Health | Hundred Fists | A storm of punches in front of you, ending in a crushing blast. |
-| Ione, Tidecaller | Monk | Riptide Chains | catch | Reach level 8 | +1 Cast shard (once Cast is unlocked); +20% Special damage; +15% knockback | Tidal Surge | A tidal wave hurls every nearby foe away, chilling them to the bone. |
-| Erebos, The Hollow King | Reaper | Reaper's Crescent | mist | Reach level 10 or slay 2 guardians | +10% damage; Restore 2 Health per foe slain; +50% souls gathered; −15 max Health | Eclipse | Darkness falls: every foe in sight is stunned and Doomed, and you drink their life. |
-| Rook, The Powder Ghost | Gunner | Thunderbuss | evade | Reach level 12 | Hits on foes close to you deal +30% damage; +15% knockback | Cannonade | Cannon shots rain down on the foes around you. |
-| Selene, Starbound | Duelist | Starsplitter | parry | Reach level 15 or escape once | +1 Dash charge; +15% Attack damage; Dash recharges 20% faster | Starfall | A storm of falling stars pounds the area around you. |
+| Gorran, The Unchained Fist | Brawler | Titan Gauntlets | catch | Reach level 7 or slay a guardian | Combo meter builds twice as fast; +20 max Health | Hundred Fists | A storm of punches in front of you, ending in a crushing blast. |
+| Ione, Tidecaller | Monk | Riptide Chains | catch | Reach level 10 or slay 3 guardians | +1 Cast shard (once Cast is unlocked); +20% Special damage; +15% knockback | Tidal Surge | A tidal wave hurls every nearby foe away, chilling them to the bone. |
+| Erebos, The Hollow King | Reaper | Reaper's Crescent | mist | Reach level 14 or slay 6 guardians | +10% damage; Restore 2 Health per foe slain; +50% souls gathered; −15 max Health | Eclipse | Darkness falls: every foe in sight is stunned and Doomed, and you drink their life. |
+| Rook, The Powder Ghost | Gunner | Thunderbuss | evade | Reach level 18 or escape once | Hits on foes close to you deal +30% damage; +15% knockback | Cannonade | Cannon shots rain down on the foes around you. |
+| Selene, Starbound | Duelist | Starsplitter | parry | Reach level 22 or escape 3 times | +1 Dash charge; +15% Attack damage; Dash recharges 20% faster | Starfall | A storm of falling stars pounds the area around you. |
 
 Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes souls).
 
@@ -340,6 +340,7 @@ Values shown are Common, level 1. Rarity multiplies the value; each Pomegranate 
 | Second Step | passive | Gain +1 Dash charge. |  |
 | Fleet Foot | passive | You move +15% faster. |  |
 | Quicksilver Strikes | passive | Your Attack and Special are +10% faster. |  |
+| Windstep | passive | Your Dash recharges 25% faster. |  |
 | Rebound | passive | After taking damage, Dash quickly to recover 30% of the Health you lost. |  |
 | Returning Shards | passive | Your Cast shards regenerate on their own every 5.0s. |  |
 | Extra Shard | passive | Gain +1 Cast shard. |  |
@@ -402,7 +403,7 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 | ➶ Fleet Shadow | 1 | 60 | +1 Dash charge |
 | ◆ Shard Keeper | 2 | 25 / 75 | +2 Cast shards |
 | ◎ Ferryman’s Purse | 3 | 10 / 25 / 45 | Begin each run with 120 obols |
-| ✦ Favor of the Gods | 3 | 20 / 45 / 90 | Boons are more often Rare or better: +19.5% (not the first boon of an escape) |
+| ✦ Favor of the Gods | 3 | 20 / 45 / 90 | Boons are more often Rare or better: +9.75% (not the first boon of an escape) |
 | ⛨ Iron Will | 3 | 20 / 45 / 80 | Take 15% less damage |
 | ⚗ Alchemy | 2 | 25 / 60 | Potion recharges 40% faster and heals +20% |
 | ✧ Soulcraft | 2 | 20 / 50 | +50 max souls, +40% souls gathered |
@@ -410,7 +411,9 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 
 ## Loot and gear
 
-Unlocks at level 2. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Every drop chance is listed under *Probabilities*. Up to 40 pieces are kept; a full inventory salvages new finds.
+The Gear & Inventory screen opens at level 2; loot drops from the first escape. Foes drop materials; gear drops from foes (12%), enchanted foes (35%), chests (30%) and guardians (always). Every drop chance is listed under *Probabilities*. Up to 40 pieces are kept; a full inventory salvages new finds.
+
+**Plain and starred pieces.** Common and Uncommon pieces are *plain*: no stars, and they can't be starred up (salvage them for materials). Rare and better pieces drop with stars: one star usually, each extra star half as likely, up to a cap set by your level. Legendary pieces come only from guardians.
 
 | Material | Source |
 |---|---|
@@ -420,17 +423,17 @@ Unlocks at level 2. Foes drop materials; gear drops from foes (1.2%), enchanted 
 | ● Gate Pearl | Dropped by foes at the Last Gate. |
 | ⬢ Titan Scale | Dropped by guardians and enchanted foes. Rare. |
 
-| Tier | Bonuses | Bonus strength × | Chance (foe) | Chance (guardian luck) | Perk |
-|---|---|---|---|---|---|
-| Common | 1 | 1 | 49% | 35% | — |
-| Uncommon | 2 | 1.15 | 27% | 25% | — |
-| Rare | 2 | 1.3 | 14% | 19% | — |
-| Epic | 3 | 1.55 | 5.4% | 11% | — |
-| Legendary | 4 | 1.85 | 2.5% | 7% | — |
-| Unique | 4 | 2.1 | 1.5% | 2.7% | One Unique perk |
-| Ghost | 5 | 2.5 | 0.3% | 0.7% | One Ghost perk |
+| Tier | Bonuses | Bonus strength × | Bonus roll | Stars | Drops from | Perk |
+|---|---|---|---|---|---|---|
+| Common | 1 | 1 | 0.80–1.25 | None (plain) | Any drop that rolls no star | — |
+| Uncommon | 2 | 1.15 | 0.80–1.25 | None (plain) | Any drop that rolls no star | — |
+| Rare | 2 | 1.3 | 0.80–1.25 | 1–10 | Foes, Enchanted foes, Chests, Guardians | — |
+| Epic | 3 | 1.55 | 0.80–1.25 | 1–10 | Enchanted foes, Chests, Guardians | — |
+| Legendary | 4 | 1.85 | 0.80–1.25 | 1–10 | Guardians | — |
+| Unique | 4 | 2.1 | 0.80–1.25 | 1–10 | Enchanted foes, Guardians | One Unique perk |
+| Ghost | 5 | 2.5 | 1.00–1.25 | 1–10 | Any foe (0.1% a kill) | One Ghost perk |
 
-Guardians always drop Rare or better (lower tiers roll up to Rare).
+A bonus is its base value × roll × tier strength × star bonus. Ghost bonuses never roll low: the weakest Ghost bonus (2.50× base) beats the best Legendary one (2.31×).
 
 | Perk | Tier | Effect |
 |---|---|---|
@@ -459,27 +462,26 @@ Guardians always drop Rare or better (lower tiers roll up to Rare).
 | +6% Wrath gain | 6% | Helmet |
 | +6% potion healing | 6% | Armor |
 
-Pieces are starred up from 1 to 10 stars. The first five stars are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.
+Rare and better pieces are starred up from 1 to 10 stars. Stars 2–5 are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.
 
-| Stars | Bonus × | Next star (Common) | Next star (Epic) | Next star (Ghost) |
+| Stars | Bonus × | Next star (Rare) | Next star (Epic) | Next star (Ghost) |
 |---|---|---|---|---|
-| ★ gold | 1.00 | 6 ☗ | 6 ☗ · 2 ✹ · 1 ⬢ | 6 ☗ · 2 ● · 1 ⬢ |
-| ★★ gold | 1.15 | 12 ☗ | 12 ☗ · 4 ✹ · 2 ⬢ | 12 ☗ · 4 ● · 2 ⬢ |
-| ★★★ gold | 1.30 | 18 ☗ | 18 ☗ · 6 ✹ · 3 ⬢ | 18 ☗ · 6 ● · 3 ⬢ |
-| ★★★★ gold | 1.45 | 24 ☗ | 24 ☗ · 8 ✹ · 4 ⬢ | 24 ☗ · 8 ● · 4 ⬢ |
-| ★★★★★ gold | 1.60 | 30 ☗ · 1 ⬢ | 30 ☗ · 10 ✹ · 6 ⬢ | 30 ☗ · 10 ● · 6 ⬢ |
-| ★ purple + ★★★★ gold | 1.80 | 36 ☗ · 2 ⬢ | 36 ☗ · 12 ✹ · 8 ⬢ | 36 ☗ · 12 ● · 8 ⬢ |
-| ★★ purple + ★★★ gold | 2.00 | 42 ☗ · 3 ⬢ | 42 ☗ · 14 ✹ · 10 ⬢ | 42 ☗ · 14 ● · 10 ⬢ |
-| ★★★ purple + ★★ gold | 2.20 | 48 ☗ · 4 ⬢ | 48 ☗ · 16 ✹ · 12 ⬢ | 48 ☗ · 16 ● · 12 ⬢ |
-| ★★★★ purple + ★ gold | 2.40 | 54 ☗ · 5 ⬢ | 54 ☗ · 18 ✹ · 14 ⬢ | 54 ☗ · 18 ● · 14 ⬢ |
+| ★ gold | 1.00 | 6 ☗ · 2 ♦ | 6 ☗ · 2 ✹ · 1 ⬢ | 6 ☗ · 2 ● · 1 ⬢ |
+| ★★ gold | 1.15 | 12 ☗ · 4 ♦ | 12 ☗ · 4 ✹ · 2 ⬢ | 12 ☗ · 4 ● · 2 ⬢ |
+| ★★★ gold | 1.30 | 18 ☗ · 6 ♦ | 18 ☗ · 6 ✹ · 3 ⬢ | 18 ☗ · 6 ● · 3 ⬢ |
+| ★★★★ gold | 1.45 | 24 ☗ · 8 ♦ | 24 ☗ · 8 ✹ · 4 ⬢ | 24 ☗ · 8 ● · 4 ⬢ |
+| ★★★★★ gold | 1.60 | 30 ☗ · 10 ♦ · 1 ⬢ | 30 ☗ · 10 ✹ · 6 ⬢ | 30 ☗ · 10 ● · 6 ⬢ |
+| ★ purple + ★★★★ gold | 1.80 | 36 ☗ · 12 ♦ · 2 ⬢ | 36 ☗ · 12 ✹ · 8 ⬢ | 36 ☗ · 12 ● · 8 ⬢ |
+| ★★ purple + ★★★ gold | 2.00 | 42 ☗ · 14 ♦ · 3 ⬢ | 42 ☗ · 14 ✹ · 10 ⬢ | 42 ☗ · 14 ● · 10 ⬢ |
+| ★★★ purple + ★★ gold | 2.20 | 48 ☗ · 16 ♦ · 4 ⬢ | 48 ☗ · 16 ✹ · 12 ⬢ | 48 ☗ · 16 ● · 12 ⬢ |
+| ★★★★ purple + ★ gold | 2.40 | 54 ☗ · 18 ♦ · 5 ⬢ | 54 ☗ · 18 ✹ · 14 ⬢ | 54 ☗ · 18 ● · 14 ⬢ |
 | ★★★★★ purple +  gold | 2.60 | — | — | — |
 
-| Recipe | Rarity | Cost |
+| Recipe | Makes | Cost |
 |---|---|---|
-| Craft a piece | Common or better | 25 ☗ · 6 ♦ |
-| Craft a fine piece | Rare or better | 40 ☗ · 6 ✹ |
-| Craft a grand piece | Epic or better | 60 ☗ · 6 ● · 3 ⬢ |
-| Craft a masterwork | Legendary or better | 120 ☗ · 14 ● · 10 ⬢ |
+| Craft a plain piece | Common 70%, Uncommon 30% | 25 ☗ · 6 ♦ |
+| Craft a fine piece (1★ Rare) | Rare 100% | 40 ☗ · 6 ✹ |
+| Craft a grand piece (1★ Epic) | Epic 100% | 60 ☗ · 6 ● · 3 ⬢ |
 
 
 ## Regions and guardians
@@ -596,15 +598,15 @@ Each boon offered rolls its rarity on its own. The first boon of an escape is he
 
 | When | Common | Rare | Epic | Heroic |
 |---|---|---|---|---|
-| First boon of an escape | 90% | 10% | — | — |
-| The Shackled Deep | 85% | 14% | 1% | — |
-| The Ember Fields | 70% | 24% | 5% | 1% |
-| The Gilded Groves | 55% | 30% | 12% | 3% |
-| The Last Gate | 42% | 33% | 19% | 6% |
-| The Shackled Deep, Favor 3 | 67% | 26% | 7% | — |
-| The Ember Fields, Favor 3 | 51% | 36% | 11% | 2.5% |
-| The Gilded Groves, Favor 3 | 36% | 42% | 18% | 4.5% |
-| The Last Gate, Favor 3 | 23% | 45% | 25% | 7.5% |
+| First boon of an escape | 95% | 5% | — | — |
+| The Shackled Deep | 93% | 7% | 0.5% | — |
+| The Ember Fields | 85% | 12% | 2.5% | 0.5% |
+| The Gilded Groves | 78% | 15% | 6% | 1.5% |
+| The Last Gate | 71% | 17% | 9.5% | 3% |
+| The Shackled Deep, Favor 3 | 84% | 13% | 3.5% | — |
+| The Ember Fields, Favor 3 | 75% | 18% | 5.5% | 1.3% |
+| The Gilded Groves, Favor 3 | 68% | 21% | 9% | 2.3% |
+| The Last Gate, Favor 3 | 61% | 23% | 13% | 3.8% |
 
 Boon offers: up to 3 of the god's boons you can take, drawn evenly. A Duo boon (when its two gods are both in your build) replaces one of them 40% of the time. Duo boons have no rarity. Anvil upgrades: 3 drawn evenly from the ones you don't own. A Pomegranate levels a boon by 2 instead of 1 20% of the time.
 
@@ -629,7 +631,8 @@ Chamber 1 of a region has 1 wave, chambers 2–3 have 2 and later chambers 3. Fo
 | ☗ Bone Dust | 30% (×2 at 30%) | 48% (×2 at 30%) | 90% (×10) |
 | Region material (Ember Shard / Golden Ichor / Gate Pearl) | 14% | 22% | 42% (×6) |
 | ⬢ Titan Scale | — | 25% | 100% (×3–5) |
-| Gear | 1.2% | 12% | 100% (Rare or better) |
+| Gear | 12% | 35% | 100% (starred) |
+| Ghost gear | 0.1% | 0.1% | 0.1% |
 
 Breaking a pot: 35% obols (1–5), else 20% two souls: 13% overall, nothing 52%.
 
@@ -638,24 +641,46 @@ Breaking a pot: 35% obols (1–5), else 20% two souls: 13% overall, nothing 52%.
 | Roll | Chance |
 |---|---|
 | A combat chamber holds a chest | 25% (+10% per Treasure Sense tier) |
-| The chest is a Mimic (combat chambers) | 15% |
+| The chest is a Mimic (combat chambers); slaying it always drops a Unique piece | 3% |
 | Always inside | 15–35 obols, 6 souls, 3 Bone Dust |
 | Also a piece of gear | 30% |
 | An artifact pops out | 35% (artifacts unlocked, one left to find) |
 | Otherwise an enchantment | 25% (60% when no artifact is left) |
 
-### Gear tiers by source
+### Gear drops
 
-Luck slides the tier odds toward the better tiers. Guardians then lift anything below Rare up to Rare.
+A run of about 80 kills (10 of them enchanted) yields about 0.9 starred pieces at level 1 and 1.6 at level 30, before guardians and chests; the rest of the gear is plain. Every guardian drops one starred piece.
 
-| Source | Luck | Common | Uncommon | Rare | Epic | Legendary | Unique | Ghost |
-|---|---|---|---|---|---|---|---|---|
-| Foe, The Shackled Deep | 0.0 | 49% | 27% | 14% | 5.4% | 2.5% | 1.5% | 0.3% |
-| Foe, The Ember Fields | 0.1 | 46% | 27% | 15% | 6.6% | 3.5% | 1.7% | 0.4% |
-| Foe, The Gilded Groves | 0.2 | 43% | 27% | 16% | 7.6% | 4.3% | 1.9% | 0.4% |
-| Foe, The Last Gate | 0.3 | 41% | 26% | 17% | 8.5% | 5.1% | 2.1% | 0.5% |
-| Chest | 0.2 | 43% | 27% | 16% | 7.6% | 4.3% | 1.9% | 0.4% |
-| Guardian | 0.6 | 35% | 25% | 19% | 11% | 7% | 2.7% | 0.7% |
+| Source | Drops a piece | Plain (Common 70% / Uncommon 30%) | Starred | Starred tier |
+|---|---|---|---|---|
+| Foes | 12% | 90% | 10% | Rare 100% |
+| Enchanted foes | 35% | 80% | 20% | Rare 70%, Epic 25%, Unique 5% |
+| Chests | 30% | 84% | 16% | Rare 85%, Epic 15% |
+| Guardians | 100% | — | 100% | Rare 45%, Epic 30%, Legendary 20%, Unique 5% |
+
+Plus, on any kill (guardians too): a Ghost piece, 0.1%. *Plain* and *Starred* are at level 30; at low levels the star cap trims the many-star rolls (see below).
+
+**Stars on a drop.** The first star has the source's chance (foes 5%, enchanted foes 10%, chests 8%); each further star is half as likely. A drop carries at most 1 star, +1 every 3 player levels (1 at level 1, 6 at level 15, 10 at level 30). Guardian and Ghost pieces always have at least one star, spread the same way.
+
+| Source (level 30) | 1★ | 2★ | 3★ | 4★ | 5★ | 6★ or more |
+|---|---|---|---|---|---|---|
+| Foes | 5% | 2.5% | 1.3% | 0.6% | 0.3% | 0.3% |
+| Enchanted foes | 10% | 5% | 2.5% | 1.3% | 0.6% | 0.6% |
+| Chests | 8% | 4% | 2% | 1% | 0.5% | 0.5% |
+| Guardians | 50% | 25% | 13% | 6.3% | 3.1% | 3% |
+
+| Player level | Most stars on a drop |
+|---|---|
+| 1+ | 1 |
+| 3+ | 2 |
+| 6+ | 3 |
+| 9+ | 4 |
+| 12+ | 5 |
+| 15+ | 6 |
+| 18+ | 7 |
+| 21+ | 8 |
+| 24+ | 9 |
+| 27+ | 10 |
 
 ### Enchantment procs
 

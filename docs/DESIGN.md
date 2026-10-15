@@ -27,7 +27,7 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
 **Loop:** Hall of Shades (hub) → walk through the gate → fight through 4 regions → slay each region's guardian → escape. When you die you return to the hub and keep **Ash** (a currency) and **experience**, then spend them on permanent growth and try again.
 
 **Design pillars**
-- **Readable, fair combat.** Every enemy attack is telegraphed on the ground. The dash has invulnerability frames. Hits have hit-stop and screen shake.
+- **Readable, fair combat.** Every enemy attack is telegraphed on the ground. The dash has invulnerability frames and a cooldown (`dashRecharge`, 0.9 s a charge) that only boons (Hermes' Windstep), talents, gear and perks shorten. Hits have hit-stop and screen shake.
 - **A build every run.** Gods offer boons, and anvils, enchantments and artifacts stack on top, so no two runs play the same.
 - **Gentle onboarding, deep late game.** New players start with three buttons. Everything else unlocks one level at a time, ending in flashy ultimates, Mythic weapons and the Torment difficulty levels.
 
@@ -48,7 +48,7 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
   - Charon's shop or a Fountain. These have no fight.
 - **Once per region:** a shop, a fountain, an anvil and Hermes.
 - **Before each guardian** there is an *antechamber* with a shop and a fountain.
-- **Treasure chests** sometimes appear in combat rooms. 15% of them are Mimics.
+- **Treasure chests** sometimes appear in combat rooms. 3% of them are Mimics; a slain Mimic always drops a Unique piece of gear (`rollStarred`).
 - **Saving:** the escape autosaves at the start of every chamber (`run.ts → snapshot/restore`, stored apart from the main save). *Save & Quit* and closing the app both resume from that chamber. Death, escape or abandoning clears it.
 - **Dying** ends the run. *Death's Reprieve* (an Altar upgrade) and the *Undying* talent let you cheat death once per rank.
 
@@ -78,7 +78,8 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
 
 - **Inputs.**
   - Attack and Special. **Combat grammar:** taps chain (`ActionDef.chain` = the step); holding Attack for `POWER_HOLD` (0.22 s) after a chain hit swaps into `Weapon.powered(step)`, a charge built by `poweredAttack()` (level 1–3 from the chain step, a Perfect for releasing on the flash). Still holding after that = `Weapon.held()` (repeat, a spin, the bow's draw, the katana's ready stance…). A Special within 0.6 s of a chain hit is a combo special (30% faster windup, +25% damage).
-  - **Attack outline and charge meter** (`render.ts`: `drawAttackPreview`, `drawChargeMeter`; setting `attackPreview`): `Weapon.preview()` returns the shapes the next tap would hit (it reads the chain step without advancing it, `nextStep()`); a charging `ActionDef` shows its own `preview` filled by charge, and its `power` (label, chain level, `mult(holdT)`) drives the meter. `hold.perfect` marks the Perfect window. The outline shows only while foes are about; the charge outline always.
+  - **Attack outline and charge meter** (`render.ts`: `drawAttackPreview`, `drawChargeMeter`; setting `attackPreview`): `Weapon.preview()` returns the shapes the next tap would hit (it reads the chain step without advancing it, `nextStep()`); a charging `ActionDef` shows its own `preview` filled by charge, and its `power` (label, chain level, `mult(holdT)`) drives the meter. `hold.perfect` marks the Perfect window. The outline appears when you attack and fades 2.2 s after the last one (`OUTLINE_HOLD`); the charge outline shows whenever a move charges.
+  - **Camera** (`Game.turnCamera`, `toggleView`): `Tab` switches the 2D and 3D views; `Z` / `X` turn the 3D camera around the hero up to 0.74 rad (~42°) each way from the default 45° yaw, both together swing it back. Rooms are built to be seen from the south-east (tall walls and doors to the north and west), which is why the turn is limited. Movement and aim are camera-relative, so they follow the turn.
   - Cast: a shard that lodges in foes; walk over it to pick it up again.
   - Dash: brief invulnerability. Attacking right after a dash gives a *Dash-Strike*.
   - Jump: attack mid-air to *Slam*.
@@ -110,7 +111,7 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
 | **Artifacts** | Caches, chests, starting artifact | Cooldown or soul-cost actives in 1–3 slots. Souls drop from slain foes |
 | **Titan Hearts** | Doors, shops | +25 max Health for the run |
 
-Every reward choice screen has a **Your build** button to review what you already own before choosing.
+Every reward choice screen (and the pause menu) has a **Your build** page to review what you already own: the four ability slots side by side, other boons grouped by god, then duos, anvil upgrades, enchantments and artifacts (`buildList` in `screens.ts`).
 
 ## 6. Heroes and Wrath
 
@@ -121,13 +122,13 @@ Eight heroes, each a class: a signature weapon, a guard style, perks, a distinct
 | Kael | Warrior | Nightblade | parry | Start | Inferno Nova |
 | Lyra | Ranger | Moonbow | evade | Start | Moonfall |
 | Doran | Vanguard | Thornspear | shield | Start | Titan's Quake |
-| Gorran | Brawler | Titan Gauntlets | catch | Level 5 | Hundred Fists |
-| Ione | Monk | Riptide Chains | catch | Level 8 | Tidal Surge |
-| Erebos | Reaper | Reaper's Crescent | mist | Level 10 or 2 guardians | Eclipse |
-| Rook | Gunner | Thunderbuss | evade | Level 12 | Cannonade |
-| Selene | Duelist | Starsplitter | parry | Level 15 or first escape | Starfall |
+| Gorran | Brawler | Titan Gauntlets | catch | Level 7 or 1 guardian | Hundred Fists |
+| Ione | Monk | Riptide Chains | catch | Level 10 or 3 guardians | Tidal Surge |
+| Erebos | Reaper | Reaper's Crescent | mist | Level 14 or 6 guardians | Eclipse |
+| Rook | Gunner | Thunderbuss | evade | Level 18 or 1 escape | Cannonade |
+| Selene | Duelist | Starsplitter | parry | Level 22 or 3 escapes | Starfall |
 
-The Wrath gauge fills from damage dealt and taken (talents and Kael speed it up). When full, press `F`, `R3` or the ☄ touch button. Every Wrath grants a moment of invulnerability and slow motion.
+The Wrath gauge fills from damage dealt and taken (talents and Kael speed it up). When full, press `V`, `R3` or the ☄ touch button. Every Wrath grants a moment of invulnerability and slow motion.
 
 ## 7. Enemies
 
@@ -207,10 +208,10 @@ Slaying Threefang is an **escape**. It raises the Torment cap, gives a large amo
 
 Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (`feature: 'gear'`). Pickups fly to you within 120 px and all of them when a chamber is cleared; `World.feed()` lists them on the HUD, and `Run.spoils` is shown when the escape ends. Numbers are in GAME_DATA.md → *Loot and gear*; the code is `src/game/gear.ts` (data) and `src/ui/gear.ts` (screen).
 - **Materials** drop from foes during escapes and are kept forever (`save.materials`): Bone Dust everywhere, a region material (Ember Shard, Golden Ichor, Gate Pearl), and Titan Scales from guardians and enchanted foes.
-- **Gear** has a slot (helmet, armor, leggings, boots), one of seven tiers (Common, Uncommon, Rare, Epic, Legendary, Unique, Ghost: 1–5 random bonuses, stronger with each tier) and a star level. It drops from foes (rarely), enchanted foes, chests and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
-- **Tiers** (`rarityOdds`): each tier is rarer than the one below at any luck; luck (foes 0.1 per region, chests 0.2, guardians 0.6) moves odds from Common to the better tiers, the best most. Ghost is the rarest (0.3%, at most 1%); Unique is next. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
-- **Stars** (1–10): stars 1–5 are gold (+15% each), and stars 6–10 turn them purple one by one (+20% each, and they cost Titan Scales).
-- **Gear & Inventory** (Armory or pause menu): equip, star up, salvage for materials, or craft a random piece with one of four recipes.
+- **Gear** has a slot (helmet, armor, leggings, boots), one of seven tiers (Common, Uncommon, Rare, Epic, Legendary, Unique, Ghost: 1–5 random bonuses, stronger with each tier) and a star level. It drops from foes (12%), enchanted foes (35%), chests (30%) and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
+- **Plain and starred** (`rollDrop`, tables in `odds.ts`): a drop rolls its stars first: one star at the source's chance (foes 5%, enchanted foes 10%, chests 8%, guardians always), each further star half as likely, capped by `maxDropStars` (1, +1 every 3 player levels). No star = a *plain* Common/Uncommon piece that can't be starred up; a star = a Rare+ piece whose tier comes from `STARRED_TIER` (Legendary only from guardians, 20% against Epic's 30%). About 1–2 starred pieces per 80-kill run. Any kill also rolls a Ghost piece at 0.1%; Ghost bonuses roll 1.0–1.25 (`minRoll`) so even the weakest beats the best Legendary roll. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
+- **Stars** (1–10, Rare and better only): stars 2–5 are gold (+15% each), and stars 6–10 turn them purple one by one (+20% each, and they cost Titan Scales).
+- **Gear & Inventory** (Armory or pause menu): equip, star up, salvage for materials (or every plain piece at once), or craft a piece with one of three recipes (plain, 1★ Rare, 1★ Epic; Legendary can't be crafted).
 - Equipped bonuses are added in `Game.recomputeStats` after talents, hero and forge.
 
 ## 9. The Hall of Shades (hub)

@@ -1372,10 +1372,15 @@ function drawScreenOverlays(ctx: CanvasRenderingContext2D, w: World, dpr: number
 
 
 /** Telegraphs, shockwaves, zones, swipes, projectiles and lightning: everything flat or glowing. */
+/** Seconds the attack outline stays after an attack, and its fade-out. */
+const OUTLINE_HOLD = 2.2;
+const OUTLINE_FADE = 0.6;
+
 /**
  * Where the next attack lands: a faint dashed outline in the weapon colour
- * while foes are about. A charging move shows its full reach instead, filling
- * as it powers up and turning gold in the Perfect window.
+ * that appears when you attack and fades a couple of seconds after you stop.
+ * A charging move shows its full reach instead, filling as it powers up and
+ * turning gold in the Perfect window.
  */
 function drawAttackPreview(ctx: CanvasRenderingContext2D, w: World): void {
   const p = w.player;
@@ -1385,13 +1390,15 @@ function drawAttackPreview(ctx: CanvasRenderingContext2D, w: World): void {
   let shapes: Shape[] | undefined;
   let k = 0;
   let perfect = false;
+  let fade = 1;
   if (charging) {
     const h = charging.def.hold!;
     shapes = charging.def.preview?.(p, p.aim);
     k = clamp(charging.holdT / h.max, 0, 1);
     perfect = !!h.perfect && charging.holdT >= h.max && charging.holdT <= h.max + h.perfect;
-  } else if ((p.state === 'free' || (run && run.fired)) && w.enemies.some((e) => !e.dead && !e.spawning)) {
-    shapes = p.weapon.preview?.(p, w);
+  } else if (p.state === 'free' || (run && run.fired)) {
+    fade = clamp((OUTLINE_HOLD - (p.t - p.lastAttackT)) / OUTLINE_FADE, 0, 1);
+    if (fade > 0) shapes = p.weapon.preview?.(p, w);
   }
   if (!shapes?.length) return;
   const color = perfect ? '#fff0b0' : WEAPON_INFO[p.weapon.id].color;
@@ -1399,7 +1406,7 @@ function drawAttackPreview(ctx: CanvasRenderingContext2D, w: World): void {
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
   for (const s of shapes) {
-    ctx.globalAlpha = charging ? 0.06 + 0.16 * k : 0.05;
+    ctx.globalAlpha = charging ? 0.06 + 0.16 * k : 0.05 * fade;
     pathShape(ctx, s);
     ctx.fill();
     if (charging) {
@@ -1407,7 +1414,7 @@ function drawAttackPreview(ctx: CanvasRenderingContext2D, w: World): void {
       pathShape(ctx, s, k);
       ctx.fill();
     }
-    ctx.globalAlpha = charging ? 0.45 + 0.45 * k : 0.3;
+    ctx.globalAlpha = charging ? 0.45 + 0.45 * k : 0.3 * fade;
     ctx.lineWidth = charging ? 2.5 : 1.5;
     ctx.setLineDash(charging ? [] : [7, 6]);
     pathShape(ctx, s);

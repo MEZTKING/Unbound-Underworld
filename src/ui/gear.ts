@@ -1,11 +1,13 @@
-// Gear & Inventory: equip helmets, armor, leggings and boots; upgrade, salvage
-// and craft them with materials. Opens from the Armory (level 10+) and the
-// pause menu.
+// Gear & Inventory: equip helmets, armor, leggings and boots; star up (Rare
+// and better), salvage and craft them with materials. Opens from the Armory
+// and the pause menu.
 
 import { audio } from '../engine/audio';
 import { Rng } from '../engine/math';
 import type { Game } from '../game/game';
 import {
+  canStarUp,
+  craftGear,
   CRAFTS,
   costText,
   describeAffix,
@@ -13,13 +15,13 @@ import {
   gearStars,
   GEAR_SLOTS,
   hasMaterials,
+  isStarredTier,
   INVENTORY_SIZE,
   MATERIAL_IDS,
   MATERIALS,
   MAX_GEAR_LEVEL,
   PERKS,
   rarityRank,
-  rollGear,
   salvageValue,
   SLOT_GLYPH,
   SLOT_NAME,
@@ -30,8 +32,9 @@ import {
 } from '../game/gear';
 import { esc } from './overlay';
 
-/** Five stars: gold up to level 5, then turning purple one by one up to 10. */
+/** Five stars: gold up to level 5, then turning purple one by one up to 10. Plain pieces show none. */
 export function starsHtml(level: number): string {
+  if (level <= 0) return '<span class="stars plain" title="A plain piece: no stars">plain</span>';
   const { gold, purple } = gearStars(level);
   let out = '';
   for (let i = 0; i < 5; i++) out += `<i class="${i < purple ? 'purple' : i < purple + gold ? 'gold' : 'off'}">★</i>`;
@@ -70,11 +73,13 @@ export function gearScreen(g: Game): void {
       .join('');
     const sel = gear.items.find((i) => i.uid === selected);
     const isWorn = !!sel && gear.equipped[sel.slot] === sel.uid;
-    const up = sel && sel.level < MAX_GEAR_LEVEL ? upgradeCost(sel) : null;
+    const up = sel && canStarUp(sel) ? upgradeCost(sel) : null;
+    const upLabel = !sel ? '' : !isStarredTier(sel.rarity) ? 'Plain pieces can\'t be starred' : up ? `${sel.level >= 5 ? 'Empower' : 'Star up'} (${costText(up)})` : 'All stars purple';
+    const plain = gear.items.filter((i) => !isStarredTier(i.rarity) && !Object.values(gear.equipped).includes(i.uid));
     const actions = sel
       ? `<div class="row-btns">
           <button class="btn" data-nav data-act="equip">${isWorn ? 'Unequip' : 'Equip'}</button>
-          <button class="btn${up && hasMaterials(g.save.materials, up) ? '' : ' disabled'}" data-nav data-act="upgrade">${up ? `${sel.level >= 5 ? 'Empower' : 'Star up'} (${costText(up)})` : 'All stars purple'}</button>
+          <button class="btn${up && hasMaterials(g.save.materials, up) ? '' : ' disabled'}" data-nav data-act="upgrade">${upLabel}</button>
           <button class="btn danger" data-nav data-act="salvage">Salvage (+${costText(salvageValue(sel))})</button></div>`
       : '<p class="small">Select a piece to equip, upgrade or salvage it.</p>';
     return `<div class="mats">${mats}</div>
@@ -82,6 +87,7 @@ export function gearScreen(g: Game): void {
       ${actions}
       <h3 class="section">Inventory <small>${gear.items.length}/${INVENTORY_SIZE}</small></h3>
       <div class="gear-grid">${bag || '<p class="small">Nothing yet. Foes, chests and guardians drop gear.</p>'}</div>
+      ${plain.length ? `<div class="row-btns"><button class="btn danger" data-nav data-act="salvagePlain">Salvage all plain pieces (${plain.length})</button></div>` : ''}
       <div class="row-btns">${CRAFTS.map(
         (c, i) => `<button class="btn${hasMaterials(g.save.materials, c.cost) && gear.items.length < INVENTORY_SIZE ? '' : ' disabled'}" data-nav data-act="craft" data-recipe="${i}">${c.name} (${costText(c.cost)})</button>`,
       ).join('')}</div>`;
@@ -122,11 +128,27 @@ export function gearScreen(g: Game): void {
             audio.play('deny');
             return;
           }
-          const item = rollGear(new Rng(Date.now() & 0x7fffffff), 0.15, undefined, recipe.min);
+          const item = craftGear(new Rng(Date.now() & 0x7fffffff), recipe);
           gear.items.push(item);
           selected = item.uid;
           audio.play('boon');
           g.ui.toast(`Crafted ${GEAR_RARITY[item.rarity].name}: ${item.name}`);
+          changed();
+          return;
+        }
+        if (act === 'salvagePlain') {
+          if (!b.dataset.armed) {
+            b.dataset.armed = '1';
+            b.textContent = 'Tap again to salvage them all';
+            return;
+          }
+          const worn = Object.values(gear.equipped);
+          const junk = gear.items.filter((i) => !isStarredTier(i.rarity) && !worn.includes(i.uid));
+          for (const i of junk) for (const [k, v] of Object.entries(salvageValue(i))) g.save.materials[k as MaterialId] = (g.save.materials[k as MaterialId] ?? 0) + (v ?? 0);
+          gear.items = gear.items.filter((i) => !junk.includes(i));
+          if (selected && !gear.items.some((i) => i.uid === selected)) selected = null;
+          audio.play('gold');
+          g.ui.toast(`Salvaged ${junk.length} plain piece${junk.length === 1 ? '' : 's'}`);
           changed();
           return;
         }
@@ -137,7 +159,7 @@ export function gearScreen(g: Game): void {
           audio.play('boon');
         } else if (act === 'upgrade') {
           const cost = upgradeCost(sel);
-          if (sel.level >= MAX_GEAR_LEVEL || !spendMaterials(g.save.materials, cost)) {
+          if (!canStarUp(sel) || !spendMaterials(g.save.materials, cost)) {
             audio.play('deny');
             return;
           }

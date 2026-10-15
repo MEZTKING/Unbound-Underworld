@@ -1,7 +1,9 @@
 // Every chance roll in the run, in one place, so the probability tables in
 // docs/GAME_DATA.md (`npm run docs`) always match the game. Boon rarity odds
-// live in boons.ts (BOON_RARITY_BY_REGION), gear tier odds in gear.ts
-// (rarityOdds) and enchantment procs in enchants.ts.
+// live in boons.ts (BOON_RARITY_BY_REGION) and enchantment procs in
+// enchants.ts; gear.ts turns the gear tables below into pieces.
+
+import type { GearRarity } from './gear';
 
 /** How many doors a cleared chamber opens: [doors, weight]. */
 export const DOOR_COUNT: readonly [number, number][] = [
@@ -52,8 +54,8 @@ export function eliteChance(depth: number, region: number, eliteRoom: boolean): 
 export const CHEST = {
   /** Base chance a combat chamber holds a chest (Prospector raises it). */
   spawn: 0.25,
-  /** A chest in a combat chamber is a Mimic. */
-  mimic: 0.15,
+  /** A chest in a combat chamber is a Mimic: rare, and it guards a Unique piece of gear. */
+  mimic: 0.03,
   /** The chest also holds a piece of gear. */
   gear: 0.3,
   /** An artifact pops out (needs artifacts unlocked and one left to find). */
@@ -74,14 +76,38 @@ export const FOE_DROP = {
   regional: 0.14,
   /** Elite foes drop a Wyrm Scale (guardians always do). */
   eliteScale: 0.25,
-  gear: 0.012,
-  eliteGear: 0.12,
+  /** A piece of gear (guardians always drop one). */
+  gear: 0.12,
+  eliteGear: 0.35,
   eliteMult: 1.6,
   guardianMult: 3,
 };
 
-/** Gear luck (0..1) by source: it slides the tier odds toward better tiers (see rarityOdds). */
-export const GEAR_LUCK = { perRegion: 0.1, chest: 0.2, guardian: 0.6 };
+/** Where a piece of gear came from. */
+export type DropSource = 'foe' | 'elite' | 'chest' | 'guardian';
+
+/** A plain piece (no stars, can't be starred up): its tier. */
+export const PLAIN_TIER: Partial<Record<GearRarity, number>> = { common: 0.7, uncommon: 0.3 };
+
+/**
+ * Chance a dropped piece comes with one star; two stars are half as likely,
+ * three half again, and so on up to the cap your level sets (maxDropStars).
+ * Guardians always drop a starred piece.
+ */
+export const STAR_CHANCE: Record<DropSource, number> = { foe: 0.05, chest: 0.08, elite: 0.1, guardian: 1 };
+
+/** Tier of a starred piece, by source. Legendary only from guardians, and less often than Epic (40:60). */
+export const STARRED_TIER: Record<DropSource, Partial<Record<GearRarity, number>>> = {
+  foe: { rare: 1 },
+  chest: { rare: 0.85, epic: 0.15 },
+  elite: { rare: 0.7, epic: 0.25, unique: 0.05 },
+  guardian: { rare: 0.45, epic: 0.3, legendary: 0.2, unique: 0.05 },
+};
+
+/** Any slain foe, guardians included, may also drop a Ghost piece. */
+export const GHOST_CHANCE = 0.001;
+/** Ghost pieces take their stars as a guardian's drop does. */
+export const GHOST_STARS: DropSource = 'guardian';
 
 /** Breaking a pot: gold first, else souls. */
 export const POT = { gold: 0.35, souls: 0.2 };

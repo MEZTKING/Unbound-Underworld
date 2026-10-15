@@ -1,6 +1,6 @@
 import { audio } from '../engine/audio';
 import { ARTIFACT_BY_ID, ARTIFACTS } from '../game/artifacts';
-import { BOON_BY_ID, describeBoon, GODS, HAMMER_BY_ID, RARITY_COLOR } from '../game/boons';
+import { BOON_BY_ID, describeBoon, GODS, HAMMER_BY_ID, RARITY_COLOR, type OwnedBoon } from '../game/boons';
 import { BIOMES } from '../game/rooms';
 import { ACHIEVEMENTS, BESTIARY, foeRegions, type FoeEntry } from '../game/codex';
 import { ENCHANT_BY_ID } from '../game/enchants';
@@ -8,7 +8,7 @@ import type { Game, RunSummary } from '../game/game';
 import { CHARACTERS, characterUnlocked, heroForWeapon, type CharacterId, type GuardStyle, type Palette } from '../game/characters';
 import { clearSave, currentSlot, eraseSlot, heatScale, loadSave, nextCost, peekSlot, rank, setSlot, slotHasRun, SLOTS, UPGRADES, WEAPON_IDS, writeSave } from '../game/meta';
 import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS } from '../game/progression';
-import type { WeaponId } from '../game/types';
+import type { AbilitySlot, WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
 import { CAN_EXIT, exitGame, getWindowMode, HAS_WINDOW_MODES, setWindowMode, type WindowMode } from '../platform';
 import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
@@ -486,38 +486,77 @@ export function settings(g: Game): void {
 
 // ---------------------------------------------------------------- pause
 
-/** Everything collected this run: boons, anvil upgrades, enchantments, artifacts. */
-function buildList(g: Game): string {
-  const run = g.run;
-  return run
-    ? [
-        ...run.boons.map((b) => {
-          const def = BOON_BY_ID[b.id];
-          const col = def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color;
-          return `<div class="bitem" style="--c:${col}"><b>${esc(def.name)}</b> <span class="tag" style="--t:${RARITY_COLOR[b.rarity]}">${b.rarity}${b.level > 1 ? ` · Lv ${b.level}` : ''}</span><div>${esc(describeBoon(b))}</div></div>`;
-        }),
-        ...run.hammers.map((h) => `<div class="bitem" style="--c:#d8d8e8"><b>⚒ ${esc(HAMMER_BY_ID[h].name)}</b><div>${esc(HAMMER_BY_ID[h].desc)}</div></div>`),
-        ...run.enchants.map((e) => {
-          const d = ENCHANT_BY_ID[e.id];
-          return `<div class="bitem" style="--c:${d.color}"><b>${d.glyph} ${esc(d.name)} ${'I'.repeat(e.tier)}</b><div>${esc(d.desc(e.tier))}</div></div>`;
-        }),
-        ...run.artifacts
-          .filter((a): a is string => !!a)
-          .map((a) => {
-            const d = ARTIFACT_BY_ID[a];
-            return `<div class="bitem" style="--c:${d.color}"><b>${d.glyph} ${esc(d.name)}</b><div>${esc(d.desc)}</div></div>`;
-          }),
-      ].join('') || '<p class="small">No boons yet. Clear chambers to earn them.</p>'
-    : '<p class="small">You are in the Hall of Shades. Walk through the northern gate to begin an escape.</p>';
+const SLOT_LABEL: Record<AbilitySlot, string> = { attack: 'Attack', special: 'Special', cast: 'Cast', dash: 'Dash' };
+
+/** One boon as a card: name in its god's colour, rarity and level, what it does. */
+function boonCard(b: OwnedBoon, opts: { slot?: string } = {}): string {
+  const def = BOON_BY_ID[b.id];
+  const col = def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color;
+  const gods = def.duoOf ? def.duoOf.map((id) => GODS[id].glyph).join(' ') : GODS[def.god].glyph;
+  return `<div class="bcard" style="--c:${col}">
+    ${opts.slot ? `<span class="bslot">${opts.slot}</span>` : ''}
+    <div class="bhead"><i class="bglyph">${gods}</i><b>${esc(def.name)}</b><span class="tag" style="--t:${RARITY_COLOR[b.rarity]}">${b.rarity}${b.level > 1 ? ` · Lv ${b.level}` : ''}</span></div>
+    <div class="bdesc">${esc(describeBoon(b))}</div></div>`;
 }
 
-/** Your current build, opened from a boon (or other) choice. Back returns to the choice. */
-export function buildView(g: Game): void {
+/**
+ * Everything collected this run, organised: the four ability slots, passive
+ * boons grouped by god, duo boons, then anvil upgrades, enchantments and
+ * artifacts.
+ */
+function buildList(g: Game): string {
+  const run = g.run;
+  if (!run) return '<p class="small">You are in the Hall of Shades. Walk through the northern gate to begin an escape.</p>';
+  const boons = run.boons.filter((b) => BOON_BY_ID[b.id]);
+  const slots = (Object.keys(SLOT_LABEL) as AbilitySlot[])
+    .filter((slot) => slot !== 'cast' || g.stats.canCast || boons.some((b) => BOON_BY_ID[b.id].slot === 'cast'))
+    .map((slot) => {
+      const b = boons.find((x) => BOON_BY_ID[x.id].slot === slot);
+      return b ? boonCard(b, { slot: SLOT_LABEL[slot] }) : `<div class="bcard empty"><span class="bslot">${SLOT_LABEL[slot]}</span><div class="bdesc">No boon yet</div></div>`;
+    })
+    .join('');
+  const passives = boons.filter((b) => BOON_BY_ID[b.id].slot === 'passive');
+  const byGod = [...new Set(passives.map((b) => BOON_BY_ID[b.id].god))]
+    .map((god) => {
+      const mine = passives.filter((b) => BOON_BY_ID[b.id].god === god);
+      const gd = GODS[god];
+      return `<div class="bgod" style="--c:${gd.color}"><h4><i>${gd.glyph}</i> ${esc(gd.name)} <small>${mine.length}</small></h4><div class="bgrid">${mine.map((b) => boonCard(b)).join('')}</div></div>`;
+    })
+    .join('');
+  const duos = boons.filter((b) => BOON_BY_ID[b.id].slot === 'duo');
+  const chip = (color: string, title: string, desc: string) => `<div class="bchip" style="--c:${color}"><b>${title}</b><div>${esc(desc)}</div></div>`;
+  const hammers = run.hammers.map((h) => chip('#d8d8e8', `⚒ ${esc(HAMMER_BY_ID[h].name)}`, HAMMER_BY_ID[h].desc));
+  const enchants = run.enchants.map((e) => {
+    const d = ENCHANT_BY_ID[e.id];
+    return chip(d.color, `${d.glyph} ${esc(d.name)} ${'I'.repeat(e.tier)}`, d.desc(e.tier));
+  });
+  const artifacts = run.artifacts
+    .filter((a): a is string => !!a)
+    .map((a) => {
+      const d = ARTIFACT_BY_ID[a];
+      return chip(d.color, `${d.glyph} ${esc(d.name)}`, d.desc);
+    });
+  const section = (title: string, body: string, count?: number) => (body ? `<h3 class="section">${title}${count !== undefined ? ` <small>${count}</small>` : ''}</h3>${body}` : '');
+  const gods = new Set(boons.map((b) => BOON_BY_ID[b.id].god)).size;
+  const summary = `<p class="small bsum">${boons.length} boon${boons.length === 1 ? '' : 's'} from ${gods} god${gods === 1 ? '' : 's'}${hammers.length ? ` · ${hammers.length} anvil upgrade${hammers.length === 1 ? '' : 's'}` : ''}${enchants.length ? ` · ${enchants.length} enchantment${enchants.length === 1 ? '' : 's'}` : ''}${artifacts.length ? ` · ${artifacts.length} artifact${artifacts.length === 1 ? '' : 's'}` : ''}</p>`;
+  return [
+    summary,
+    section('Abilities', `<div class="bslots">${slots}</div>`),
+    section('Blessings', byGod, passives.length),
+    section('Duo boons', duos.length ? `<div class="bgrid">${duos.map((b) => boonCard(b)).join('')}</div>` : '', duos.length),
+    section('Weapon upgrades', hammers.length ? `<div class="bgrid">${hammers.join('')}</div>` : '', hammers.length),
+    section('Enchantments', enchants.length ? `<div class="bgrid">${enchants.join('')}</div>` : '', enchants.length),
+    section('Artifacts', artifacts.length ? `<div class="bgrid">${artifacts.join('')}</div>` : '', artifacts.length),
+  ].join('');
+}
+
+/** Your current build on its own page: from a reward choice ("Back to the choice") or the pause menu. */
+export function buildView(g: Game, back = 'Back to the choice'): void {
   const el = g.ui.push(
     'build-view',
-    `<div class="panel wide"><h2 class="title">Your Build</h2>
-      <div class="build">${buildList(g)}</div>
-      <button class="btn primary" data-nav data-a="back">Back to the choice</button></div>`,
+    `<div class="panel wide build-panel"><h2 class="title">Your Build</h2>
+      <div class="build organised">${buildList(g)}</div>
+      <button class="btn primary" data-nav data-a="back">${back}</button></div>`,
     { onBack: () => g.ui.pop() },
   );
   bind(el, '[data-a]', () => g.ui.pop());
@@ -534,6 +573,7 @@ export function pause(g: Game): void {
         <div class="menu">
           <button class="btn primary" data-nav data-a="resume">Resume</button>
           <button class="btn" data-nav data-a="help">Controls</button>
+          ${run ? '<button class="btn" data-nav data-a="build">Your Build</button>' : ''}
           <button class="btn" data-nav data-a="map">Map</button>
           ${g.has('gear') ? '<button class="btn" data-nav data-a="gear">Gear &amp; Inventory</button>' : ''}
           <button class="btn" data-nav data-a="codex">Bestiary &amp; Achievements</button>
@@ -544,7 +584,7 @@ export function pause(g: Game): void {
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
           ${run ? '<p class="small save-note">Your escape is saved at the start of each chamber. You\'ll resume from this chamber.</p>' : ''}
         </div>
-        <div class="build">${build}</div>
+        <div class="build organised compact">${build}</div>
       </div>
     </div>`,
     { onBack: () => g.ui.pop(), closesOnPause: true },
@@ -556,6 +596,7 @@ export function pause(g: Game): void {
     else if (a === 'codex') codex(g);
     else if (a === 'gear') gearScreen(g);
     else if (a === 'map') mapScreen(g);
+    else if (a === 'build') buildView(g, 'Back');
     else if (a === 'dev') devMenu(g);
     else if (a === 'settings') settings(g);
     else if (a === 'title') g.quitToTitle();
@@ -781,7 +822,6 @@ export function customise(g: Game): void {
       (c) => `<button class="swatch${pal()[key] === c ? ' on' : ''}" data-nav data-k="${key}" data-v="${c}" style="--s:${c}" aria-label="${c}"></button>`,
     ).join('')}</div></div>`;
   const render = () => `
-    <canvas class="look-preview" width="160" height="200"></canvas>
     ${row('cloak', 'Cloak')}${row('trim', 'Trim')}${row('hair', 'Hair')}
     <div class="look-row"><span>Headwear</span><div class="swatches">${CROWNS.map(
       (c) => `<button class="btn mini${pal().crown === c.id ? ' on' : ''}" data-nav data-crown="${c.id}">${c.name}</button>`,
@@ -789,15 +829,24 @@ export function customise(g: Game): void {
   const el = g.ui.push(
     'station',
     `<div class="panel wide" style="--c:${hero.color}"><h2 class="title" style="color:${hero.color}">${esc(hero.name)}'s Appearance</h2>
+      <canvas class="look-preview${g.view3d ? ' voxel' : ''}" width="160" height="200" title="${g.view3d ? 'Drag to turn' : ''}"></canvas>
       <div data-body>${render()}</div>
       <div class="row-btns"><button class="btn" data-nav data-a="reset">Reset to default</button><button class="btn primary" data-nav data-a="back">Done</button></div></div>`,
     { onBack: () => g.ui.pop(), cols: 10 },
   );
+  const canvas = el.querySelector('canvas')!;
+  // In the 3D view the preview is the voxel hero from the game camera's angle;
+  // in the 2D view, the 2D art.
+  const voxel = g.view3d;
+  if (voxel) {
+    const cam = g.camera;
+    void import('../render3d/voxel').then(({ HeroPreview }) => new HeroPreview(canvas, g.player, cam.yaw, Math.asin(Math.min(1, cam.yScale))));
+  }
   const refresh = () => {
     el.querySelector('[data-body]')!.innerHTML = render();
     g.ui.refreshItems();
     wire();
-    drawPreview(g, el.querySelector('canvas')!);
+    if (!voxel) drawPreview(g, canvas);
   };
   const wire = () => {
     bind(el, '[data-k]', (b) => {
@@ -821,7 +870,7 @@ export function customise(g: Game): void {
     });
   };
   wire();
-  drawPreview(g, el.querySelector('canvas')!);
+  if (!voxel) drawPreview(g, canvas);
 }
 
 /** The hero as drawn by the 2D art, for the appearance screen. */

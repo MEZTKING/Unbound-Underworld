@@ -1,11 +1,14 @@
-// Loot and gear (unlocks at level 10). Foes drop materials and, now and then,
-// a piece of gear: a helmet, armor, leggings or boots with random bonuses.
-// Gear comes in seven tiers, from Common to the near-mythical Ghost; Unique
-// and Ghost pieces carry a perk of their own. Gear is kept between escapes,
-// equipped at the Armory, and starred up (1–5 gold stars, then 5 more that
-// turn purple) or salvaged with materials.
+// Loot and gear. Foes drop materials and, now and then, a piece of gear: a
+// helmet, armor, leggings or boots with random bonuses. Gear comes in seven
+// tiers, from Common to the near-mythical Ghost; Unique and Ghost pieces carry
+// a perk of their own. Common and Uncommon pieces are plain: no stars, and
+// they can't be starred up. Rare and better pieces drop with stars (each star
+// half as likely as the one before, capped by your level) and are starred up
+// with materials (1–5 gold stars, then 5 more that turn purple). Gear is kept
+// between escapes, equipped at the Armory, and salvaged for materials.
 
 import type { Rng } from '../engine/math';
+import { GHOST_STARS, PLAIN_TIER, STAR_CHANCE, STARRED_TIER, type DropSource } from './odds';
 import type { PlayerStats } from './stats';
 
 // ---------------------------------------------------------------- materials
@@ -174,25 +177,38 @@ export interface GearItem {
   rarity: GearRarity;
   name: string;
   /**
-   * Star level (1..MAX_GEAR_LEVEL). Levels 1–5 show as gold stars; 6–10 turn
-   * them purple one by one. Gold stars add 15% to every bonus, purple 20%.
+   * Star level (0..MAX_GEAR_LEVEL). 0 = a plain piece (Common, Uncommon).
+   * Levels 1–5 show as gold stars; 6–10 turn them purple one by one. Stars
+   * past the first add 15% to every bonus (gold) or 20% (purple).
    */
   level: number;
-  /** Bonuses as multiples of their base value (rolled 0.8–1.25, then scaled by rarity). */
+  /** Bonuses as multiples of their base value (rolled 0.8–1.25, Ghost 1–1.25, then scaled by rarity). */
   affixes: { id: AffixId; roll: number }[];
   /** Unique and Ghost pieces only. */
   perk?: PerkId;
 }
 
 export const MAX_GEAR_LEVEL = 10;
-/** Stars a piece shows: `gold` and `purple` out of five. */
+/** Rare and better pieces carry stars; Common and Uncommon are plain. */
+export function isStarredTier(r: GearRarity): boolean {
+  return rarityRank(r) >= rarityRank('rare');
+}
+/** Whether a piece can be starred up (plain pieces never can). */
+export function canStarUp(item: GearItem): boolean {
+  return isStarredTier(item.rarity) && item.level < MAX_GEAR_LEVEL;
+}
+/** Stars a piece shows: `gold` and `purple` out of five (none for a plain piece). */
 export function gearStars(level: number): { gold: number; purple: number } {
-  const l = Math.max(1, Math.min(MAX_GEAR_LEVEL, level));
+  const l = Math.max(0, Math.min(MAX_GEAR_LEVEL, level));
   return l <= 5 ? { gold: l, purple: 0 } : { gold: 10 - l, purple: l - 5 };
 }
-/** How much a piece's star level multiplies its bonuses. */
+/** How much a piece's star level multiplies its bonuses (plain and 1-star pieces: ×1). */
 export function levelMult(level: number): number {
-  return 1 + Math.min(4, level - 1) * 0.15 + Math.max(0, level - 5) * 0.2;
+  return 1 + Math.max(0, Math.min(4, level - 1)) * 0.15 + Math.max(0, level - 5) * 0.2;
+}
+/** The most stars a dropped piece can carry at a player level: 1, +1 every 3 levels. */
+export function maxDropStars(playerLevel: number): number {
+  return Math.max(1, Math.min(MAX_GEAR_LEVEL, 1 + Math.floor(playerLevel / 3)));
 }
 export const INVENTORY_SIZE = 40;
 
@@ -213,47 +229,84 @@ export function describeAffix(item: GearItem, i: number): string {
   return AFFIXES[item.affixes[i].id].name(affixValue(item, i));
 }
 
-/** Tier weights with no luck, and how much full luck multiplies each (×1 + luck × boost). */
-const TIER_WEIGHT = { common: 0.5, uncommon: 0.28, rare: 0.14, epic: 0.055, legendary: 0.025 };
-const TIER_LUCK = { common: 0, uncommon: 0.5, rare: 1.5, epic: 3, legendary: 5 };
-
 /**
- * The chance of each tier for a given luck (0..1). Each tier is rarer than
- * the one below it whatever the luck; luck moves odds from Common to the
- * better tiers, the best ones most. Ghost stays the hardest to find: 0.3%,
- * 1% at best.
+ * Star odds of a drop: index k = the chance of k stars (index 0 = a plain
+ * piece). The first star has STAR_CHANCE[source]; each further star is half
+ * as likely; stars stop at the cap your level sets. Sources that always drop
+ * starred pieces (guardians) spread the whole chance the same way.
  */
-export function rarityOdds(luck = 0): Record<GearRarity, number> {
-  const ghost = 0.003 + luck * 0.007;
-  const unique = 0.015 + luck * 0.02;
-  const rest = 1 - ghost - unique;
-  const tiers = Object.keys(TIER_WEIGHT) as (keyof typeof TIER_WEIGHT)[];
-  const w = tiers.map((k) => TIER_WEIGHT[k] * (1 + luck * TIER_LUCK[k]));
+export function starOdds(source: DropSource, playerLevel: number): number[] {
+  const cap = maxDropStars(playerLevel);
+  const base = STAR_CHANCE[source];
+  const w = Array.from({ length: cap }, (_, i) => base * 0.5 ** i);
   const sum = w.reduce((a, b) => a + b, 0);
-  const odds = { unique, ghost } as Record<GearRarity, number>;
-  tiers.forEach((k, i) => (odds[k] = (w[i] / sum) * rest));
-  return odds;
+  const starred = Math.min(1, sum);
+  return [1 - starred, ...w.map((v) => (v / sum) * starred)];
 }
 
-/** Rolls a piece of gear. `luck` (0..1) raises the chance of better rarities. */
-export function rollGear(rng: Rng, luck = 0, slot?: GearSlot, minRarity: GearRarity = 'common'): GearItem {
-  const s = slot ?? rng.pick(GEAR_SLOTS);
-  const odds = rarityOdds(luck);
-  let r = rng.next();
-  let rarity: GearRarity = 'common';
-  for (const k of [...RARITY_ORDER].reverse()) {
-    if (r < odds[k]) {
-      rarity = k;
-      break;
-    }
-    r -= odds[k];
+function pickTier(rng: Rng, odds: Partial<Record<GearRarity, number>>): GearRarity {
+  const keys = Object.keys(odds) as GearRarity[];
+  let r = rng.next() * keys.reduce((a, k) => a + (odds[k] ?? 0), 0);
+  for (const k of keys) {
+    r -= odds[k] ?? 0;
+    if (r < 0) return k;
   }
-  if (rarityRank(rarity) < rarityRank(minRarity)) rarity = minRarity;
+  return keys[keys.length - 1];
+}
+
+function rollStars(rng: Rng, odds: number[]): number {
+  let r = rng.next();
+  for (let k = 0; k < odds.length; k++) {
+    r -= odds[k];
+    if (r < 0) return k;
+  }
+  return odds.length - 1;
+}
+
+/**
+ * A piece dropped by a foe, an enchanted foe, a chest or a guardian: plain
+ * (Common/Uncommon, no stars) unless it rolls a star; starred pieces take
+ * their tier from the source (Legendary only from guardians).
+ */
+export function rollDrop(rng: Rng, source: DropSource, playerLevel: number, slot?: GearSlot): GearItem {
+  const stars = rollStars(rng, starOdds(source, playerLevel));
+  const rarity = stars === 0 ? pickTier(rng, PLAIN_TIER) : pickTier(rng, STARRED_TIER[source]);
+  return makeGear(rng, rarity, stars, slot);
+}
+
+/** A starred piece of a set tier, its stars rolled as a guardian's drop. */
+export function rollStarred(rng: Rng, rarity: GearRarity, playerLevel: number): GearItem {
+  const stars = Math.max(1, rollStars(rng, starOdds(GHOST_STARS, playerLevel)));
+  return makeGear(rng, rarity, stars);
+}
+
+/** A Ghost piece (any foe can drop one): always starred, stars as a guardian's. */
+export function rollGhost(rng: Rng, playerLevel: number): GearItem {
+  return rollStarred(rng, 'ghost', playerLevel);
+}
+
+/** A crafted piece: plain recipes give Common/Uncommon, the others a 1-star piece of their tier. */
+export function craftGear(rng: Rng, recipe: (typeof CRAFTS)[number]): GearItem {
+  const rarity = pickTier(rng, recipe.tiers);
+  return makeGear(rng, rarity, isStarredTier(rarity) ? 1 : 0);
+}
+
+/**
+ * Lowest bonus roll for a tier (rolls run up to 1.25). Ghost bonuses never
+ * roll low: its weakest bonus still beats the best a Legendary can roll.
+ */
+export function minRoll(rarity: GearRarity): number {
+  return rarity === 'ghost' ? 1 : 0.8;
+}
+
+/** Builds a piece of a given tier and star level. */
+export function makeGear(rng: Rng, rarity: GearRarity, stars: number, slot?: GearSlot): GearItem {
+  const s = slot ?? rng.pick(GEAR_SLOTS);
   const pool = (Object.keys(AFFIXES) as AffixId[]).filter((id) => !AFFIXES[id].slots || AFFIXES[id].slots!.includes(s));
   const affixes: GearItem['affixes'] = [];
   for (let i = 0; i < GEAR_RARITY[rarity].affixes && pool.length; i++) {
     const id = pool.splice(Math.floor(rng.next() * pool.length), 1)[0];
-    affixes.push({ id, roll: Math.round((0.8 + rng.next() * 0.45) * 100) / 100 });
+    affixes.push({ id, roll: Math.round((minRoll(rarity) + rng.next() * (1.25 - minRoll(rarity))) * 100) / 100 });
   }
   const perk = rarity === 'ghost' ? rng.pick(GHOST_PERKS) : rarity === 'unique' ? rng.pick(UNIQUE_PERKS) : undefined;
   const noun = rng.pick(NAMES[s]);
@@ -263,7 +316,7 @@ export function rollGear(rng: Rng, luck = 0, slot?: GearSlot, minRarity: GearRar
     slot: s,
     rarity,
     name,
-    level: 1,
+    level: isStarredTier(rarity) ? Math.max(1, Math.min(MAX_GEAR_LEVEL, stars)) : 0,
     affixes,
     ...(perk ? { perk } : {}),
   };
@@ -302,12 +355,11 @@ export function salvageValue(item: GearItem): Materials {
   return { bone: 3 + r * 3 + item.level * 2, ...(r >= 3 ? { scale: r - 2 + (item.level > 5 ? item.level - 5 : 0) } : {}) };
 }
 
-/** Crafting recipes: a random piece of at least this rarity. */
-export const CRAFTS: { name: string; min: GearRarity; cost: Materials }[] = [
-  { name: 'Craft a piece', min: 'common', cost: { bone: 25, ember: 6 } },
-  { name: 'Craft a fine piece', min: 'rare', cost: { bone: 40, ichor: 6 } },
-  { name: 'Craft a grand piece', min: 'epic', cost: { bone: 60, pearl: 6, scale: 3 } },
-  { name: 'Craft a masterwork', min: 'legendary', cost: { bone: 120, pearl: 14, scale: 10 } },
+/** Crafting recipes: the tiers each can make. Legendary pieces can't be crafted (guardians only). */
+export const CRAFTS: { name: string; tiers: Partial<Record<GearRarity, number>>; cost: Materials }[] = [
+  { name: 'Craft a plain piece', tiers: { common: 0.7, uncommon: 0.3 }, cost: { bone: 25, ember: 6 } },
+  { name: 'Craft a fine piece (1★ Rare)', tiers: { rare: 1 }, cost: { bone: 40, ichor: 6 } },
+  { name: 'Craft a grand piece (1★ Epic)', tiers: { epic: 1 }, cost: { bone: 60, pearl: 6, scale: 3 } },
 ];
 export const CRAFT_COST = CRAFTS[0].cost;
 
@@ -331,7 +383,9 @@ export function normalizeGear(raw: unknown): GearState {
       )
     : [];
   for (const i of items) {
-    i.level = Math.max(1, Math.min(MAX_GEAR_LEVEL, Math.round(Number(i.level) || 1)));
+    // Plain pieces carry no stars (older saves gave them one); starred ones at least one.
+    const lv = Math.round(Number(i.level) || 0);
+    i.level = isStarredTier(i.rarity) ? Math.max(1, Math.min(MAX_GEAR_LEVEL, lv)) : Math.max(0, Math.min(MAX_GEAR_LEVEL, lv > 1 ? lv : 0));
     if (i.perk && !(i.perk in PERKS)) delete i.perk;
   }
   const equipped: GearState['equipped'] = {};

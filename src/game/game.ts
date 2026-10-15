@@ -1,7 +1,7 @@
 import { audio, type Mood } from '../engine/audio';
 import { Camera } from '../engine/camera';
 import { Input, keyLabel, type Action } from '../engine/input';
-import { clamp, fx, Rng } from '../engine/math';
+import { clamp, damp, fx, Rng } from '../engine/math';
 import { Particles } from '../engine/particles';
 import { UI } from '../ui/overlay';
 import * as screens from '../ui/screens';
@@ -29,7 +29,7 @@ import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
 import { drawHUD, drawHudTooltip, drawSaveIcon, useKeyLabels } from './hud';
 import { newAchievements } from './codex';
-import { applyGear, costText, equippedItems, gearDefiance, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollGear, salvageValue, SLOT_NAME, type MaterialId } from './gear';
+import { applyGear, costText, equippedItems, gearDefiance, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollDrop, rollGhost, rollStarred, salvageValue, SLOT_NAME, type MaterialId } from './gear';
 import type { Loot } from './entities';
 import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, type SaveData } from './meta';
 import { Player, useHeroLooks } from './player';
@@ -43,7 +43,7 @@ import type { PlayerStats } from './stats';
 import type { GodId, RewardSpec } from './types';
 import { createWeapon, WEAPON_INFO } from './weapons';
 import { World, type Door, type Interactable, type WorldHost } from './world';
-import { CHEST, FOE_DROP, GEAR_LUCK, POM_DOUBLE } from './odds';
+import { CHEST, FOE_DROP, GHOST_CHANCE, POM_DOUBLE } from './odds';
 
 const STEP = 1 / 60;
 
@@ -66,6 +66,13 @@ export interface RunSummary {
 /** The 3D view's camera: yaw turns the room, pitch is how far it looks down. */
 const VIEW_YAW = Math.PI / 4;
 const VIEW_PITCH = 0.7;
+/**
+ * How far Z / X turn the 3D camera around the hero, each way (radians), and
+ * how fast. Rooms are built to be seen from the south-east (tall walls and
+ * doors to the north and west), so the camera stays within that quarter.
+ */
+const CAM_TURN_MAX = 0.74;
+const CAM_TURN_SPEED = 1.6;
 
 const DEV_KEY = 'unbound-underworld-dev';
 
@@ -101,6 +108,8 @@ export class Game implements WorldHost {
   private fadeTarget = 0;
   private fadeCb: (() => void) | null = null;
   private acc = 0;
+  /** Z / X camera turn away from the default 3D angle (radians). */
+  private camTurn = 0;
   private last = 0;
   private params = new URLSearchParams(location.search);
   private lastHit = 'the Underworld';
@@ -130,6 +139,12 @@ export class Game implements WorldHost {
     if (lv > 0) this.debugLevel = Math.floor(lv);
     this.applySettings();
     useHeroLooks(this.save.looks);
+    // Unlock conditions can change between versions: a hero this save no longer has falls back to Kael.
+    const hero = CHARACTER_BY_ID[this.save.character];
+    if (!hero || !characterUnlocked(hero, this.save, this.level)) {
+      this.save.character = 'kael';
+      this.save.weapon = CHARACTER_BY_ID.kael.weapon;
+    }
     this.player = new Player(this.save.weapon, this.save.character);
     this.stats = computeStats([], [], metaBonuses(this.save));
     const unlock = () => audio.unlock();
@@ -278,13 +293,49 @@ export class Game implements WorldHost {
     // A Hades-style angle: the room turned 45° and seen from about 40° up.
     const cam = this.camera;
     if ((cam.yaw !== 0) !== on) {
-      cam.setAngle(VIEW_YAW, on ? VIEW_PITCH : null);
+      this.camTurn = 0;
       cam.viewScale = on ? 1.15 : 1;
       cam.resize(cam.vw, cam.vh);
-      const up = cam.lift;
-      this.particles.liftX = up.x;
-      this.particles.liftY = up.y;
+      this.setCameraAngle(on);
     }
+  }
+
+  /** Tab: switch between the 3D and the 2D view. */
+  private toggleView(): void {
+    const st = this.save.settings;
+    if (!st.view3d && (this.voxelState === 'failed' || !this.canvas3d)) {
+      this.ui.toast("The 3D view isn't available on this device");
+      return;
+    }
+    st.view3d = !st.view3d;
+    this.applyView();
+    this.persist();
+    this.ui.toast(st.view3d ? '3D view (Tab for 2D)' : '2D view (Tab for 3D)', 1600);
+  }
+
+  /** Z / X turn the 3D camera around the hero; both together swing it back. */
+  private turnCamera(dt: number): void {
+    const cam = this.camera;
+    if (cam.yaw === 0) {
+      this.camTurn = 0;
+      return;
+    }
+    const inp = this.input;
+    const l = inp.down('camLeft');
+    const r = inp.down('camRight');
+    const turn = l && r ? damp(this.camTurn, 0, 8, dt) : clamp(this.camTurn + ((r ? 1 : 0) - (l ? 1 : 0)) * CAM_TURN_SPEED * dt, -CAM_TURN_MAX, CAM_TURN_MAX);
+    if (Math.abs(turn - this.camTurn) < 1e-5) return;
+    this.camTurn = Math.abs(turn) < 1e-4 ? 0 : turn;
+    this.setCameraAngle(true);
+  }
+
+  /** Points the camera for the current view (3D: the default angle plus the player's turn). */
+  private setCameraAngle(on: boolean): void {
+    const cam = this.camera;
+    cam.setAngle(VIEW_YAW + this.camTurn, on ? VIEW_PITCH : null);
+    const up = cam.lift;
+    this.particles.liftX = up.x;
+    this.particles.liftY = up.y;
   }
 
   /** Developer options: play as if at this level (0 = your real level). */
@@ -411,6 +462,8 @@ export class Game implements WorldHost {
       screens.pause(this);
       return;
     }
+    if (this.input.pressed('view') && (this.mode === 'hub' || this.mode === 'run')) this.toggleView();
+    this.turnCamera(dt);
     w.titleDrift = this.mode === 'title';
     this.saveMark = Math.max(0, this.saveMark - dt);
     if (this.mode === 'title') {
@@ -499,6 +552,7 @@ export class Game implements WorldHost {
         };
       }),
       potionCd: Math.min(1, p.potionCd / s.potionCooldown),
+      dashCd: p.dashCharges > 0 || s.dashRecharge <= 0 ? 0 : Math.min(1, p.dashRechargeT / s.dashRecharge),
       castAmmo: p.castAmmo,
       interact: w.focus ? w.focus.prompt : null,
     });
@@ -845,7 +899,13 @@ export class Game implements WorldHost {
     if (rng.next() < D.regional * big) w.dropLoot(e.x, e.y, { material: region, count: e.isBoss ? 6 : 1 });
     if (e.isBoss || (elite && rng.next() < D.eliteScale)) w.dropLoot(e.x, e.y, { material: 'scale', count: e.isBoss ? 3 + Math.floor(rng.next() * 3) : 1 });
     const gearChance = e.isBoss ? 1 : elite ? D.eliteGear : D.gear;
-    if (rng.next() < gearChance) w.dropLoot(e.x, e.y, { gear: rollGear(rng, e.isBoss ? GEAR_LUCK.guardian : run.biomeIndex * GEAR_LUCK.perRegion, undefined, e.isBoss ? 'rare' : 'common') });
+    if (rng.next() < gearChance) w.dropLoot(e.x, e.y, { gear: rollDrop(rng, e.isBoss ? 'guardian' : elite ? 'elite' : 'foe', this.level) });
+    if (rng.next() < GHOST_CHANCE) w.dropLoot(e.x, e.y, { gear: rollGhost(rng, this.level) });
+    // A Mimic guards a hoard: always a Unique piece (otherwise a rare find).
+    if (e.name === 'Mimic') {
+      w.dropLoot(e.x, e.y, { gear: rollStarred(rng, 'unique', this.level) });
+      w.showBanner("Mimic's Hoard", 'It was guarding something unique.');
+    }
   }
 
   onLoot(w: World, loot: Loot): void {
@@ -863,7 +923,8 @@ export class Game implements WorldHost {
       const item = loot.gear;
       const color = GEAR_RARITY[item.rarity].color;
       spoils?.gear.push({ name: item.name, rarity: item.rarity });
-      w.feed(`${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}: ${item.name}`, color);
+      const stars = item.level > 0 ? ` ${'★'.repeat(Math.min(5, item.level))}${item.level > 5 ? `+${item.level - 5}` : ''}` : '';
+      w.feed(`${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}${stars}: ${item.name}`, color);
       if (this.save.gear.items.length >= INVENTORY_SIZE) {
         // Full: salvage it on the spot.
         const back = salvageValue(item);
@@ -871,8 +932,9 @@ export class Game implements WorldHost {
         this.ui.toast(`Inventory full: ${item.name} salvaged for ${costText(back)}`, 3000);
       } else {
         this.save.gear.items.push(item);
-        const top = item.rarity === 'ghost' || item.rarity === 'unique';
-        this.ui.toast(`${top ? '✦ ' : ''}Found ${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}: ${item.name}`, top ? 4200 : 2600);
+        const top = item.rarity === 'ghost' || item.rarity === 'unique' || item.rarity === 'legendary';
+        // Plain finds only show in the feed; starred ones get a toast too.
+        if (item.level > 0) this.ui.toast(`${top ? '✦ ' : ''}Found ${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}${stars}: ${item.name}`, top ? 4200 : 2600);
         if (top) {
           audio.play('boon');
           w.particles.burst(p.x, p.y - 20, color, 30, 260, { kind: 'spark', life: 0.8 });
@@ -950,7 +1012,7 @@ export class Game implements WorldHost {
     w.dropSouls(it.x, it.y, 6);
     if (run) {
       w.dropLoot(it.x, it.y, { material: 'bone', count: 3 });
-      if (Math.random() < CHEST.gear) w.dropLoot(it.x, it.y, { gear: rollGear(run.rng, GEAR_LUCK.chest) });
+      if (Math.random() < CHEST.gear) w.dropLoot(it.x, it.y, { gear: rollDrop(run.rng, 'chest', this.level) });
     }
     w.particles.burst(it.x, it.y - 20, '#ffd890', 30, 320);
     const r = Math.random();

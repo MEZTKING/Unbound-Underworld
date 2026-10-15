@@ -136,6 +136,8 @@ export class Player extends Actor {
   private attackHold = -1;
   /** When the last chain hit ended, for combo specials. */
   private lastChainT = -10;
+  /** When the hero last started an attack (this.t), for the attack outline. */
+  lastAttackT = -99;
   // ---- combo meter
   /** Hits landed in a row without getting hurt. */
   combo = 0;
@@ -577,6 +579,7 @@ export class Player extends Actor {
       w.particles.text(this.x, this.y, 80, 'RIPOSTE', '#fff0b0', 18);
     }
     const run: ActionRun = { def, t: 0, fired: false, aim: this.aim, holdT: 0, released: false, riposte };
+    if (def.slot === 'attack') this.lastAttackT = this.t;
     this.action = run;
     if (def.windup <= 0 && !def.hold) {
       run.fired = true;
@@ -932,7 +935,9 @@ export class Player extends Actor {
     const run = Math.min(1, spd / 260);
     // Two bumps a stride while running; a slow breath when standing.
     const bob = moving ? -Math.abs(Math.cos(this.walk)) * (1 + run * 2) : Math.sin(this.t * 3) * 0.8;
-    const lean = this.state === 'dash' ? 0.25 * Math.sign(this.dashDir.x || 1) : moving ? clamp(this.vx / MOVE_SPEED, -1, 1) * 0.1 : 0;
+    // A dash leans the way it goes: toward the dash on screen, which reads as
+    // a lean back when dashing away from where the hero faces.
+    const lean = this.state === 'dash' ? 0.25 * clamp(this.dashDir.x * 1.5, -1, 1) : moving ? clamp(this.vx / MOVE_SPEED, -1, 1) * 0.1 : 0;
     const white = this.flash > 0;
     if (!back) this.weapon.draw(ctx, this, w, true);
     ctx.save();

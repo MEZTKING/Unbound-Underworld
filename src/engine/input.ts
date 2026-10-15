@@ -19,6 +19,9 @@ export type Action =
   | 'guard'
   | 'pause'
   | 'mute'
+  | 'view'
+  | 'camLeft'
+  | 'camRight'
   | 'menuUp'
   | 'menuDown'
   | 'menuLeft'
@@ -46,7 +49,11 @@ const DEFAULT_KEYMAP: Record<string, Action[]> = {
   Digit3: ['artifact3'],
   Digit4: ['potion'],
   Digit5: ['wrath'],
-  KeyV: ['guard'],
+  KeyF: ['guard'],
+  KeyV: ['wrath'],
+  KeyZ: ['camLeft'],
+  KeyX: ['camRight'],
+  Tab: ['view'],
   Numpad1: ['artifact1'],
   Numpad2: ['artifact2'],
   Numpad3: ['artifact3'],
@@ -55,7 +62,6 @@ const DEFAULT_KEYMAP: Record<string, Action[]> = {
   KeyQ: ['cast'],
   KeyL: ['cast'],
   KeyE: ['interact'],
-  KeyF: ['wrath'],
   Escape: ['pause', 'back'],
   KeyP: ['pause'],
   KeyM: ['mute'],
@@ -81,6 +87,9 @@ export const BINDABLE: { action: Action; label: string }[] = [
   { action: 'artifact2', label: 'Artifact 2' },
   { action: 'artifact3', label: 'Artifact 3' },
   { action: 'wrath', label: 'Wrath' },
+  { action: 'view', label: 'Switch 2D / 3D view' },
+  { action: 'camLeft', label: 'Turn camera left (3D)' },
+  { action: 'camRight', label: 'Turn camera right (3D)' },
 ];
 
 /** Keys bound to an action in the default layout. */
