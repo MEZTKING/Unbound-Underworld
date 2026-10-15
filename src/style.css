@@ -1413,6 +1413,71 @@ h3.section small {
   font-size: 13px;
   color: #a8d8a8;
 }
+.gear-text em {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--c);
+}
+.gear-text .stars {
+  display: block;
+  line-height: 1;
+  margin: 1px 0 2px;
+  letter-spacing: 1px;
+}
+.stars i,
+.gear-text .stars i {
+  display: inline;
+  font-style: normal;
+  font-size: 13px;
+  color: #ffd24a;
+  text-shadow: 0 0 4px rgba(255, 190, 60, 0.6);
+}
+.stars i.purple {
+  color: #c77dff;
+  text-shadow: 0 0 6px rgba(190, 110, 255, 0.85);
+}
+.stars i.off {
+  color: rgba(255, 255, 255, 0.14);
+  text-shadow: none;
+}
+/* The top tiers shimmer: Unique pulses, Ghost drifts like a spirit. */
+.gear-item.tier-unique,
+.gear-item.tier-ghost {
+  position: relative;
+  overflow: hidden;
+}
+.gear-item.tier-unique {
+  box-shadow: inset 0 0 14px color-mix(in srgb, var(--c) 22%, transparent);
+}
+.gear-item.tier-ghost {
+  background: linear-gradient(120deg, rgba(159, 247, 255, 0.04), rgba(159, 247, 255, 0.12), rgba(159, 247, 255, 0.04));
+  background-size: 300% 100%;
+  animation: ghostdrift 5s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(159, 247, 255, 0.25), inset 0 0 16px rgba(159, 247, 255, 0.15);
+}
+.gear-item.tier-ghost .gear-glyph {
+  animation: ghostfloat 3s ease-in-out infinite;
+  text-shadow: 0 0 10px var(--c);
+}
+@keyframes ghostdrift {
+  50% {
+    background-position: 100% 0;
+  }
+}
+@keyframes ghostfloat {
+  50% {
+    transform: translateY(-3px);
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gear-item.tier-ghost,
+  .gear-item.tier-ghost .gear-glyph {
+    animation: none;
+  }
+}
 .section small {
   color: var(--muted);
   font-size: 13px;
@@ -1802,4 +1867,227 @@ h3.section small {
   .title-screen:has(.update-banner:not(:empty)) {
     padding-top: 52px;
   }
+}
+
+/* ---------------------------------------------------------------- key bindings */
+.keybinds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+  margin: 8px 0 14px;
+}
+.keybinds .btn {
+  margin: 0;
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- animated title
+   Original art: an emblem (broken shackle, laurels, a living flame), letters
+   that rise out of the dark one by one, a gold shine and drifting embers. */
+.title-head {
+  position: relative;
+}
+.emblem {
+  display: block;
+  width: clamp(54px, 15vh, 132px);
+  height: clamp(54px, 15vh, 132px);
+  margin: 0 auto clamp(4px, 1.4vh, 12px);
+  overflow: visible;
+  filter: drop-shadow(0 0 14px rgba(255, 90, 50, 0.45));
+  animation: emb-in 1.4s ease-out both;
+}
+.emb-flame {
+  transform-origin: 0 24px;
+  transform-box: view-box;
+  animation: emb-flicker 0.9s ease-in-out infinite alternate;
+}
+.emb-glow {
+  animation: emb-pulse 2.6s ease-in-out infinite alternate;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+.emb-runes {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: emb-spin 40s linear infinite;
+}
+.emb-link-l,
+.emb-link-r {
+  transform-box: view-box;
+  transform-origin: 0 43px;
+}
+.emb-link-l {
+  animation: emb-break-l 1.6s 0.6s ease-out both;
+}
+.emb-link-r {
+  animation: emb-break-r 1.6s 0.6s ease-out both;
+}
+@keyframes emb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+@keyframes emb-flicker {
+  0% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  35% {
+    transform: scale(0.94, 1.08) skewX(2deg);
+  }
+  70% {
+    transform: scale(1.04, 0.95) skewX(-2deg);
+  }
+  100% {
+    transform: scale(0.97, 1.05) skewX(1deg);
+  }
+}
+@keyframes emb-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+@keyframes emb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes emb-break-l {
+  from {
+    transform: translateX(9px) rotate(0deg);
+  }
+  to {
+    transform: translateX(0) rotate(-14deg);
+  }
+}
+@keyframes emb-break-r {
+  from {
+    transform: translateX(-9px) rotate(0deg);
+  }
+  to {
+    transform: translateX(0) rotate(14deg);
+  }
+}
+.logo {
+  position: relative;
+}
+.logo i {
+  display: inline-block;
+  font-style: normal;
+  animation: letter-in 0.9s calc(0.15s + var(--i) * 0.07s) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.logo-word {
+  animation: logo-glow 3.2s 1.6s ease-in-out infinite alternate;
+}
+/* A band of light sweeps across the letters now and then. */
+.logo::after {
+  content: '';
+  position: absolute;
+  inset: -6px -10px;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 244, 214, 0.75) 50%, transparent 58%);
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  animation: logo-shine 7s 2s ease-in-out infinite;
+}
+@keyframes letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em) scale(1.15);
+    filter: blur(6px);
+  }
+}
+@keyframes logo-glow {
+  to {
+    text-shadow:
+      0 0 44px rgba(255, 90, 70, 0.95),
+      0 4px 0 #3a0a14;
+  }
+}
+@keyframes logo-shine {
+  0%,
+  60% {
+    background-position: 130% 0;
+  }
+  85%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+.title-wrap .menu,
+.title-wrap .tagline,
+.title-wrap .credits {
+  animation: fade-up 0.8s 1.1s ease-out both;
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.embers i {
+  position: absolute;
+  bottom: -12px;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff0c0, #ff8a3a 55%, rgba(255, 60, 30, 0) 75%);
+  box-shadow: 0 0 8px rgba(255, 120, 50, 0.8);
+  animation: ember-rise var(--d) var(--delay) linear infinite;
+}
+@keyframes ember-rise {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(var(--x), -105vh);
+    opacity: 0;
+  }
+}
+@media (max-height: 600px) {
+  .emblem {
+    width: clamp(44px, 18vh, 90px);
+    height: clamp(44px, 18vh, 90px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .embers {
+    display: none;
+  }
+  .emblem,
+  .emblem *,
+  .logo i,
+  .logo-word,
+  .logo::after,
+  .title-wrap .menu,
+  .title-wrap .tagline,
+  .title-wrap .credits {
+    animation: none !important;
+  }
+}
+.logo span.logo-word {
+  display: block;
+  font-size: 1em;
+  letter-spacing: inherit;
+  color: inherit;
+  margin-top: 0;
 }

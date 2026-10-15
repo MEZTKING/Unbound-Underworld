@@ -33,6 +33,8 @@ export interface Settings {
   view3d: boolean;
   /** HUD, menu and label size multiplier (0.75..1.5). */
   uiSize: number;
+  /** Rebound keys: action → key codes (unset actions use the defaults). */
+  keys: Record<string, string[]>;
 }
 
 export function defaultSettings(): Settings {
@@ -55,6 +57,7 @@ export function defaultSettings(): Settings {
     leftHanded: false,
     view3d: true,
     uiSize: 1,
+    keys: {},
   };
 }
 
@@ -229,6 +232,20 @@ function legacyXp(stats: SaveData['stats']): number {
   return Math.min(xp, xpForLevel(MAX_LEVEL));
 }
 
+/** Guardians renamed in 0.6: kills recorded under the old names carry over. */
+const RENAMED: Record<string, string> = { Campe: 'Vexa', 'The Hydra': 'The Many-Maw', 'Hydra Head': 'Maw Head', Talos: 'Aurex', Cerberus: 'Threefang' };
+
+function migrateBestiary(raw: unknown): Record<string, number> {
+  if (typeof raw !== 'object' || !raw) return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v !== 'number') continue;
+    const name = RENAMED[k] ?? k;
+    out[name] = (out[name] ?? 0) + v;
+  }
+  return out;
+}
+
 /** Merges stored data over defaults so older saves keep working. */
 export function normalizeSave(raw: unknown): SaveData {
   const d = defaultSave();
@@ -255,7 +272,7 @@ export function normalizeSave(raw: unknown): SaveData {
     talents: typeof r.talents === 'object' && r.talents ? { ...r.talents } : {},
     character: isCharacterId(r.character) ? r.character : 'kael',
     forge: typeof r.forge === 'object' && r.forge ? { ...r.forge } : {},
-    bestiary: typeof r.bestiary === 'object' && r.bestiary ? { ...r.bestiary } : {},
+    bestiary: migrateBestiary(r.bestiary),
     achievements: Array.isArray(r.achievements) ? r.achievements.filter((a) => typeof a === 'string') : [],
     shopSeen: Array.isArray(r.shopSeen) ? r.shopSeen.filter((a) => typeof a === 'string') : [],
     looks: typeof r.looks === 'object' && r.looks ? { ...r.looks } : {},

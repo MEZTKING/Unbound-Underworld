@@ -26,8 +26,8 @@ export interface BiomeInfo {
 export const BIOMES: BiomeInfo[] = [
   {
     id: 'tartarus',
-    name: 'Tartarus',
-    subtitle: 'The Pit of the Damned',
+    name: 'The Shackled Deep',
+    subtitle: 'Where the Damned Are Chained',
     floorA: '#3a1d22',
     floorB: '#32181d',
     grout: '#1c0c10',
@@ -51,8 +51,8 @@ export const BIOMES: BiomeInfo[] = [
   },
   {
     id: 'asphodel',
-    name: 'Asphodel',
-    subtitle: 'The Burning Meadows',
+    name: 'The Ember Fields',
+    subtitle: 'Meadows of Cinder and Ash',
     floorA: '#2b2320',
     floorB: '#241d1a',
     grout: '#120c0a',
@@ -78,8 +78,8 @@ export const BIOMES: BiomeInfo[] = [
   },
   {
     id: 'elysium',
-    name: 'Elysium',
-    subtitle: 'Fields of the Blessed',
+    name: 'The Gilded Groves',
+    subtitle: 'Gardens of the Honored Dead',
     floorA: '#1f3a33',
     floorB: '#1a322c',
     grout: '#0e1f1a',
@@ -105,8 +105,8 @@ export const BIOMES: BiomeInfo[] = [
   },
   {
     id: 'styx',
-    name: 'Gates of the Styx',
-    subtitle: 'Where the Warden Waits',
+    name: 'The Last Gate',
+    subtitle: 'Where the Hound Keeps Watch',
     floorA: '#1d1a2e',
     floorB: '#181628',
     grout: '#0a0914',

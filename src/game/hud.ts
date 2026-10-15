@@ -21,6 +21,12 @@ interface Tip {
   color: string;
 }
 let tips: Tip[] = [];
+
+/** The key shown for an action ("R", "4"…); the game points this at the live bindings. */
+let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'F', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
+export function useKeyLabels(fn: (action: string) => string): void {
+  keyOf = fn;
+}
 const tip = (x: number, y: number, r: number, title: string, body: string, color = '#ffd890') => tips.push({ x, y, r, title, body, color });
 
 /** Draws the tooltip for the HUD icon under the mouse, if any (mx, my in HUD coordinates). */
@@ -115,7 +121,9 @@ export function drawHUD(
   const hx = mirror ? vw - (touch ? 250 : 330) : 24;
   // The panel grows as the potion and artifacts unlock; on desktop it hugs the bottom edge.
   // Touch screens use a narrower, shorter panel so it doesn't crowd small phones.
-  const ph = touch ? (s.artifactSlots ? 86 : s.canWrath ? 66 : 58) : s.canPotion || s.artifactSlots ? 104 : s.canWrath ? 70 : 64;
+  // Heights leave room for everything inside, down to the key labels under the
+  // potion and artifact slots (which sit 30 below their centres, at hy + 76).
+  const ph = touch ? (s.artifactSlots ? 86 : s.canWrath ? 66 : 58) : s.canPotion || s.artifactSlots ? 120 : s.canWrath ? 70 : 64;
   const pw = touch ? 250 : 330;
   const hy = touch ? 44 : vh + 18 - ph;
   panel(ctx, hx - 10, hy - 34, pw, ph);
@@ -156,7 +164,7 @@ export function drawHUD(
     if (k >= 1) {
       ctx.font = `700 11px ${FONT}`;
       ctx.fillStyle = '#ffd04a';
-      ctx.fillText(touch ? '☄' : '☄ F', hx + bw + 8, hy + 28);
+      ctx.fillText(touch ? '☄' : `☄ ${keyOf('wrath')}`, hx + bw + 8, hy + 28);
     }
   }
   // Cast shards
@@ -239,7 +247,7 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
     ctx.stroke();
     if (id) {
       const def = ARTIFACT_BY_ID[id];
-      tip(ax, ay, 18, def.name, `${def.desc} (key ${i + 1})`, def.color);
+      tip(ax, ay, 18, def.name, `${def.desc} (key ${keyOf(`artifact${i + 1}`)})`, def.color);
       ctx.fillStyle = def.color;
       ctx.font = `700 18px ${FONT}`;
       ctx.textAlign = 'center';
@@ -263,14 +271,14 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
     ctx.fillStyle = '#c8b8c0';
     ctx.font = `700 10px ${FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText(`${i + 1}`, ax, ay + 30);
+    ctx.fillText(keyOf(`artifact${i + 1}`), ax, ay + 30);
   }
 }
 
 function drawPotion(ctx: CanvasRenderingContext2D, w: World, px: number, py: number): void {
   const p = w.player;
   const s = w.stats;
-  tip(px, py, 14, 'Healing Potion', `Restores health. Recharges in ${Math.round(s.potionCooldown)}s. (key R)`, '#5adf6a');
+  tip(px, py, 14, 'Healing Potion', `Restores health. Recharges in ${Math.round(s.potionCooldown)}s. (key ${keyOf('potion')})`, '#5adf6a');
   ctx.fillStyle = p.potionCd > 0 ? '#3a5a3a' : '#5adf6a';
   ctx.beginPath();
   ctx.arc(px, py, 14, 0, TAU);
@@ -281,7 +289,7 @@ function drawPotion(ctx: CanvasRenderingContext2D, w: World, px: number, py: num
   ctx.fillStyle = '#fff';
   ctx.font = `700 11px ${FONT}`;
   ctx.textAlign = 'center';
-  ctx.fillText('R', px, py + 30);
+  ctx.fillText(keyOf('potion'), px, py + 30);
   if (p.potionCd > 0) {
     ctx.font = `700 12px ${FONT}`;
     ctx.fillText(`${Math.ceil(p.potionCd)}`, px, py + 4);
@@ -478,24 +486,7 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
   // Phones: a little lower so the banner clears the health panel and boss bar.
   const bannerY = touch ? 0.36 : 0.22;
   const bn = w.banner;
-  if (bn) {
-    const a = Math.min(1, bn.t * 3, (3.2 - bn.t) * 2);
-    ctx.globalAlpha = Math.max(0, a);
-    ctx.textAlign = 'center';
-    const g = ctx.createLinearGradient(vw / 2 - 300, 0, vw / 2 + 300, 0);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(0.5, 'rgba(0,0,0,0.6)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(vw / 2 - 300, vh * bannerY - 44, 600, 84);
-    ctx.font = `700 36px ${FONT}`;
-    ctx.fillStyle = '#ffd890';
-    ctx.fillText(bn.title, vw / 2, vh * bannerY);
-    ctx.font = `italic 600 16px ${FONT}`;
-    ctx.fillStyle = '#d8c8c0';
-    ctx.fillText(bn.sub, vw / 2, vh * bannerY + 28);
-    ctx.globalAlpha = 1;
-  }
+  if (bn) drawBanner(ctx, bn, vw / 2, vh * bannerY, vw);
 
   // ---------------------------------------------------------------- control hint
   if (prefs.hints && !touch && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
@@ -505,10 +496,10 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
     ctx.fillStyle = 'rgba(220,200,200,0.7)';
     // Only what you've unlocked so far.
     const extras = [
-      s.artifactSlots > 0 ? `${['1', '1 2', '1 2 3'][s.artifactSlots - 1]} Artifacts` : '',
-      s.canPotion ? 'R Potion' : '',
-      s.canWrath ? 'F Wrath' : '',
-      'E Interact · Esc Pause',
+      s.artifactSlots > 0 ? `${[1, 2, 3].slice(0, s.artifactSlots).map((i) => keyOf(`artifact${i}`)).join(' ')} Artifacts` : '',
+      s.canPotion ? `${keyOf('potion')} Potion` : '',
+      s.canWrath ? `${keyOf('wrath')} Wrath` : '',
+      `${keyOf('interact')} Interact · Esc Pause`,
     ].filter(Boolean);
     const lines = [
       'WASD move · Mouse aim',
@@ -525,4 +516,104 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
     ctx.font = `700 12px ${FONT}`;
     ctx.fillText('Void Prism — press again to stop', vw / 2, vh - 30);
   }
+}
+
+/**
+ * The region banner: gilded rules unfurl from the centre with diamond
+ * ornaments, then the name rises in gold over a smoky band.
+ */
+function drawBanner(ctx: CanvasRenderingContext2D, bn: { title: string; sub: string; t: number }, cx: number, cy: number, vw: number): void {
+  const a = Math.max(0, Math.min(1, bn.t * 3, (3.2 - bn.t) * 2));
+  const open = 1 - (1 - Math.min(1, bn.t / 0.7)) ** 3;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = `700 36px ${FONT}`;
+  const tw = Math.max(ctx.measureText(bn.title).width, 200);
+  const half = Math.min(vw / 2 - 12, tw / 2 + 110);
+  const g = ctx.createLinearGradient(cx - half, 0, cx + half, 0);
+  g.addColorStop(0, 'rgba(10,4,8,0)');
+  g.addColorStop(0.5, 'rgba(10,4,8,0.72)');
+  g.addColorStop(1, 'rgba(10,4,8,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - half, cy - 46, half * 2, 90);
+  // Gilded rules above and below, unfurling from the middle.
+  const rw = half * open;
+  const gold = ctx.createLinearGradient(cx - rw, 0, cx + rw, 0);
+  gold.addColorStop(0, 'rgba(242,211,138,0)');
+  gold.addColorStop(0.2, 'rgba(242,211,138,0.85)');
+  gold.addColorStop(0.5, '#fff0c0');
+  gold.addColorStop(0.8, 'rgba(242,211,138,0.85)');
+  gold.addColorStop(1, 'rgba(242,211,138,0)');
+  ctx.strokeStyle = gold;
+  for (const [y, w] of [
+    [cy - 46, 1.6],
+    [cy - 41, 0.8],
+    [cy + 44, 1.6],
+    [cy + 39, 0.8],
+  ]) {
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(cx - rw, y);
+    ctx.lineTo(cx + rw, y);
+    ctx.stroke();
+  }
+  const diamond = (x: number, y: number, r: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.7, y);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r * 0.7, y);
+    ctx.closePath();
+    ctx.fill();
+  };
+  ctx.fillStyle = '#f2d38a';
+  for (const y of [cy - 46, cy + 44]) {
+    diamond(cx, y, 7);
+    // Little wings either side of the centre diamond.
+    for (const s of [-1, 1]) {
+      diamond(cx + s * 16, y, 3.5);
+      diamond(cx + s * rw * 0.82, y, 3);
+    }
+  }
+  // The name, in gold with an ember glow.
+  const tg = ctx.createLinearGradient(0, cy - 30, 0, cy + 4);
+  tg.addColorStop(0, '#fff3cc');
+  tg.addColorStop(0.55, '#f2c86a');
+  tg.addColorStop(1, '#b07a2a');
+  ctx.shadowColor = 'rgba(255,120,50,0.55)';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = tg;
+  ctx.fillText(bn.title, cx, cy + (1 - open) * 8);
+  ctx.shadowBlur = 0;
+  ctx.font = `italic 600 16px ${FONT}`;
+  ctx.fillStyle = '#e0d0c4';
+  ctx.globalAlpha = a * Math.min(1, Math.max(0, (bn.t - 0.25) * 3));
+  ctx.fillText(bn.sub, cx, cy + 28);
+  ctx.restore();
+}
+
+/** A small "Saved" mark with a turning ring, shown after an autosave. `k` runs 0→1 over its life. */
+export function drawSaveIcon(ctx: CanvasRenderingContext2D, vw: number, k: number, t: number): void {
+  const a = Math.min(1, k * 6, (1 - k) * 3);
+  if (a <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = a;
+  const x = vw / 2 - 30;
+  const y = 18;
+  ctx.strokeStyle = '#f2d38a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, 7, t * 6, t * 6 + Math.PI * 1.4);
+  ctx.stroke();
+  ctx.fillStyle = '#f2d38a';
+  ctx.beginPath();
+  ctx.arc(x, y, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = `600 13px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#e8dcc8';
+  ctx.fillText('Saved', x + 13, y + 1);
+  ctx.restore();
 }

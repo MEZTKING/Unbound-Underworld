@@ -637,14 +637,18 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       const hover = y - 10 + Math.sin(w.time * 4 + pk.x) * 3;
       // A soft beam marks gear so it isn't missed.
       if (l.gear) {
+        // Unique and Ghost pieces throw up a taller, pulsing beam.
+        const top = l.gear.rarity === 'ghost' || l.gear.rarity === 'unique';
+        const bh = top ? 140 : 60;
+        const bw = top ? 10 : 6;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const g = ctx.createLinearGradient(0, hover - 60, 0, hover);
+        const g = ctx.createLinearGradient(0, hover - bh, 0, hover);
         g.addColorStop(0, 'rgba(0,0,0,0)');
         g.addColorStop(1, color);
-        ctx.globalAlpha = 0.35;
+        ctx.globalAlpha = top ? 0.4 + Math.sin(w.time * 5) * 0.15 : 0.35;
         ctx.fillStyle = g;
-        ctx.fillRect(pk.x - 6, hover - 60, 12, 60);
+        ctx.fillRect(pk.x - bw, hover - bh, bw * 2, bh);
         ctx.restore();
       }
       ctx.fillStyle = 'rgba(10,6,14,0.85)';

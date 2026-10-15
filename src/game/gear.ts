@@ -1,7 +1,9 @@
 // Loot and gear (unlocks at level 10). Foes drop materials and, now and then,
 // a piece of gear: a helmet, armor, leggings or boots with random bonuses.
-// Gear is kept between escapes, equipped at the Armory, and upgraded or
-// salvaged with materials.
+// Gear comes in seven tiers, from Common to the near-mythical Ghost; Unique
+// and Ghost pieces carry a perk of their own. Gear is kept between escapes,
+// equipped at the Armory, and starred up (1–5 gold stars, then 5 more that
+// turn purple) or salvaged with materials.
 
 import type { Rng } from '../engine/math';
 import type { PlayerStats } from './stats';
@@ -12,9 +14,9 @@ export type MaterialId = 'bone' | 'ember' | 'ichor' | 'pearl' | 'scale';
 
 export const MATERIALS: Record<MaterialId, { name: string; glyph: string; color: string; desc: string }> = {
   bone: { name: 'Bone Dust', glyph: '☗', color: '#e8e0d0', desc: 'Dropped by foes everywhere. The basic crafting material.' },
-  ember: { name: 'Ember Shard', glyph: '♦', color: '#ff7a2a', desc: 'Dropped by foes in Tartarus and Asphodel.' },
-  ichor: { name: 'Golden Ichor', glyph: '✹', color: '#e8c860', desc: 'Dropped by foes in Elysium.' },
-  pearl: { name: 'Styx Pearl', glyph: '●', color: '#b0a0ff', desc: 'Dropped by foes at the Gates of the Styx.' },
+  ember: { name: 'Ember Shard', glyph: '♦', color: '#ff7a2a', desc: 'Dropped by foes in the Shackled Deep and the Ember Fields.' },
+  ichor: { name: 'Golden Ichor', glyph: '✹', color: '#e8c860', desc: 'Dropped by foes in the Gilded Groves.' },
+  pearl: { name: 'Gate Pearl', glyph: '●', color: '#b0a0ff', desc: 'Dropped by foes at the Last Gate.' },
   scale: { name: 'Titan Scale', glyph: '⬢', color: '#ff4a5a', desc: 'Dropped by guardians and enchanted foes. Rare.' },
 };
 
@@ -51,13 +53,85 @@ export const GEAR_SLOTS: GearSlot[] = ['helmet', 'armor', 'legs', 'boots'];
 export const SLOT_NAME: Record<GearSlot, string> = { helmet: 'Helmet', armor: 'Armor', legs: 'Leggings', boots: 'Boots' };
 export const SLOT_GLYPH: Record<GearSlot, string> = { helmet: '⛑', armor: '⛨', legs: '⧉', boots: '⚶' };
 
-export type GearRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type GearRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'unique' | 'ghost';
 export const GEAR_RARITY: Record<GearRarity, { name: string; color: string; affixes: number; power: number }> = {
   common: { name: 'Common', color: '#d8d0c8', affixes: 1, power: 1 },
+  uncommon: { name: 'Uncommon', color: '#7ad87a', affixes: 2, power: 1.15 },
   rare: { name: 'Rare', color: '#5ac8ff', affixes: 2, power: 1.3 },
-  epic: { name: 'Epic', color: '#c86bff', affixes: 3, power: 1.6 },
-  legendary: { name: 'Legendary', color: '#ffb14a', affixes: 4, power: 2 },
+  epic: { name: 'Epic', color: '#c86bff', affixes: 3, power: 1.55 },
+  legendary: { name: 'Legendary', color: '#ffb14a', affixes: 4, power: 1.85 },
+  unique: { name: 'Unique', color: '#ff5a7a', affixes: 4, power: 2.1 },
+  ghost: { name: 'Ghost', color: '#9ff7ff', affixes: 5, power: 2.5 },
 };
+/** Tiers from worst to best. */
+export const RARITY_ORDER = Object.keys(GEAR_RARITY) as GearRarity[];
+export const rarityRank = (r: GearRarity) => RARITY_ORDER.indexOf(r);
+
+// ---------------------------------------------------------------- perks
+
+export type PerkId = 'breath' | 'fleet' | 'leech' | 'giantbane' | 'quiver' | 'keen' | 'artificer' | 'phantom' | 'wraith' | 'revenant' | 'ward';
+
+interface PerkDef {
+  name: string;
+  /** Goes after the item's name: "Helm of …". */
+  of: string;
+  desc: string;
+  ghost?: boolean;
+  /** Extra Death Defiance granted at the start of each escape. */
+  defiance?: number;
+  apply: (s: PlayerStats) => void;
+}
+
+/** Unique pieces carry one of the first seven perks; Ghost pieces one of the last four. */
+export const PERKS: Record<PerkId, PerkDef> = {
+  breath: { name: 'Second Breath', of: 'Second Breath', desc: '+1 Death Defiance each escape.', defiance: 1, apply: () => {} },
+  fleet: { name: 'Fleetfoot', of: 'the Fleetfoot', desc: '+1 dash charge.', apply: (s) => (s.dashCharges += 1) },
+  leech: { name: 'Leech', of: 'the Leech', desc: 'Heal 2 health for every foe slain.', apply: (s) => (s.lifeOnKill += 2) },
+  giantbane: { name: 'Giantbane', of: 'Giantbane', desc: '+25% damage to guardians and enchanted foes.', apply: (s) => (s.bigGameDmg += 0.25) },
+  quiver: { name: 'Deep Quiver', of: 'the Deep Quiver', desc: '+1 cast shard.', apply: (s) => (s.castAmmo += 1) },
+  keen: { name: 'Keen Edge', of: 'Keen Edges', desc: 'Critical hits deal +50% more damage.', apply: (s) => (s.critMult += 0.5) },
+  artificer: { name: 'Artificer', of: 'the Artificer', desc: 'Artifacts recharge 20% faster.', apply: (s) => (s.artifactCdMult *= 0.8) },
+  phantom: {
+    name: 'Phantom Step',
+    of: 'the Phantom Step',
+    desc: '+1 dash charge and dashes recharge 25% faster.',
+    ghost: true,
+    apply: (s) => {
+      s.dashCharges += 1;
+      s.dashRecharge *= 0.75;
+    },
+  },
+  wraith: {
+    name: 'Wraithblood',
+    of: 'Wraithblood',
+    desc: 'Heal 4 health for every foe slain, and +15% damage.',
+    ghost: true,
+    apply: (s) => {
+      s.lifeOnKill += 4;
+      s.globalDmg += 0.15;
+    },
+  },
+  revenant: {
+    name: 'Revenant',
+    of: 'the Revenant',
+    desc: '+1 Death Defiance and +20 max health.',
+    ghost: true,
+    defiance: 1,
+    apply: (s) => (s.maxHp += 20),
+  },
+  ward: {
+    name: 'Spectral Ward',
+    of: 'the Spectral Ward',
+    desc: 'Take 15% less damage and move 10% faster.',
+    ghost: true,
+    apply: (s) => {
+      s.damageTaken *= 0.85;
+      s.moveSpeed += 0.1;
+    },
+  },
+};
+const UNIQUE_PERKS = (Object.keys(PERKS) as PerkId[]).filter((k) => !PERKS[k].ghost);
+const GHOST_PERKS = (Object.keys(PERKS) as PerkId[]).filter((k) => PERKS[k].ghost);
 
 export type AffixId = 'health' | 'damage' | 'speed' | 'crit' | 'guard' | 'dash' | 'gold' | 'souls' | 'wrath' | 'potion';
 
@@ -99,13 +173,27 @@ export interface GearItem {
   slot: GearSlot;
   rarity: GearRarity;
   name: string;
-  /** Upgrade level (1..MAX_GEAR_LEVEL): each level adds 15% to every bonus. */
+  /**
+   * Star level (1..MAX_GEAR_LEVEL). Levels 1–5 show as gold stars; 6–10 turn
+   * them purple one by one. Gold stars add 15% to every bonus, purple 20%.
+   */
   level: number;
   /** Bonuses as multiples of their base value (rolled 0.8–1.25, then scaled by rarity). */
   affixes: { id: AffixId; roll: number }[];
+  /** Unique and Ghost pieces only. */
+  perk?: PerkId;
 }
 
-export const MAX_GEAR_LEVEL = 5;
+export const MAX_GEAR_LEVEL = 10;
+/** Stars a piece shows: `gold` and `purple` out of five. */
+export function gearStars(level: number): { gold: number; purple: number } {
+  const l = Math.max(1, Math.min(MAX_GEAR_LEVEL, level));
+  return l <= 5 ? { gold: l, purple: 0 } : { gold: 10 - l, purple: l - 5 };
+}
+/** How much a piece's star level multiplies its bonuses. */
+export function levelMult(level: number): number {
+  return 1 + Math.min(4, level - 1) * 0.15 + Math.max(0, level - 5) * 0.2;
+}
 export const INVENTORY_SIZE = 40;
 
 const NAMES: Record<GearSlot, string[]> = {
@@ -118,33 +206,63 @@ const PREFIX = ['Ashen', 'Bronze', 'Gilded', 'Ember', 'Shade', 'Bone', 'Starlit'
 
 export function affixValue(item: GearItem, i: number): number {
   const a = item.affixes[i];
-  return AFFIXES[a.id].base * a.roll * GEAR_RARITY[item.rarity].power * (1 + (item.level - 1) * 0.15);
+  return AFFIXES[a.id].base * a.roll * GEAR_RARITY[item.rarity].power * levelMult(item.level);
 }
 
 export function describeAffix(item: GearItem, i: number): string {
   return AFFIXES[item.affixes[i].id].name(affixValue(item, i));
 }
 
+/**
+ * The chance of each tier for a given luck (0..1). Ghost stays the hardest
+ * to find whatever the luck: 0.3% normally, 1% at best.
+ */
+export function rarityOdds(luck = 0): Record<GearRarity, number> {
+  const ghost = 0.003 + luck * 0.007;
+  const unique = 0.015 + luck * 0.02;
+  const rest = 1 - ghost - unique;
+  // The rest is split along a scale that luck slides toward the better tiers.
+  const shift = luck * 0.25;
+  const cut = (x: number) => Math.max(0, Math.min(1, x + shift));
+  const legendary = cut(0.05);
+  const epic = cut(0.15) - legendary;
+  const rare = cut(0.35) - cut(0.15);
+  const uncommon = cut(0.62) - cut(0.35);
+  const common = 1 - cut(0.62);
+  return { common: common * rest, uncommon: uncommon * rest, rare: rare * rest, epic: epic * rest, legendary: legendary * rest, unique, ghost };
+}
+
 /** Rolls a piece of gear. `luck` (0..1) raises the chance of better rarities. */
 export function rollGear(rng: Rng, luck = 0, slot?: GearSlot, minRarity: GearRarity = 'common'): GearItem {
   const s = slot ?? rng.pick(GEAR_SLOTS);
-  const r = rng.next() - luck * 0.25;
-  let rarity: GearRarity = r < 0.04 ? 'legendary' : r < 0.16 ? 'epic' : r < 0.45 ? 'rare' : 'common';
-  const order: GearRarity[] = ['common', 'rare', 'epic', 'legendary'];
-  if (order.indexOf(rarity) < order.indexOf(minRarity)) rarity = minRarity;
+  const odds = rarityOdds(luck);
+  let r = rng.next();
+  let rarity: GearRarity = 'common';
+  for (const k of [...RARITY_ORDER].reverse()) {
+    if (r < odds[k]) {
+      rarity = k;
+      break;
+    }
+    r -= odds[k];
+  }
+  if (rarityRank(rarity) < rarityRank(minRarity)) rarity = minRarity;
   const pool = (Object.keys(AFFIXES) as AffixId[]).filter((id) => !AFFIXES[id].slots || AFFIXES[id].slots!.includes(s));
   const affixes: GearItem['affixes'] = [];
   for (let i = 0; i < GEAR_RARITY[rarity].affixes && pool.length; i++) {
     const id = pool.splice(Math.floor(rng.next() * pool.length), 1)[0];
     affixes.push({ id, roll: Math.round((0.8 + rng.next() * 0.45) * 100) / 100 });
   }
+  const perk = rarity === 'ghost' ? rng.pick(GHOST_PERKS) : rarity === 'unique' ? rng.pick(UNIQUE_PERKS) : undefined;
+  const noun = rng.pick(NAMES[s]);
+  const name = rarity === 'ghost' ? `Ghostly ${noun} of ${PERKS[perk!].of}` : rarity === 'unique' ? `${noun} of ${PERKS[perk!].of}` : `${rng.pick(PREFIX)} ${noun}`;
   return {
     uid: `${Date.now().toString(36)}${Math.floor(rng.next() * 1e9).toString(36)}`,
     slot: s,
     rarity,
-    name: `${rng.pick(PREFIX)} ${rng.pick(NAMES[s])}`,
+    name,
     level: 1,
     affixes,
+    ...(perk ? { perk } : {}),
   };
 }
 
@@ -153,22 +271,32 @@ export function applyGear(items: (GearItem | undefined)[], s: PlayerStats): void
   for (const item of items) {
     if (!item) continue;
     item.affixes.forEach((a, i) => AFFIXES[a.id]?.apply(s, affixValue(item, i)));
+    if (item.perk) PERKS[item.perk]?.apply(s);
   }
 }
 
-/** Materials to raise an item one level. */
+/** Death Defiance that equipped perks add to each escape. */
+export function gearDefiance(items: (GearItem | undefined)[]): number {
+  return items.reduce((n, i) => n + ((i?.perk && PERKS[i.perk]?.defiance) || 0), 0);
+}
+
+/** Materials to raise an item one star. Purple stars (6–10) also take Titan Scales. */
 export function upgradeCost(item: GearItem): Materials {
   const k = item.level;
-  const extra: Materials =
-    item.rarity === 'legendary' ? { pearl: 2 * k, scale: k } : item.rarity === 'epic' ? { ichor: 2 * k, scale: k } : item.rarity === 'rare' ? { ember: 2 * k } : {};
-  return { bone: 6 * k, ...extra };
+  const t = rarityRank(item.rarity);
+  const cost: Materials = { bone: 6 * k };
+  if (t === 1) cost.ember = k;
+  else if (t === 2) cost.ember = 2 * k;
+  else if (t === 3) (cost.ichor = 2 * k), (cost.scale = k);
+  else if (t >= 4) (cost.pearl = 2 * k), (cost.scale = k);
+  if (k >= 5) cost.scale = (cost.scale ?? 0) + (k - 4);
+  return cost;
 }
 
 /** Materials returned by salvaging an item. */
 export function salvageValue(item: GearItem): Materials {
-  const order: GearRarity[] = ['common', 'rare', 'epic', 'legendary'];
-  const r = order.indexOf(item.rarity);
-  return { bone: 3 + r * 3 + item.level * 2, ...(r >= 2 ? { scale: r - 1 } : {}) };
+  const r = rarityRank(item.rarity);
+  return { bone: 3 + r * 3 + item.level * 2, ...(r >= 3 ? { scale: r - 2 + (item.level > 5 ? item.level - 5 : 0) } : {}) };
 }
 
 /** Crafting recipes: a random piece of at least this rarity. */
@@ -176,6 +304,7 @@ export const CRAFTS: { name: string; min: GearRarity; cost: Materials }[] = [
   { name: 'Craft a piece', min: 'common', cost: { bone: 25, ember: 6 } },
   { name: 'Craft a fine piece', min: 'rare', cost: { bone: 40, ichor: 6 } },
   { name: 'Craft a grand piece', min: 'epic', cost: { bone: 60, pearl: 6, scale: 3 } },
+  { name: 'Craft a masterwork', min: 'legendary', cost: { bone: 120, pearl: 14, scale: 10 } },
 ];
 export const CRAFT_COST = CRAFTS[0].cost;
 
@@ -198,6 +327,10 @@ export function normalizeGear(raw: unknown): GearState {
           !!i && typeof i.uid === 'string' && GEAR_SLOTS.includes(i.slot) && i.rarity in GEAR_RARITY && Array.isArray(i.affixes) && i.affixes.every((a) => a.id in AFFIXES),
       )
     : [];
+  for (const i of items) {
+    i.level = Math.max(1, Math.min(MAX_GEAR_LEVEL, Math.round(Number(i.level) || 1)));
+    if (i.perk && !(i.perk in PERKS)) delete i.perk;
+  }
   const equipped: GearState['equipped'] = {};
   for (const s of GEAR_SLOTS) {
     const uid = r.equipped?.[s];

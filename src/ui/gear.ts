@@ -10,12 +10,15 @@ import {
   costText,
   describeAffix,
   GEAR_RARITY,
+  gearStars,
   GEAR_SLOTS,
   hasMaterials,
   INVENTORY_SIZE,
   MATERIAL_IDS,
   MATERIALS,
   MAX_GEAR_LEVEL,
+  PERKS,
+  rarityRank,
   rollGear,
   salvageValue,
   SLOT_GLYPH,
@@ -27,13 +30,23 @@ import {
 } from '../game/gear';
 import { esc } from './overlay';
 
+/** Five stars: gold up to level 5, then turning purple one by one up to 10. */
+export function starsHtml(level: number): string {
+  const { gold, purple } = gearStars(level);
+  let out = '';
+  for (let i = 0; i < 5; i++) out += `<i class="${i < purple ? 'purple' : i < purple + gold ? 'gold' : 'off'}">★</i>`;
+  return `<span class="stars" title="${level} star${level > 1 ? 's' : ''} of ${MAX_GEAR_LEVEL}">${out}</span>`;
+}
+
 function itemCard(item: GearItem, opts: { equipped?: boolean; selected?: boolean; attr: string }): string {
   const r = GEAR_RARITY[item.rarity];
-  return `<button class="gear-item${opts.selected ? ' on' : ''}${opts.equipped ? ' worn' : ''}" data-nav ${opts.attr} style="--c:${r.color}">
+  const perk = item.perk ? PERKS[item.perk] : null;
+  return `<button class="gear-item tier-${item.rarity}${opts.selected ? ' on' : ''}${opts.equipped ? ' worn' : ''}" data-nav ${opts.attr} style="--c:${r.color}">
     <span class="gear-glyph">${SLOT_GLYPH[item.slot]}</span>
-    <span class="gear-text"><b>${esc(item.name)}${item.level > 1 ? ` +${item.level - 1}` : ''}</b>
+    <span class="gear-text"><b>${esc(item.name)}</b>${starsHtml(item.level)}
       <small>${r.name} ${SLOT_NAME[item.slot]}${opts.equipped ? ' · equipped' : ''}</small>
-      ${item.affixes.map((_, i) => `<i>${esc(describeAffix(item, i))}</i>`).join('')}</span></button>`;
+      ${item.affixes.map((_, i) => `<i>${esc(describeAffix(item, i))}</i>`).join('')}
+      ${perk ? `<em>${esc(perk.name)}: ${esc(perk.desc)}</em>` : ''}</span></button>`;
 }
 
 export function gearScreen(g: Game): void {
@@ -52,7 +65,7 @@ export function gearScreen(g: Game): void {
     }).join('');
     const bag = gear.items
       .filter((i) => !Object.values(gear.equipped).includes(i.uid))
-      .sort((a, b) => GEAR_SLOTS.indexOf(a.slot) - GEAR_SLOTS.indexOf(b.slot))
+      .sort((a, b) => rarityRank(b.rarity) - rarityRank(a.rarity) || b.level - a.level || GEAR_SLOTS.indexOf(a.slot) - GEAR_SLOTS.indexOf(b.slot))
       .map((i) => itemCard(i, { selected: selected === i.uid, attr: `data-item="${i.uid}"` }))
       .join('');
     const sel = gear.items.find((i) => i.uid === selected);
@@ -61,7 +74,7 @@ export function gearScreen(g: Game): void {
     const actions = sel
       ? `<div class="row-btns">
           <button class="btn" data-nav data-act="equip">${isWorn ? 'Unequip' : 'Equip'}</button>
-          <button class="btn${up && hasMaterials(g.save.materials, up) ? '' : ' disabled'}" data-nav data-act="upgrade">${up ? `Upgrade (${costText(up)})` : 'Fully upgraded'}</button>
+          <button class="btn${up && hasMaterials(g.save.materials, up) ? '' : ' disabled'}" data-nav data-act="upgrade">${up ? `${sel.level >= 5 ? 'Empower' : 'Star up'} (${costText(up)})` : 'All stars purple'}</button>
           <button class="btn danger" data-nav data-act="salvage">Salvage (+${costText(salvageValue(sel))})</button></div>`
       : '<p class="small">Select a piece to equip, upgrade or salvage it.</p>';
     return `<div class="mats">${mats}</div>
@@ -113,7 +126,7 @@ export function gearScreen(g: Game): void {
           gear.items.push(item);
           selected = item.uid;
           audio.play('boon');
-          g.ui.toast(`Crafted ${GEAR_RARITY[item.rarity].name} ${item.name}`);
+          g.ui.toast(`Crafted ${GEAR_RARITY[item.rarity].name}: ${item.name}`);
           changed();
           return;
         }
@@ -130,6 +143,7 @@ export function gearScreen(g: Game): void {
           }
           sel.level++;
           audio.play('boon');
+          g.ui.toast(sel.level > 5 ? `${sel.name}: a star turns purple (${sel.level - 5}/5)` : `${sel.name}: ${sel.level} gold stars`);
         } else if (act === 'salvage') {
           if (!b.dataset.armed) {
             b.dataset.armed = '1';

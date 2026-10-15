@@ -1,13 +1,25 @@
 // In-app updates. The Windows installer and the Linux AppImage download and
-// install new versions themselves; the other app builds open the new download;
-// the web version reloads once its service worker has fetched the new files.
-// Store builds (VITE_DISTRIBUTION=play) leave updating to the store.
+// install new versions themselves; so does the Android APK (it downloads the
+// new APK and opens Android's installer without leaving the game); other app
+// builds open the new download; the web version reloads once its service
+// worker has fetched the new files. Store builds (VITE_DISTRIBUTION=play)
+// leave updating to the store.
+
+import { registerPlugin } from '@capacitor/core';
 
 declare const __APP_VERSION__: string;
 
 export const APP_VERSION = __APP_VERSION__;
 export const RELEASES_REPO = 'MEZTKING/Unbound-Underworld';
 const LATEST_API = `https://api.github.com/repos/${RELEASES_REPO}/releases/latest`;
+
+/** The Android app's native updater (android/.../ApkUpdaterPlugin.java). */
+interface ApkUpdater {
+  canInstall(): Promise<{ allowed: boolean }>;
+  openInstallSettings(): Promise<void>;
+  downloadAndInstall(o: { url: string }): Promise<void>;
+  addListener(event: 'progress', cb: (e: { percent: number }) => void): Promise<{ remove: () => Promise<void> }>;
+}
 
 /** Exposed by electron/preload.cjs inside the desktop app. */
 interface DesktopBridge {
@@ -19,8 +31,8 @@ interface DesktopBridge {
 export type UpdateState =
   | { kind: 'idle' | 'checking' | 'current' }
   | { kind: 'error'; message: string }
-  | { kind: 'available'; version: string; action: 'install' | 'download' | 'reload'; url: string }
-  | { kind: 'downloading'; version: string; percent: number }
+  | { kind: 'available'; version: string; action: 'install' | 'download' | 'reload'; url: string; hint?: string }
+  | { kind: 'downloading'; version: string; percent: number; android?: boolean }
   | { kind: 'opened'; version: string };
 
 type Platform = 'desktop' | 'android' | 'web' | 'store';
@@ -31,6 +43,8 @@ const native = !!host.Capacitor?.isNativePlatform?.();
 
 const platform: Platform =
   import.meta.env.VITE_DISTRIBUTION === 'play' ? 'store' : desktop ? 'desktop' : native ? 'android' : 'web';
+
+const apkUpdater = platform === 'android' ? registerPlugin<ApkUpdater>('ApkUpdater') : null;
 
 let state: UpdateState = { kind: 'idle' };
 const listeners = new Set<(s: UpdateState) => void>();
@@ -112,7 +126,7 @@ export async function check(): Promise<void> {
       set(url ? { kind: 'available', version, action: 'download', url } : { kind: 'current' });
     } else {
       const url = findAsset(rel, [/-android\.apk$/]);
-      set(url ? { kind: 'available', version, action: 'download', url } : { kind: 'current' });
+      set(url ? { kind: 'available', version, action: apkUpdater ? 'install' : 'download', url } : { kind: 'current' });
     }
   } catch {
     set({ kind: 'error', message: "Couldn't reach the update server." });
@@ -143,6 +157,10 @@ export async function applyUpdate(): Promise<void> {
     set({ kind: 'opened', version: s.version });
     return;
   }
+  if (apkUpdater) {
+    await installApk(apkUpdater, s);
+    return;
+  }
   if (!desktop) return;
   set({ kind: 'downloading', version: s.version, percent: 0 });
   desktop.onProgress((percent) => {
@@ -153,6 +171,36 @@ export async function applyUpdate(): Promise<void> {
     if ((await desktop.install()) === 'none') set({ kind: 'current' });
   } catch {
     set({ kind: 'error', message: 'The update failed to download. Try again later.' });
+  }
+}
+
+/** Android: download the new APK in the game and open the system installer. */
+async function installApk(up: ApkUpdater, s: UpdateState & { kind: 'available' }): Promise<void> {
+  try {
+    // Android 8+ asks once whether this app may install updates.
+    if (!(await up.canInstall()).allowed) {
+      await up.openInstallSettings();
+      set({ ...s, hint: 'Allow installs from Unbound Underworld, then come back and tap Update now.' });
+      return;
+    }
+  } catch {
+    // An older app without the native updater: open the download instead.
+    location.href = s.url;
+    set({ kind: 'opened', version: s.version });
+    return;
+  }
+  set({ kind: 'downloading', version: s.version, percent: 0, android: true });
+  const sub = await up.addListener('progress', ({ percent }) => {
+    if (state.kind === 'downloading') set({ kind: 'downloading', version: s.version, percent, android: true });
+  });
+  try {
+    await up.downloadAndInstall({ url: s.url });
+    // Android's installer is now on screen; if it's dismissed, the button comes back.
+    set({ ...s, hint: 'Finish installing in the window Android opened.' });
+  } catch {
+    set({ kind: 'error', message: 'The update failed to download. Try again later.' });
+  } finally {
+    void sub.remove();
   }
 }
 

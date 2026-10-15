@@ -7,14 +7,14 @@ describe('codex', () => {
     const names = BESTIARY.map((e) => e.name);
     expect(new Set(names).size).toBe(names.length);
     for (const e of BESTIARY) expect(e.make().name).toBe(e.name);
-    expect(BESTIARY.filter((e) => e.guardian).map((e) => e.name)).toEqual(expect.arrayContaining(['Campe', 'The Hydra', 'Talos', 'Cerberus']));
+    expect(BESTIARY.filter((e) => e.guardian).map((e) => e.name)).toEqual(expect.arrayContaining(['Vexa', 'The Many-Maw', 'Aurex', 'Threefang']));
   });
 
   it('awards achievements from save data once', () => {
     const save = defaultSave();
     expect(newAchievements(save)).toEqual([]);
     save.stats.kills = 1;
-    save.bestiary.Campe = 1;
+    save.bestiary.Vexa = 1;
     const got = newAchievements(save).map((a) => a.id);
     expect(got).toEqual(expect.arrayContaining(['first_blood', 'jailbreak']));
     save.achievements.push(...got);

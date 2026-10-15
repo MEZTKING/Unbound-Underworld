@@ -48,12 +48,12 @@ export const BESTIARY: FoeEntry[] = [
   foe('bonecaller', 'Summons Numblings, which die with it.', 'Kill the Bonecaller first.'),
   foe('mimic', 'A chest that bites back with hopping slams.', 'Dash or jump out of its landing zone.'),
   foe('dummy', 'The training dummy in the Hall of Shades. Heals when left alone.', 'Practise your combos.'),
-  guardian('fury', 'Jailer of Tartarus. Whip lashes, a dashing charge and bullet rings.', 'Step off the dash lane; slip through gaps in the rings.'),
+  guardian('fury', 'Warden of Chains. Whip lashes, a dashing charge and bullet rings.', 'Step off the dash lane; slip through gaps in the rings.'),
   guardian('hydra', 'Rooted in place. Bites, spits fire and grows extra heads.', 'Clear the heads if overwhelmed, then focus the body.'),
   {
-    name: 'Hydra Head',
+    name: 'Maw Head',
     guardian: true,
-    behaviour: "Extra heads the Hydra grows. They spit fire bolts and die with the body.",
+    behaviour: "Extra heads the Many-Maw grows. They spit fire bolts and die with the body.",
     counter: 'Strike them down when the fire gets too thick.',
     make: () => new HydraHead(0, 0),
   },
@@ -64,7 +64,7 @@ export const BESTIARY: FoeEntry[] = [
 /** The region(s) a foe appears in. */
 export function foeRegions(entry: FoeEntry): string {
   if (entry.name === 'Old Bones') return 'The Hall of Shades';
-  if (entry.name === 'Hydra Head') return BIOMES[1].name;
+  if (entry.name === 'Maw Head') return BIOMES[1].name;
   const e = entry.make();
   const where = BIOMES.filter((b) => (entry.guardian ? createBoss(b.boss, 0, 0).name === e.name : b.pool.some(([k]) => createEnemy(k, 0, 0).name === e.name)));
   return where.map((b) => b.name).join(', ') || '—';
@@ -85,10 +85,10 @@ const slain = (save: SaveData, name: string) => (save.bestiary[name] ?? 0) > 0;
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_blood', name: 'First Blood', glyph: '⚔', desc: 'Slay your first foe.', done: (s) => s.stats.kills >= 1 },
   { id: 'culler', name: 'Culler of Shades', glyph: '☠', desc: 'Slay 500 foes.', done: (s) => s.stats.kills >= 500 },
-  { id: 'jailbreak', name: 'Jailbreak', glyph: '⛓', desc: 'Slay Campe, Jailer of Tartarus.', done: (s) => slain(s, 'Campe') },
-  { id: 'headhunter', name: 'Headhunter', glyph: '🜂', desc: 'Slay the Hydra.', done: (s) => slain(s, 'The Hydra') },
-  { id: 'bronze', name: 'Scrap Metal', glyph: '⚙', desc: 'Slay Talos, the Bronze Colossus.', done: (s) => slain(s, 'Talos') },
-  { id: 'gatebreaker', name: 'Gatebreaker', glyph: '⛩', desc: 'Slay Cerberus, Warden of the Gate.', done: (s) => slain(s, 'Cerberus') },
+  { id: 'jailbreak', name: 'Jailbreak', glyph: '⛓', desc: 'Slay Vexa, Warden of Chains.', done: (s) => slain(s, 'Vexa') },
+  { id: 'headhunter', name: 'Headhunter', glyph: '🜂', desc: 'Slay the Many-Maw.', done: (s) => slain(s, 'The Many-Maw') },
+  { id: 'bronze', name: 'Scrap Metal', glyph: '⚙', desc: 'Slay Aurex, the Gilded Colossus.', done: (s) => slain(s, 'Aurex') },
+  { id: 'gatebreaker', name: 'Gatebreaker', glyph: '⛩', desc: 'Slay Threefang, Hound of the Last Gate.', done: (s) => slain(s, 'Threefang') },
   { id: 'escape', name: 'Unbound', glyph: '✦', desc: 'Escape the Underworld.', done: (s) => s.stats.escapes >= 1 },
   { id: 'escape5', name: 'Old Hand', glyph: '✧', desc: 'Escape 5 times.', done: (s) => s.stats.escapes >= 5 },
   { id: 'swift', name: 'Swift as Hermes', glyph: '➶', desc: 'Escape in under 20 minutes.', done: (s) => s.stats.bestTime > 0 && s.stats.bestTime < 20 * 60 },
