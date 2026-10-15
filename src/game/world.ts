@@ -783,7 +783,23 @@ export class World {
     p.souls = Math.min(this.stats.soulMax, p.souls + n * this.stats.soulGain);
   }
 
+  /** The nearest open floor to a point, so whatever lands there can be reached. */
+  openSpot(x: number, y: number): Vec {
+    const free = (px: number, py: number) => px > 70 && py > 170 && px < this.room.w - 70 && py < this.room.h - 70 && this.grid.block[this.cellIndex(px, py)] === 0;
+    if (free(x, y)) return { x, y };
+    for (let r = CELL / 2; r < 900; r += CELL / 2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * TAU;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        if (free(px, py)) return { x: px, y: py };
+      }
+    }
+    return { x, y };
+  }
+
   spawnReward(reward: RewardSpec, x: number, y: number): void {
+    ({ x, y } = this.openSpot(x, y));
     const pk = new Pickup('reward', x, y, 0);
     pk.reward = reward;
     pk.r = 28;

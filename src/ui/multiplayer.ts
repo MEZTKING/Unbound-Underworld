@@ -376,6 +376,8 @@ function replaceSave(g: Game, save: ReturnType<typeof importSave>): void {
   // The game saves itself as the page unloads: make sure it saves this one.
   g.save = save;
   writeSave(save);
+  // An escape in progress belonged to the save being replaced.
+  g.dropSavedRun();
   g.ui.toast('Save loaded. Restarting…');
   setTimeout(() => location.reload(), 600);
 }

@@ -44,7 +44,7 @@ import { applyFeatures, applyForge, applyLevel, hasFeature, levelFromXp, tierFor
 import { REWARD_INFO, renderOpts, renderOverlay } from './render';
 import type { VoxelQuality, VoxelRenderer } from '../render3d/voxel';
 import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
-import { Run, type RoomPlan, type RunSnapshot, type Spoils } from './run';
+import { Run, type LeftBehind, type RoomPlan, type RunSnapshot, type Spoils } from './run';
 import type { PlayerStats } from './stats';
 import type { GodId, RewardSpec } from './types';
 import { createWeapon, WEAPON_INFO } from './weapons';
@@ -129,6 +129,8 @@ export class Game implements WorldHost {
   /** Developer options were used this session: achievements are off until restart. */
   cheated = false;
   private pendingDoors: RoomPlan[] = [];
+  /** Rewards taken in this chamber whose choice isn't finished yet (saved as still to take). */
+  private resolving: RewardSpec[] = [];
   private fade = 1;
   private fadeTarget = 0;
   private fadeCb: (() => void) | null = null;
@@ -868,7 +870,8 @@ export class Game implements WorldHost {
 
   /** Android back button. Returns false when the app should go to the background instead. */
   handleBack(): boolean {
-    if (this.mode === 'title') return false;
+    // On the title screen itself, Back leaves the app; from a menu opened there it closes the menu.
+    if (this.mode === 'title') return this.ui.depth > 1 && this.ui.back();
     if (this.ui.back()) return true;
     if ((this.mode === 'hub' || this.mode === 'run') && this.player.state !== 'dead') {
       screens.pause(this);
@@ -1022,6 +1025,7 @@ export class Game implements WorldHost {
     const w = new World(this, layout, biome, this.camera, this.particles, this.members.map((m) => m.player));
     this.world = w;
     this.pendingDoors = [];
+    this.resolving = [];
     // Higher Torment: more foes attack at once, and they aim better.
     w.tokenBonus = Math.floor(run.heat / 2);
     w.foeAimError = Math.max(0.35, 1 - run.heat * 0.1);
@@ -1043,7 +1047,7 @@ export class Game implements WorldHost {
         w.addEnemy(boss);
         w.startEncounter([], sc.hp, sc.dmg);
         w.showBanner(boss.name.toUpperCase(), boss.title);
-        audio.play('roar');
+        if (!restore) audio.play('roar');
         break;
       }
       case 'shop':
@@ -1069,25 +1073,46 @@ export class Game implements WorldHost {
         break;
     }
     if (restore) {
-      // The chamber was already won: no foes, the same doors, and what was used stays used.
+      // The chamber was already won: no foes, what was used stays used, what
+      // was left lying there is put back, and the same doors open.
       for (const e of w.enemies) e.dead = true;
       w.enemies = [];
+      w.boss = null;
       w.encounter = null;
       w.cleared = true;
       w.clearCount = Math.max(1, w.clearCount);
       run.rng.state = restore.rng;
-      this.pendingDoors = restore.doors!.map((d) => ({ kind: d.kind, reward: d.reward ? { ...d.reward } : null }));
-      w.openDoors(this.pendingDoors.map((d) => d.reward));
       for (const it of w.interactables) if (restore.usedHere?.includes(it.id)) it.used = true;
-      w.showBanner('Escape resumed', 'This chamber is won: choose a door.');
+      const left = restore.left;
+      const cx = w.room.w / 2;
+      const cy = w.room.h / 2;
+      left?.rewards.forEach((r, i) => w.spawnReward({ ...r }, cx + (i - (left.rewards.length - 1) / 2) * 120, cy));
+      if (left?.gold) w.dropGold(cx, cy + 80, left.gold);
+      if (left?.souls) w.dropSouls(cx, cy + 80, left.souls);
+      if (left?.ash) this.dropAsh(w, cx + 90, cy + 40, left.ash);
+      for (const l of left?.loot ?? []) w.dropLoot(cx, cy + 80, l);
+      for (const pk of w.pickups) if (pk.kind !== 'reward') pk.magnet = true;
+      this.pendingDoors = (restore.doors ?? []).map((d) => ({ kind: d.kind, reward: d.reward ? { ...d.reward } : null }));
+      if (this.pendingDoors.length) w.openDoors(this.pendingDoors.map((d) => d.reward));
+      else if (!left?.rewards.length) this.openExitDoors(w);
+      w.showBanner('Escape resumed', left?.rewards.length ? 'This chamber is won: claim its reward.' : 'This chamber is won: choose a door.');
       this.saveClearedRoom();
     }
+  }
+
+  /** Set once another save replaces this one (it reloads): the escape here is no longer saved. */
+  private runSaveOff = false;
+
+  /** Drops the saved escape for good (another save is taking this one's place). */
+  dropSavedRun(): void {
+    writeRun(null);
+    this.runSaveOff = true;
   }
 
   /** Saves the escape at the start of the current chamber (solo play only). */
   private saveRun(extra: Partial<RunSnapshot> = {}): void {
     const run = this.run;
-    if (!run || this.net?.clientStep) return;
+    if (!run || this.net?.clientStep || this.runSaveOff) return;
     if (this.members.length !== 1) {
       writeRun(null);
       return;
@@ -1099,12 +1124,35 @@ export class Game implements WorldHost {
   /** Once a chamber is won and its doors are open, saves it as it stands so resuming keeps what you earned there. */
   saveClearedRoom(): void {
     const w = this.world;
-    if (this.mode !== 'run' || !w?.cleared || !this.pendingDoors.length || this.members.length !== 1) return;
+    const run = this.run;
+    if (this.mode !== 'run' || !run || !w?.cleared || w !== this.world || this.members.length !== 1) return;
+    // The last guardian's fall ends the escape: nothing to resume.
+    if (run.current.kind === 'boss' && run.isFinalBiome) return;
+    const left: LeftBehind = { rewards: this.resolving.map((r) => ({ ...r })), gold: 0, souls: 0, ash: 0, loot: [] };
+    for (const pk of w.pickups) {
+      if (pk.collected) continue;
+      if (pk.kind === 'reward' && pk.reward) left.rewards.push({ ...pk.reward });
+      else if (pk.kind === 'gold') left.gold += pk.value;
+      else if (pk.kind === 'soul') left.souls += pk.value;
+      else if (pk.kind === 'ash') left.ash += pk.value;
+      else if (pk.kind === 'loot' && pk.loot) left.loot.push(pk.loot);
+    }
     this.saveRun({
       cleared: true,
       doors: this.pendingDoors.map((d) => ({ kind: d.kind, reward: d.reward ? { ...d.reward } : null })),
       usedHere: w.interactables.filter((i) => i.used).map((i) => i.id),
+      left,
     });
+  }
+
+  /** A reward's choice is under way: until it's done, a save keeps it as still to take. */
+  private track(r: RewardSpec, after: () => void): () => void {
+    this.resolving.push(r);
+    return () => {
+      const i = this.resolving.indexOf(r);
+      if (i >= 0) this.resolving.splice(i, 1);
+      after();
+    };
   }
 
   private setupShop(w: World, count: number): void {
@@ -1141,9 +1189,12 @@ export class Game implements WorldHost {
 
   private openExitDoors(w: World): void {
     const run = this.run;
-    if (!run) return;
+    // A late answer from a chamber already left (or an escape already over) changes nothing.
+    if (!run || w !== this.world) return;
     if (run.current.kind === 'boss' && run.isFinalBiome) {
-      w.later(2.5, () => this.victory());
+      // The escape counts at once; the victory screen follows a moment later.
+      const summary = this.recordVictory();
+      if (summary) w.later(2.5, () => this.showVictory(summary));
       return;
     }
     this.pendingDoors = run.rollDoors();
@@ -1190,11 +1241,15 @@ export class Game implements WorldHost {
       const god = new Rng(run.seed + run.roomsCleared).pick(OLYMPIANS);
       w.spawnReward({ kind: 'boon', god }, w.room.w / 2, w.room.h / 2);
       this.dropAsh(w, w.room.w / 2 + 90, w.room.h / 2 + 40, Math.round((25 + run.biomeIndex * 15) * run.ashMult()));
+      // Saved as won right away: resuming never replays the fight (or its drops).
+      this.saveClearedRoom();
       return;
     }
     const reward = run.current.reward;
-    if (reward) w.spawnReward(reward, cx, cy);
-    else this.openExitDoors(w);
+    if (reward) {
+      w.spawnReward(reward, cx, cy);
+      this.saveClearedRoom();
+    } else this.openExitDoors(w);
   }
 
   private dropAsh(w: World, x: number, y: number, amount: number): void {
@@ -1207,12 +1262,12 @@ export class Game implements WorldHost {
   onRewardPicked(w: World, reward: RewardSpec): void {
     // A bonus (from a chest) is for whoever picked it up; a chamber's reward is for everyone.
     if (reward.bonus) {
-      this.resolveReward(reward, () => this.saveClearedRoom());
+      this.resolveReward(reward, this.track(reward, () => this.saveClearedRoom()));
       return;
     }
     this.forEachMember(
       (done) => this.resolveReward(reward, done),
-      () => this.openExitDoors(w),
+      this.track(reward, () => this.openExitDoors(w)),
     );
   }
 
@@ -1282,6 +1337,8 @@ export class Game implements WorldHost {
       w.later(1, () => this.transition(() => this.enterHub()));
       return;
     }
+    // The escape is already won: its victory screen is on the way.
+    if (run.won) return;
     this.mode = 'over';
     this.save.stats.deaths++;
     this.persist();
@@ -1301,10 +1358,14 @@ export class Game implements WorldHost {
     w.later(1.8, () => screens.death(this, summary));
   }
 
-  private victory(): void {
+  /**
+   * The final guardian fell: the escape counts straight away (so quitting
+   * during the moment before the victory screen loses nothing).
+   */
+  private recordVictory(): RunSummary | null {
     const run = this.run;
-    if (!run) return;
-    this.mode = 'over';
+    if (!run || run.won) return null;
+    run.won = true;
     writeRun(null);
     const bonus = Math.round(60 * run.ashMult());
     this.addAsh(bonus);
@@ -1319,7 +1380,7 @@ export class Game implements WorldHost {
     this.save.maxHeat = Math.max(this.save.maxHeat, run.heat + 1);
     if (!this.save.stats.bestTime || run.time < this.save.stats.bestTime) this.save.stats.bestTime = run.time;
     this.persist();
-    const summary: RunSummary = {
+    return {
       victory: true,
       rooms: run.roomsCleared,
       kills: run.kills,
@@ -1329,6 +1390,12 @@ export class Game implements WorldHost {
       cause: '',
       spoils: run.spoils,
     };
+  }
+
+  private showVictory(summary: RunSummary): void {
+    if (this.mode !== 'run') return;
+    this.mode = 'over';
+    this.ui.closeAll();
     this.net?.over?.(true, summary);
     screens.victory(this, summary);
   }
@@ -1517,7 +1584,7 @@ export class Game implements WorldHost {
       this.saveClearedRoom();
       return;
     }
-    this.resolveReward(spec, () => this.saveClearedRoom());
+    this.resolveReward(spec, this.track(spec, () => this.saveClearedRoom()));
   }
 
   // ---------------------------------------------------------------- rewards
@@ -1808,6 +1875,7 @@ export class Game implements WorldHost {
     if (!this.save.weapons.includes(def.weapon)) this.save.weapons.push(def.weapon);
     this.persist();
     this.setHero(this.me, id);
+    this.refreshHubPrompts();
   }
 
   /** Swaps a member's hero class on the spot (their weapon comes with it). */
@@ -1852,6 +1920,23 @@ export class Game implements WorldHost {
   resumeRun(): boolean {
     const snap = loadRun();
     if (!snap) return false;
+    try {
+      this.restoreRun(snap);
+      return true;
+    } catch (err) {
+      // A save that can't be rebuilt is dropped, rather than leaving a blank screen.
+      console.error(err);
+      writeRun(null);
+      this.run = null;
+      this.enterHub(true);
+      this.mode = 'title';
+      this.ui.closeAll();
+      screens.title(this);
+      return false;
+    }
+  }
+
+  private restoreRun(snap: RunSnapshot): void {
     this.ui.closeAll();
     const run = Run.restore(this.save, snap);
     this.run = run;
@@ -1874,7 +1959,6 @@ export class Game implements WorldHost {
     this.player.dashCharges = this.stats.dashCharges;
     this.mode = 'run';
     this.goToRoom(snap.current, snap);
-    return true;
   }
 
   /** Leaves to the title screen; an escape in progress stays saved at its last chamber. */

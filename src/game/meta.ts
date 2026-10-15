@@ -5,7 +5,7 @@ import { HERO_MAX_LEVEL, heroXpForLevel } from './herotree';
 import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
 import { partsFromHistory } from './smith';
-import type { WeaponId } from './types';
+import type { RoomKind, WeaponId } from './types';
 
 export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'nunchaku', 'scythe', 'blunderbuss', 'katana'];
 
@@ -367,12 +367,15 @@ export function writeRun(snap: RunSnapshot | null): void {
 }
 
 /** The saved escape, if there is a valid one. */
+const ROOM_KINDS: RoomKind[] = ['combat', 'boss', 'shop', 'fountain', 'antechamber'];
+
 export function loadRun(): RunSnapshot | null {
   try {
     const raw = localStorage.getItem(runKey());
     if (!raw) return null;
     const snap = JSON.parse(raw) as RunSnapshot;
-    if (snap?.v !== 1 || !snap.current || !Array.isArray(snap.boons) || !isWeaponId(snap.weapon)) return null;
+    if (snap?.v !== 1 || !ROOM_KINDS.includes(snap.current?.kind) || !Array.isArray(snap.boons) || !isWeaponId(snap.weapon)) return null;
+    if (![snap.seed, snap.rng, snap.depth, snap.roomsCleared, snap.biomeIndex].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
     return snap;
   } catch {
     return null;

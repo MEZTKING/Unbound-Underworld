@@ -66,6 +66,8 @@ interface Screen {
   /** Grid columns for left/right vs up/down navigation. */
   cols: number;
   closesOnPause: boolean;
+  /** Runs when the menu above this one closes (to redraw what it changed). */
+  onReturn: (() => void) | null;
 }
 
 /**
@@ -90,12 +92,17 @@ export class UI {
     return this.stack.length > 0;
   }
 
+  /** How many menus are open (stacked). */
+  get depth(): number {
+    return this.stack.length;
+  }
+
   private get top(): Screen | null {
     return this.stack[this.stack.length - 1] ?? null;
   }
 
   /** Pushes a screen. `build` fills the panel and returns focusable items. */
-  push(className: string, html: string, opts: { onBack?: (() => void) | null; cols?: number; closesOnPause?: boolean; focus?: number } = {}): HTMLElement {
+  push(className: string, html: string, opts: { onBack?: (() => void) | null; onReturn?: (() => void) | null; cols?: number; closesOnPause?: boolean; focus?: number } = {}): HTMLElement {
     const el = document.createElement('div');
     el.className = `screen ${className}`;
     el.innerHTML = html;
@@ -108,6 +115,7 @@ export class UI {
       onBack: opts.onBack ?? null,
       cols: opts.cols ?? 1,
       closesOnPause: opts.closesOnPause ?? false,
+      onReturn: opts.onReturn ?? null,
     };
     this.stack.push(screen);
     this.root.classList.add('active');
@@ -134,7 +142,9 @@ export class UI {
     const top = this.top;
     if (top) {
       top.el.classList.remove('hidden');
-      this.refreshItems(top.index);
+      const at = top.index;
+      top.onReturn?.();
+      this.refreshItems(at);
     } else this.root.classList.remove('active');
     // Swallow the key press that closed the menu so the game doesn't react to it.
     this.input.endStep();

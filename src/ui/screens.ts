@@ -116,7 +116,7 @@ function savedRunLabel(g: Game): string | null {
   const biome = BIOMES[snap.biomeIndex]?.name ?? 'the Underworld';
   const k = snap.current.kind;
   const where = k === 'boss' ? 'Guardian' : k === 'antechamber' ? 'Antechamber' : k === 'shop' ? 'Wares' : k === 'fountain' ? 'Fountain' : `Chamber ${snap.cleared ? snap.depth : snap.depth + 1}`;
-  return `${biome} · ${where}${snap.cleared ? ' · won' : ''}`;
+  return `${biome} · ${where}${snap.cleared && (k === 'combat' || k === 'boss') ? ' · won' : ''}`;
 }
 
 /**
@@ -197,7 +197,7 @@ export function title(g: Game): void {
     if (a === 'resume') {
       if (!g.resumeRun()) {
         audio.play('deny');
-        g.ui.toast('That saved escape could not be loaded.');
+        g.ui.toast('That saved escape could not be resumed. Your progress outside it is safe.', 4000);
       }
     } else if (a === 'play') {
       g.ui.pop();
@@ -572,6 +572,9 @@ export function pause(g: Game): void {
   const guest = g.net?.role === 'client';
   // A guest's escape belongs to the host: no saving, quitting or abandoning it here.
   const run = guest ? null : g.run;
+  // A party escape isn't saved: leaving it ends it, so that asks first.
+  const party = !!run && g.members.length > 1;
+  const confirm = party ? ' data-confirm' : '';
   const build = buildList(g);
   const el = g.ui.push(
     'pause',
@@ -589,10 +592,10 @@ export function pause(g: Game): void {
           <button class="btn" data-nav data-a="settings">Settings</button>
           ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
           ${g.net ? `<button class="btn" data-nav data-a="leave">${guest ? 'Leave the game' : 'Stop hosting'}</button>` : ''}
-          ${run ? '<button class="btn" data-nav data-a="title">Save &amp; Quit to Title</button>' : '<button class="btn" data-nav data-a="title">Title Screen</button>'}
-          ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit">${run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
+          <button class="btn" data-nav data-a="title"${confirm}>${party ? 'Quit to Title (ends escape)' : run ? 'Save &amp; Quit to Title' : 'Title Screen'}</button>
+          ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit"${confirm}>${party ? 'Exit Game (ends escape)' : run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
-          ${run ? `<p class="small save-note">${g.members.length > 1 ? 'Party escapes aren\'t saved: quitting ends this one.' : 'Your escape is saved when you enter a chamber, and again once its doors open (with what you earned there).'}</p>` : ''}
+          ${run ? `<p class="small save-note">${party ? 'Party escapes aren\'t saved: quitting ends this one.' : 'Your escape is saved when you enter a chamber, and again once you win it (with what you earned there).'}</p>` : ''}
         </div>
         <div class="build organised compact">${build}</div>
       </div>
@@ -601,6 +604,11 @@ export function pause(g: Game): void {
   );
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
+    if (b.dataset.confirm !== undefined && !b.dataset.armed) {
+      b.dataset.armed = '1';
+      b.textContent = 'Confirm: end this escape';
+      return;
+    }
     if (a === 'resume') g.ui.pop();
     else if (a === 'help') help(g);
     else if (a === 'codex') codex(g);
@@ -624,7 +632,7 @@ export function pause(g: Game): void {
       void leaveOnline(g).finally(() => exitGame());
     } else if (a === 'abandon') {
       if (b.dataset.armed) {
-        g.save.stats.deaths++;
+        if (!g.run?.won) g.save.stats.deaths++;
         g.persist();
         g.abandonRun();
       } else {
@@ -808,7 +816,8 @@ export function heroes(g: Game): void {
     `<div class="panel wide"><h2 class="title" style="color:#ff8a6e">Hall of Heroes</h2>
       <div data-list>${render()}</div>
       <div class="row-btns"><button class="btn primary" data-nav data-a="switch">Switch hero</button><button class="btn" data-nav data-a="look">Customise appearance</button><button class="btn" data-nav data-a="back">Back</button></div></div>`,
-    { onBack: () => g.ui.pop() },
+    // Back from the gear, skill tree or hero picker: show what changed there.
+    { onBack: () => g.ui.pop(), onReturn: () => refresh() },
   );
   const refresh = () => {
     el.querySelector('[data-list]')!.innerHTML = render();

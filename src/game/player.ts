@@ -178,12 +178,23 @@ export class Player extends Actor {
     return this.wrath >= WRATH_MAX;
   }
 
+  /** Max Health lost to a build change: getting it back (a gear swap) doesn't heal. */
+  private maxLost = 0;
+
   /** Re-syncs derived values after the build changes. */
   applyStats(s: PlayerStats, fullHeal = false): void {
     const oldMax = this.maxHp;
     this.maxHp = s.maxHp;
-    if (fullHeal) this.hp = this.maxHp;
-    else if (this.maxHp > oldMax) this.hp += this.maxHp - oldMax;
+    if (fullHeal) {
+      this.hp = this.maxHp;
+      this.maxLost = 0;
+    } else if (this.maxHp > oldMax) {
+      // New max Health comes with as much Health, unless it's only coming back.
+      const gain = this.maxHp - oldMax;
+      const back = Math.min(gain, this.maxLost);
+      this.maxLost -= back;
+      this.hp += gain - back;
+    } else if (this.maxHp < oldMax) this.maxLost += oldMax - this.maxHp;
     this.hp = Math.min(this.hp, this.maxHp);
     this.dashCharges = Math.min(this.dashCharges, s.dashCharges);
     this.castAmmo = Math.min(this.castAmmo, s.castAmmo);
