@@ -2,6 +2,7 @@ import { Rng } from '../engine/math';
 import { ARTIFACTS } from './artifacts';
 import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
 import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
+import type { CharacterId } from './characters';
 import type { GearRarity, MaterialId } from './gear';
 import { altarDefiance, altarFavor, applyAltar, rankOf } from './altar';
 import { heatScale, type SaveData } from './meta';
@@ -16,7 +17,10 @@ export interface RoomPlan {
   reward: RewardSpec | null;
 }
 
-/** A saved escape: the run as it stood when its current chamber began. */
+/**
+ * A saved escape: the run as it stood when its current chamber began, or
+ * (`cleared`) once that chamber was won and its doors opened.
+ */
 export interface RunSnapshot {
   v: 1;
   seed: number;
@@ -43,6 +47,16 @@ export interface RunSnapshot {
   souls: number;
   /** Loot gathered so far (added in v0.7). */
   spoils?: Spoils;
+  /** The hero played (v0.9.1; older saves use the save's hero). */
+  character?: CharacterId;
+  /** Saved after the chamber was won: it resumes with its doors open (v0.9.1). */
+  cleared?: boolean;
+  /** The random state the chamber was built from, to rebuild the same room. */
+  roomRng?: number;
+  /** The doors that were open. */
+  doors?: RoomPlan[];
+  /** Chests, wares and fountains already used in the chamber. */
+  usedHere?: string[];
 }
 
 /** What an escape has gathered, for the Spoils list at its end. */
@@ -101,6 +115,8 @@ export class Run {
   /** Your level, which gates enchantments, artifacts and anvils behind doors. */
   level = 99;
   current: RoomPlan = { kind: 'combat', reward: { kind: 'boon' } };
+  /** The random state the current chamber was built from (saved, to rebuild it on resume). */
+  roomRng = 0;
   /** Per-biome once-only rooms and rewards. */
   used = new Set<string>();
   spoils: Spoils = { materials: {}, gear: [] };
@@ -173,8 +189,9 @@ export class Run {
   }
 
   /** Captures the run (plus the player's health and souls) for saving. */
-  snapshot(hp: number, souls: number): RunSnapshot {
+  snapshot(hp: number, souls: number, extra: Partial<RunSnapshot> = {}): RunSnapshot {
     return {
+      ...extra,
       v: 1,
       seed: this.seed,
       rng: this.rng.state,
@@ -198,6 +215,7 @@ export class Run {
       hp,
       souls,
       spoils: { materials: { ...this.spoils.materials }, gear: this.spoils.gear.map((g) => ({ ...g })) },
+      roomRng: this.roomRng,
     };
   }
 
@@ -221,6 +239,7 @@ export class Run {
     run.heat = snap.heat;
     run.time = snap.time;
     run.current = snap.current;
+    run.roomRng = typeof snap.roomRng === 'number' ? snap.roomRng : snap.rng;
     run.used = new Set(snap.used);
     if (snap.spoils) run.spoils = { materials: { ...snap.spoils.materials }, gear: [...(snap.spoils.gear ?? [])] };
     return run;

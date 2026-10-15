@@ -32,7 +32,7 @@ The builds are **not code-signed** by a store, so your system will warn you the 
 
 In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
 
-**Saving and quitting.** An escape in progress is saved automatically at the start of every chamber. In the pause menu, *Save & Quit to Title* (or *Save & Exit Game* in the desktop and Android apps) lets you stop at any time. *Resume Escape* on the title screen picks up at the start of that chamber, even if the app was closed.
+**Saving and quitting.** An escape in progress is saved automatically when you enter a chamber, and again once you've won it and its doors open (with the boon, gold or other reward you took there). In the pause menu, *Save & Quit to Title* (or *Save & Exit Game* in the desktop and Android apps) lets you stop at any time. *Resume Escape* on the title screen picks up where that save left you: at the start of the chamber, or in the won chamber with the same doors to choose from, even if the app was closed. Party escapes aren't saved.
 
 ### Updates
 

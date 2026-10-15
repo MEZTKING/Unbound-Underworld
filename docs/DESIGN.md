@@ -51,7 +51,8 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
 - **Once per region:** a shop, a fountain, an anvil and Hermes.
 - **Before each guardian** there is an *antechamber* with a shop and a fountain.
 - **Treasure chests** sometimes appear in combat rooms. 3% of them are Mimics; a slain Mimic always drops a Unique piece of gear (`rollStarred`).
-- **Saving:** the escape autosaves at the start of every chamber (`run.ts → snapshot/restore`, stored apart from the main save). *Save & Quit* and closing the app both resume from that chamber. Death, escape or abandoning clears it.
+- **Saving:** the escape autosaves at the start of every chamber (`run.ts → snapshot/restore`, stored apart from the main save), and again once the chamber is won and its doors are rolled (`cleared`, `doors`, `usedHere` and the chamber's starting `roomRng`, so the same chamber is rebuilt with its fight skipped and the same doors open). *Save & Quit* and closing the app both resume from the latest of the two. Death, escape or abandoning clears it; party escapes are never saved.
+- **Never stuck:** a pending fade callback always runs once the screen is black, a door that can't start its transition re-opens, and an error inside a frame or a transition is reported in a toast instead of stopping the game loop.
 - **Dying** ends the run. *Death's Reprieve* (the last section of the Altar of Ashes) and *Undying* (the last section of the Deep Altar) let you cheat death once per rank; they're the dearest upgrades in the game. In a party, a fallen hero is downed instead until everyone is.
 
 ## 3. Long-term progression

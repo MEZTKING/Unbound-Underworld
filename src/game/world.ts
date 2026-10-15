@@ -641,7 +641,7 @@ export class World {
     this.unstickT = 1;
     for (const e of this.enemies) {
       if (e.dead || e.spawning || e.isBoss || e.isDummy || e.speed <= 0) continue;
-      const off = e.x < 8 || e.y < 8 || e.x > this.room.w - 8 || e.y > this.room.h - 8 || (!e.flying && this.grid.block[this.cellIndex(e.x, e.y)] !== 0);
+      const off = !Number.isFinite(e.x) || !Number.isFinite(e.y) || e.x < 8 || e.y < 8 || e.x > this.room.w - 8 || e.y > this.room.h - 8 || (!e.flying && this.grid.block[this.cellIndex(e.x, e.y)] !== 0);
       const moved = Math.hypot(e.x - e.lastPos.x, e.y - e.lastPos.y);
       e.lastPos = { x: e.x, y: e.y };
       const reachable = this.players.some((p) => Math.hypot(e.x - p.x, e.y - p.y) < 520 && this.lineOfSight(e.x, e.y, p.x, p.y, e.r));

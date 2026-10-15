@@ -115,8 +115,8 @@ function savedRunLabel(g: Game): string | null {
   if (!snap) return null;
   const biome = BIOMES[snap.biomeIndex]?.name ?? 'the Underworld';
   const k = snap.current.kind;
-  const where = k === 'boss' ? 'Guardian' : k === 'antechamber' ? 'Antechamber' : k === 'shop' ? 'Wares' : k === 'fountain' ? 'Fountain' : `Chamber ${snap.depth + 1}`;
-  return `${biome} · ${where}`;
+  const where = k === 'boss' ? 'Guardian' : k === 'antechamber' ? 'Antechamber' : k === 'shop' ? 'Wares' : k === 'fountain' ? 'Fountain' : `Chamber ${snap.cleared ? snap.depth : snap.depth + 1}`;
+  return `${biome} · ${where}${snap.cleared ? ' · won' : ''}`;
 }
 
 /**
@@ -592,7 +592,7 @@ export function pause(g: Game): void {
           ${run ? '<button class="btn" data-nav data-a="title">Save &amp; Quit to Title</button>' : '<button class="btn" data-nav data-a="title">Title Screen</button>'}
           ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit">${run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
-          ${run ? '<p class="small save-note">Your escape is saved at the start of each chamber. You\'ll resume from this chamber.</p>' : ''}
+          ${run ? `<p class="small save-note">${g.members.length > 1 ? 'Party escapes aren\'t saved: quitting ends this one.' : 'Your escape is saved when you enter a chamber, and again once its doors open (with what you earned there).'}</p>` : ''}
         </div>
         <div class="build organised compact">${build}</div>
       </div>
@@ -617,8 +617,10 @@ export function pause(g: Game): void {
       void leaveOnline(g);
       g.quitToTitle();
     } else if (a === 'exit') {
-      // Ash, experience and the escape (at its last chamber) are already saved.
+      // Ash, experience and the escape (at its last chamber) are already saved;
+      // a won chamber is saved as it stands.
       g.persist();
+      g.saveClearedRoom();
       void leaveOnline(g).finally(() => exitGame());
     } else if (a === 'abandon') {
       if (b.dataset.armed) {
@@ -1089,17 +1091,24 @@ export function pact(g: Game): void {
 
 /** Asks which equipped artifact to swap out for a new one. */
 export function replaceArtifact(g: Game, id: string, after: () => void): void {
-  const run = g.run!;
+  const run = g.run;
   const def = ARTIFACT_BY_ID[id];
+  // Only the slots you have unlocked (and that hold an artifact) can be swapped.
+  const slots = run ? run.artifacts.map((a, i) => ({ a, i })).filter((x) => x.i < g.stats.artifactSlots && x.a && ARTIFACT_BY_ID[x.a]) : [];
+  if (!run || !def || !slots.length) {
+    after();
+    return;
+  }
   g.ui.choice({
     title: 'Artifacts full',
     subtitle: `Replace which artifact with ${def.name}?`,
     color: def.color,
-    cards: run.artifacts.map((a, i) => {
+    cards: slots.map(({ a, i }) => {
       const d = ARTIFACT_BY_ID[a!];
       return { title: `Slot ${i + 1}: ${d.name}`, color: d.color, desc: d.desc, icon: d.glyph };
     }),
-    onPick: (i) => {
+    onPick: (k) => {
+      const i = slots[k].i;
       run.artifacts[i] = id;
       g.player.artifactCd[i] = 0;
       after();
