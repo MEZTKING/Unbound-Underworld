@@ -112,6 +112,8 @@ export class Player extends Actor {
   wrath = 0;
   /** Who drives this hero; null = this device's own controls (the world's input). */
   control: Control | null = null;
+  /** A player online brings their own customised look (otherwise this save's). */
+  look: HeroLook | null = null;
   /** Party play: the player's name (shown over their hero) and colour. */
   tag = '';
   tagColor = '#ffd890';
@@ -153,7 +155,7 @@ export class Player extends Actor {
 
   /** The hero's colours and headwear, with the player's customisation applied. */
   get palette(): Palette {
-    const look = heroLooks[this.hero.id];
+    const look = this.look ?? heroLooks[this.hero.id];
     return look ? { ...this.hero.palette, ...look } : this.hero.palette;
   }
 

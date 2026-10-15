@@ -3,6 +3,7 @@
   "appName": "Unbound Underworld",
   "webDir": "dist",
   "android": {
-    "backgroundColor": "#07050a"
+    "backgroundColor": "#07050a",
+    "allowMixedContent": true
   }
 }

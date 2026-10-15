@@ -424,6 +424,54 @@ p.small,
   position: relative;
 }
 
+/* Local co-op and online: one row per player. */
+.party-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--w);
+  background: rgba(8, 4, 12, 0.55);
+  border-radius: 4px;
+}
+.party-row .btn {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.party-name {
+  flex: 1;
+  color: var(--w);
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  text-align: left;
+}
+.party-name .small {
+  color: #c8b8c0;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-weight: 400;
+}
+
+/* Party play: whose pick this is, in their party colour. */
+.choice-who {
+  display: inline-block;
+  margin: 0 auto 6px;
+  padding: 3px 14px;
+  border: 1px solid var(--w);
+  border-radius: 999px;
+  color: var(--w);
+  background: rgba(8, 4, 12, 0.7);
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--w) 35%, transparent);
+}
+
 .btn.corner {
   position: absolute;
   top: 12px;
@@ -2236,4 +2284,108 @@ h3.section small {
 }
 .hero-kit span {
   font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- multiplayer */
+
+.mp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+  text-align: left;
+}
+.mp-grid section {
+  background: rgba(8, 4, 12, 0.5);
+  border: 1px solid rgba(255, 216, 144, 0.18);
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.mp-grid h3 {
+  margin: 0 0 6px;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #ffd890;
+}
+.mp-grid code {
+  font-size: 12px;
+  color: #ffd890;
+  word-break: break-all;
+}
+.field {
+  display: block;
+  margin: 6px 0;
+  font-size: 13px;
+  color: #c8b8c0;
+}
+.field input,
+.mp-grid textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 3px;
+  padding: 7px 9px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 216, 144, 0.35);
+  border-radius: 4px;
+  color: #f0e6d8;
+  font: 15px 'EB Garamond', Georgia, serif;
+  resize: vertical;
+}
+.field input:focus,
+.mp-grid textarea:focus {
+  outline: none;
+  border-color: #7fe8ff;
+  box-shadow: 0 0 8px rgba(127, 232, 255, 0.35);
+}
+.row-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.row-btns .btn,
+.mp-grid section > .btn {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  margin: 4px 0;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+.mp-grid section > .btn.found {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.btn.found small {
+  display: block;
+  font-size: 11px;
+  color: #c8b8c0;
+}
+.net-status {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(127, 232, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(10, 30, 40, 0.45);
+  text-align: left;
+}
+.net-status > b {
+  display: block;
+  margin-bottom: 4px;
+  color: #7fe8ff;
+}
+.net-status > .btn {
+  width: auto;
+  min-width: 0;
+  margin: 6px 0 0;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.net-busy {
+  color: #7fe8ff;
+  font-style: italic;
 }

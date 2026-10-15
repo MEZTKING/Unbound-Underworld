@@ -42,6 +42,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "server/relay-core.cjs",
+      "server/lan.cjs",
       "package.json",
       "!node_modules/@capacitor{,/**/*}"
     ],

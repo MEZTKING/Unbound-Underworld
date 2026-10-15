@@ -221,6 +221,12 @@ export class Input implements Control {
 
   constructor(private target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
+      // Typing in a text box (a name, an address) isn't playing.
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !['range', 'checkbox', 'button'].includes((el as HTMLInputElement).type)))) {
+        if (e.code === 'Escape') el.blur();
+        return;
+      }
       if (this.captureKey && !e.repeat) {
         e.preventDefault();
         const fn = this.captureKey;
@@ -406,6 +412,7 @@ export class Input implements Control {
       if (this.claimed.has(p.index)) {
         // Player 2's pad still drives menus.
         for (const a of fresh) if (a.startsWith('menu') || a === 'confirm' || a === 'back' || a === 'pause') this.onAction?.(a);
+        if (fresh.includes('pause')) this.pressedSet.add('pause');
         continue;
       }
       for (const a of held) now.add(a);

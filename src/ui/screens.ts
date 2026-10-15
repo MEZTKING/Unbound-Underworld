@@ -17,6 +17,7 @@ import { devMenu } from './dev';
 import { gearScreen } from './gear';
 import { GEAR_RARITY, MATERIAL_IDS, MATERIALS } from '../game/gear';
 import { mapScreen } from './map';
+import { leaveOnline, multiplayer } from './multiplayer';
 import { esc, type Card } from './overlay';
 
 export type CardData = Card;
@@ -175,6 +176,7 @@ export function title(g: Game): void {
       <div class="menu">
         ${saved ? `<button class="btn primary resume" data-nav data-a="resume">Resume Escape<small>${esc(saved)}</small></button>` : ''}
         <button class="btn${saved ? '' : ' primary'}" data-nav data-a="play">${saved ? 'Hall of Shades' : g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
+        <button class="btn" data-nav data-a="multi">Multiplayer</button>
         <button class="btn" data-nav data-a="slots">Save Slot ${currentSlot()}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
         <button class="btn" data-nav data-a="settings">Settings</button>
@@ -204,6 +206,7 @@ export function title(g: Game): void {
       }
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
+    else if (a === 'multi') multiplayer(g);
     else if (a === 'slots') saveSlots(g);
     else if (a === 'quit') exitGame();
     else settings(g);
@@ -563,7 +566,9 @@ export function buildView(g: Game, back = 'Back to the choice'): void {
 }
 
 export function pause(g: Game): void {
-  const run = g.run;
+  const guest = g.net?.role === 'client';
+  // A guest's escape belongs to the host: no saving, quitting or abandoning it here.
+  const run = guest ? null : g.run;
   const build = buildList(g);
   const el = g.ui.push(
     'pause',
@@ -573,12 +578,14 @@ export function pause(g: Game): void {
         <div class="menu">
           <button class="btn primary" data-nav data-a="resume">Resume</button>
           <button class="btn" data-nav data-a="help">Controls</button>
-          ${run ? '<button class="btn" data-nav data-a="build">Your Build</button>' : ''}
+          ${g.run ? '<button class="btn" data-nav data-a="build">Your Build</button>' : ''}
           <button class="btn" data-nav data-a="map">Map</button>
+          <button class="btn" data-nav data-a="party">Multiplayer</button>
           ${g.has('gear') ? '<button class="btn" data-nav data-a="gear">Gear &amp; Inventory</button>' : ''}
           <button class="btn" data-nav data-a="codex">Bestiary &amp; Achievements</button>
           <button class="btn" data-nav data-a="settings">Settings</button>
           ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
+          ${g.net ? `<button class="btn" data-nav data-a="leave">${guest ? 'Leave the game' : 'Stop hosting'}</button>` : ''}
           ${run ? '<button class="btn" data-nav data-a="title">Save &amp; Quit to Title</button>' : '<button class="btn" data-nav data-a="title">Title Screen</button>'}
           ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit">${run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
@@ -596,14 +603,20 @@ export function pause(g: Game): void {
     else if (a === 'codex') codex(g);
     else if (a === 'gear') gearScreen(g);
     else if (a === 'map') mapScreen(g);
+    else if (a === 'party') multiplayer(g);
     else if (a === 'build') buildView(g, 'Back');
     else if (a === 'dev') devMenu(g);
     else if (a === 'settings') settings(g);
-    else if (a === 'title') g.quitToTitle();
-    else if (a === 'exit') {
+    else if (a === 'leave') {
+      g.ui.closeAll();
+      void leaveOnline(g);
+    } else if (a === 'title') {
+      void leaveOnline(g);
+      g.quitToTitle();
+    } else if (a === 'exit') {
       // Ash, experience and the escape (at its last chamber) are already saved.
       g.persist();
-      exitGame();
+      void leaveOnline(g).finally(() => exitGame());
     } else if (a === 'abandon') {
       if (b.dataset.armed) {
         g.save.stats.deaths++;
@@ -634,6 +647,19 @@ function spoilsHtml(sp: RunSummary['spoils']): string {
   return `<h3 class="section">Spoils</h3><div class="mats">${mats.join('')}</div>${gear.length ? `<div class="spoils-gear">${gear.join('')}</div><p class="small">Equip new gear at the Armory or from the pause menu.</p>` : ''}`;
 }
 
+/** The end-of-escape button: online guests wait for the host to take everyone back. */
+function hubButton(g: Game): string {
+  return g.net?.role === 'client'
+    ? '<p class="small">The host takes everyone back to the Hall.</p><button class="btn primary" data-nav data-a="hub">Close</button>'
+    : '<button class="btn primary" data-nav data-a="hub">Return to the Hall</button>';
+}
+
+function backToHall(g: Game): void {
+  g.ui.pop();
+  if (g.net?.role === 'client') return;
+  g.transition(() => g.enterHub());
+}
+
 export function death(g: Game, s: RunSummary): void {
   const el = g.ui.push(
     'over',
@@ -648,13 +674,10 @@ export function death(g: Game, s: RunSummary): void {
         <div><span>Ash gathered</span><b>${s.ash} ◆</b></div>
       </div>
       ${spoilsHtml(s.spoils)}
-      <button class="btn primary" data-nav data-a="hub">Return to the Hall</button>
+      ${hubButton(g)}
     </div>`,
   );
-  bind(el, '[data-a]', () => {
-    g.ui.pop();
-    g.transition(() => g.enterHub());
-  });
+  bind(el, '[data-a]', () => backToHall(g));
 }
 
 export function victory(g: Game, s: RunSummary): void {
@@ -672,13 +695,10 @@ export function victory(g: Game, s: RunSummary): void {
       </div>
       ${spoilsHtml(s.spoils)}
       <p class="small">A new Torment level is unlocked at the Oath of Torment.</p>
-      <button class="btn primary" data-nav data-a="hub">Return to the Hall</button>
+      ${hubButton(g)}
     </div>`,
   );
-  bind(el, '[data-a]', () => {
-    g.ui.pop();
-    g.transition(() => g.enterHub());
-  });
+  bind(el, '[data-a]', () => backToHall(g));
 }
 
 // ---------------------------------------------------------------- hub stations

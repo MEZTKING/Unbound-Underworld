@@ -223,6 +223,109 @@ export function drawHUD(
   ctx.restore();
 }
 
+/** Set while a second player's panel takes the bottom-right corner. */
+let partnerShown = false;
+export function setPartnerShown(on: boolean): void {
+  partnerShown = on;
+}
+
+/**
+ * Local co-op: the second player's own panel, bottom-right in their party
+ * colour (health, wrath, cast shards, dash charges, potion and souls). Draw
+ * it while that hero is the world's active one.
+ */
+export function drawPartnerHUD(ctx: CanvasRenderingContext2D, w: World, run: Run | null, vw: number, vh: number, name: string, color: string): void {
+  const p = w.player;
+  const s = w.stats;
+  const pw = 270;
+  const ph = 92;
+  const x = vw - pw - 14;
+  const y = vh - ph - 10;
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  panel(ctx, x, y, pw, ph, 0.72);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.roundRect(x, y, pw, ph, 6);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  const hx = x + 12;
+  ctx.font = `700 13px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = color;
+  ctx.fillText(p.state === 'dead' ? `${name} — DOWN` : name, hx, y + 18);
+  const dd = run?.deathDefiance ?? 0;
+  ctx.fillStyle = '#ffcf5a';
+  ctx.textAlign = 'right';
+  if (dd) ctx.fillText('✚'.repeat(dd), x + pw - 12, y + 18);
+  ctx.textAlign = 'left';
+  const bw = pw - 24;
+  const by = y + 26;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(hx, by, bw, 14);
+  const hg = ctx.createLinearGradient(hx, 0, hx + bw, 0);
+  hg.addColorStop(0, '#9a1028');
+  hg.addColorStop(1, '#ff3a4a');
+  ctx.fillStyle = hg;
+  ctx.fillRect(hx, by, bw * clamp(p.hp / p.maxHp, 0, 1), 14);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(hx, by, bw, 14);
+  ctx.font = `700 11px ${FONT}`;
+  ctx.fillStyle = '#fff';
+  ctx.fillText(`${Math.ceil(p.hp)} / ${p.maxHp}`, hx + 5, by + 11);
+  if (s.canWrath) {
+    const k = Math.min(1, p.wrath / WRATH_MAX);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(hx, by + 17, bw, 4);
+    ctx.fillStyle = k >= 1 ? '#ffd04a' : '#c89a30';
+    ctx.fillRect(hx, by + 17, bw * k, 4);
+  }
+  // Shards, dash charges, potion and souls on one row.
+  const ry = by + 38;
+  ctx.font = `700 10px ${FONT}`;
+  ctx.fillStyle = '#c8b8c0';
+  let cx = hx;
+  if (s.canCast) {
+    for (let i = 0; i < s.castAmmo; i++) {
+      ctx.fillStyle = i < p.castAmmo ? (s.castPower ? GODS[s.castPower.god].color : '#ff3050') : 'rgba(255,255,255,0.15)';
+      ctx.beginPath();
+      ctx.moveTo(cx + 5, ry - 7);
+      ctx.lineTo(cx + 10, ry);
+      ctx.lineTo(cx + 5, ry + 7);
+      ctx.lineTo(cx, ry);
+      ctx.fill();
+      cx += 13;
+    }
+    cx += 8;
+  }
+  for (let i = 0; i < s.dashCharges; i++) {
+    ctx.fillStyle = i < p.dashCharges ? '#ffd890' : 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.arc(cx + 4, ry, 4, 0, TAU);
+    ctx.fill();
+    cx += 12;
+  }
+  cx += 8;
+  if (s.canPotion) {
+    ctx.fillStyle = p.potionCd > 0 ? '#3a5a3a' : '#5adf6a';
+    ctx.beginPath();
+    ctx.arc(cx + 7, ry, 7, 0, TAU);
+    ctx.fill();
+    cooldownPie(ctx, cx + 7, ry, 7, p.potionCd / s.potionCooldown);
+    cx += 22;
+  }
+  if (s.artifactSlots > 0) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    const sw = Math.max(30, x + pw - 12 - cx);
+    ctx.fillRect(cx, ry - 3, sw, 6);
+    ctx.fillStyle = '#7fe8ff';
+    ctx.fillRect(cx, ry - 3, sw * (p.souls / s.soulMax), 6);
+  }
+  ctx.restore();
+}
+
 /** Potion, soul gauge and artifact slots (desktop layout). */
 function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: number): void {
   const p = w.player;
@@ -562,7 +665,7 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
   }
 
   // ---------------------------------------------------------------- control hint
-  if (prefs.hints && !touch && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
+  if (prefs.hints && !touch && !partnerShown && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
     const s = w.stats;
     ctx.textAlign = 'right';
     ctx.font = `600 12px ${FONT}`;

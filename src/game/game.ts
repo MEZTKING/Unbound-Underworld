@@ -5,6 +5,7 @@ import { clamp, damp, fx, Rng } from '../engine/math';
 import { Particles } from '../engine/particles';
 import { UI, type ChoiceOpts } from '../ui/overlay';
 import * as screens from '../ui/screens';
+import { syncAfterEscape, syncAtStart } from '../ui/multiplayer';
 import { TouchControls } from '../ui/touch';
 import { ARTIFACT_BY_ID, ARTIFACTS } from './artifacts';
 import {
@@ -27,7 +28,8 @@ import { createBoss } from './enemies';
 import type { Enemy } from './enemies/enemy';
 import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
-import { drawHUD, drawHudTooltip, drawSaveIcon, useKeyLabels } from './hud';
+import type { NetSession } from '../net/session';
+import { drawHUD, drawHudTooltip, drawPartnerHUD, drawSaveIcon, setPartnerShown, useKeyLabels } from './hud';
 import { newAchievements } from './codex';
 import { applyGear, costText, equippedItems, gearDefiance, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollDrop, rollGhost, rollStarred, salvageValue, SLOT_NAME, type MaterialId } from './gear';
 import type { Loot } from './entities';
@@ -61,6 +63,8 @@ export interface Grant {
   kill?: string;
   boss?: boolean;
   escape?: boolean;
+  /** An escape began, or ended in death (their run and death counts). */
+  run?: 'start' | 'death';
 }
 
 export interface RunSummary {
@@ -108,6 +112,8 @@ export class Game implements WorldHost {
   run: Run | null = null;
   /** The heroes in this game: you, a second gamepad player, players online. */
   members: Member[] = [];
+  /** The online game this device is in, if any (see src/net). */
+  net: NetSession | null = null;
   /** The member the code running now acts for (see `withMember`). */
   private active!: Member;
   world: World | null = null;
@@ -213,6 +219,34 @@ export class Game implements WorldHost {
     p.control = m.kind === 'pad' && m.pad !== undefined ? new PadControl(this.input, m.pad) : m.kind === 'remote' ? (this.remoteControl?.(m) ?? null) : null;
     p.tag = this.members.length > 1 || m.kind !== 'local' ? m.name : '';
     p.tagColor = MEMBER_COLORS[m.id % MEMBER_COLORS.length];
+    // Players online bring their own customised look.
+    p.look = m.kind === 'remote' ? (m.profile.looks[m.character] ?? null) : null;
+  }
+
+  /** Online (joined): the party as the host has it, with this device's player first. */
+  setParty(members: Member[]): void {
+    this.members = members;
+    this.active = members[0];
+  }
+
+  /** Back to just this device's player (leaving an online game). */
+  soloParty(): void {
+    this.members = [this.makeMember(0, 'local', this.save, this.save.character, 'You')];
+    this.active = this.members[0];
+  }
+
+  /** A blank member for a player seen online (their hero is filled in by the host's updates). */
+  mirrorMember(id: number, kind: MemberKind, name: string, profile: SaveData): Member {
+    const m = this.makeMember(id, kind, profile, kind === 'local' ? profile.character : 'kael', name);
+    m.player.tag = name;
+    return m;
+  }
+
+  /** Fades in from black (a new room arriving online). */
+  fadeIn(): void {
+    this.fade = 1;
+    this.fadeTarget = 0;
+    this.fadeCb = null;
   }
 
   /** Online games plug in each remote player's controls (see the net session). */
@@ -330,6 +364,7 @@ export class Game implements WorldHost {
     this.enterHub(true);
     this.mode = 'title';
     screens.title(this);
+    syncAtStart(this);
     if (this.save.notice) {
       this.ui.toast(this.save.notice, 7000);
       this.save.notice = '';
@@ -381,6 +416,7 @@ export class Game implements WorldHost {
   persist(): void {
     this.checkAchievements();
     writeSave(this.save);
+    this.net?.profileChanged?.();
   }
 
   /** Awards any achievements just earned. God mode (or developer cheats) disables them. */
@@ -602,7 +638,9 @@ export class Game implements WorldHost {
     this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     this.input.pollGamepads();
-    if (!this.ui.open) {
+    // Online the room never pauses: a menu just stands your hero still.
+    this.input.blocked = !!this.net && this.ui.open;
+    if (!this.ui.open || this.net) {
       this.acc += dt;
       let steps = 0;
       while (this.acc >= STEP && steps < 5) {
@@ -638,7 +676,7 @@ export class Game implements WorldHost {
       this.persist();
       this.ui.toast(audio.muted ? 'Sound off (M)' : 'Sound on (M)');
     }
-    if (this.input.pressed('pause') && (this.mode === 'hub' || this.mode === 'run') && this.player.state !== 'dead') {
+    if (this.input.pressed('pause') && (this.mode === 'hub' || this.mode === 'run') && (this.player.state !== 'dead' || this.net)) {
       this.input.endStep();
       screens.pause(this);
       return;
@@ -652,13 +690,22 @@ export class Game implements WorldHost {
       w.update(dt);
       return;
     }
+    const net = this.net;
+    if (net?.clientStep) {
+      net.clientStep(dt);
+      this.updateMood(w);
+      this.input.endStep();
+      return;
+    }
     if (this.run && this.mode === 'run') this.run.time += dt;
+    net?.beginStep?.();
     w.update(dt);
+    net?.afterStep?.(dt);
     this.updateMood(w);
     this.input.endStep();
   }
 
-  private updateMood(w: World): void {
+  updateMood(w: World): void {
     let mood: Mood = 'explore';
     if (this.mode === 'hub') mood = 'hub';
     else if (w.boss && !w.boss.dead) mood = 'boss';
@@ -686,7 +733,12 @@ export class Game implements WorldHost {
       if (this.mode !== 'title') {
         const k = this.dpr * this.uiScale;
         ctx.setTransform(k, 0, 0, k, 0, 0);
-        drawHUD(ctx, w, this.run, this.save, this.camera.vw / this.uiScale, this.camera.vh / this.uiScale, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
+        const vw = this.camera.vw / this.uiScale;
+        const vh = this.camera.vh / this.uiScale;
+        const pads = this.members.filter((m) => m.kind === 'pad' && w.players.includes(m.player));
+        setPartnerShown(pads.length > 0);
+        drawHUD(ctx, w, this.run, this.save, vw, vh, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
+        pads.forEach((m, i) => this.withMember(m, () => drawPartnerHUD(ctx, w, this.run, vw, vh - i * 104, m.name, m.player.tagColor)));
         if (this.saveMark > 0) drawSaveIcon(ctx, this.camera.vw / this.uiScale, 1 - this.saveMark / SAVE_MARK, performance.now() / 1000);
         if (!this.touch.enabled && this.input.mouseInside && !this.ui.open) {
           drawHudTooltip(ctx, this.input.mouse.x / this.uiScale, this.input.mouse.y / this.uiScale, this.camera.vw / this.uiScale);
@@ -795,6 +847,8 @@ export class Game implements WorldHost {
   // ---------------------------------------------------------------- hub
 
   enterHub(silent = false): void {
+    // Back from an escape: keep-in-sync uploads the save (see Multiplayer → Sync saves).
+    if (this.run && !this.net?.clientStep) syncAfterEscape(this);
     this.mode = 'hub';
     this.run = null;
     this.particles.clear();
@@ -840,6 +894,7 @@ export class Game implements WorldHost {
     if (biomeParam > 0) this.run.biomeIndex = clamp(Math.floor(biomeParam), 0, BIOMES.length - 1);
     this.save.stats.runs++;
     this.persist();
+    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { run: 'start' });
     this.respawnMembers();
     const run = this.run;
     run.level = this.level;
@@ -1097,6 +1152,7 @@ export class Game implements WorldHost {
     this.mode = 'over';
     this.save.stats.deaths++;
     this.persist();
+    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { run: 'death' });
     writeRun(null);
     const summary: RunSummary = {
       victory: false,
@@ -1108,6 +1164,7 @@ export class Game implements WorldHost {
       cause: this.lastHit,
       spoils: run.spoils,
     };
+    this.net?.over?.(false, summary);
     w.later(1.8, () => screens.death(this, summary));
   }
 
@@ -1129,7 +1186,7 @@ export class Game implements WorldHost {
     this.save.maxHeat = Math.max(this.save.maxHeat, run.heat + 1);
     if (!this.save.stats.bestTime || run.time < this.save.stats.bestTime) this.save.stats.bestTime = run.time;
     this.persist();
-    screens.victory(this, {
+    const summary: RunSummary = {
       victory: true,
       rooms: run.roomsCleared,
       kills: run.kills,
@@ -1138,7 +1195,9 @@ export class Game implements WorldHost {
       biome: run.biome.name,
       cause: '',
       spoils: run.spoils,
-    });
+    };
+    this.net?.over?.(true, summary);
+    screens.victory(this, summary);
   }
 
   onEnemyKilled(w: World, e: Enemy): void {
@@ -1611,11 +1670,23 @@ export class Game implements WorldHost {
     this.save.weapon = def.weapon;
     if (!this.save.weapons.includes(def.weapon)) this.save.weapons.push(def.weapon);
     this.persist();
-    this.player.weapon = createWeapon(def.weapon);
-    this.player.hero = def;
-    this.player.wrath = 0;
-    this.recomputeStats(true);
-    this.world?.particles.ring(this.player.x, this.player.y, def.color, 90, 0.4, 6);
+    this.setHero(this.me, id);
+  }
+
+  /** Swaps a member's hero class on the spot (their weapon comes with it). */
+  setHero(m: Member, id: CharacterId): void {
+    const def = CHARACTER_BY_ID[id];
+    if (!def) return;
+    m.character = id;
+    this.withMember(m, () => {
+      const p = this.player;
+      p.weapon = createWeapon(def.weapon);
+      p.hero = def;
+      p.wrath = 0;
+      if (this.run) this.run.weapon = def.weapon;
+      this.recomputeStats(true);
+      this.world?.particles.ring(p.x, p.y, def.color, 90, 0.4, 6);
+    });
   }
 
   unspentTalents(): number {

@@ -269,6 +269,17 @@ export class World {
   }
 
   /** Heroes still standing. */
+  /** The heroes this screen follows: this device's own (never empty). */
+  get viewers(): Player[] {
+    const v = this.host.viewPlayers?.().filter((p) => this.players.includes(p));
+    return v?.length ? v : [this.players[0]];
+  }
+
+  /** Runs `fn` once as each hero in the party (drawing, mostly). */
+  eachHero(fn: (p: Player) => void, who: Player[] = this.players): void {
+    for (const p of who) this.as(p, () => fn(p));
+  }
+
   get living(): Player[] {
     return this.players.filter((p) => p.state !== 'dead');
   }
@@ -817,11 +828,14 @@ export class World {
       p.flash = 0.1;
     } else {
       p.onHurt(amount);
-      this.host.onPlayerHurt?.();
-      this.camera.shake(0.35);
       this.hitstop(0.06);
-      this.hurtFlash = 0.35;
-      audio.play('hurt');
+      // Screen shake, red flash and buzz are for the hero(es) on this screen.
+      if (this.viewers.includes(p)) {
+        this.host.onPlayerHurt?.();
+        this.camera.shake(0.35);
+        this.hurtFlash = 0.35;
+        audio.play('hurt');
+      } else audio.play('hurt', 0.4);
       if (src) {
         p.knock(p.x - src.x, p.y - src.y, 280);
       }
@@ -999,22 +1013,52 @@ export class World {
     this.allies = this.allies.filter((a) => !a.dead);
     if (this.boss?.dead && this.boss.deathT > 0.6) this.boss = null;
 
-    // Ambient embers
-    if (Math.random() < 0.3) {
-      this.particles.spawn({
-        kind: 'ember',
-        x: this.camera.x + fx.range(-700, 700),
-        y: this.camera.y + fx.range(-200, 500),
-        z: fx.range(0, 40),
-        vz: fx.range(20, 60),
-        vx: fx.range(-15, 15),
-        size: fx.range(1, 2.4),
-        color: this.biome.accent,
-        life: fx.range(1.5, 3),
-        drag: 0.2,
-      });
-    }
+    this.ambient();
+    this.followCamera(rawDt);
+  }
 
+  /** Embers drifting up around the camera. */
+  private ambient(): void {
+    if (Math.random() >= 0.3) return;
+    this.particles.spawn({
+      kind: 'ember',
+      x: this.camera.x + fx.range(-700, 700),
+      y: this.camera.y + fx.range(-200, 500),
+      z: fx.range(0, 40),
+      vz: fx.range(20, 60),
+      vx: fx.range(-15, 15),
+      size: fx.range(1, 2.4),
+      color: this.biome.accent,
+      life: fx.range(1.5, 3),
+      drag: 0.2,
+    });
+  }
+
+  /**
+   * Online, on the screen of a player who joined: the host runs the room, so
+   * this only advances what is purely visual (particles, fading slashes,
+   * banners, the camera) between the host's updates.
+   */
+  mirrorStep(rawDt: number): void {
+    const dt = rawDt * this.slowmo;
+    this.particles.update(dt);
+    if (this.banner) {
+      this.banner.t += rawDt;
+      if (this.banner.t > 3.2) this.banner = null;
+    }
+    for (const f of this.lootFeed) f.t += rawDt;
+    if (this.lootFeed.length && this.lootFeed[0].t > LOOT_FEED_TIME) this.lootFeed.shift();
+    this.hurtFlash = Math.max(0, this.hurtFlash - rawDt);
+    this.eclipseT = Math.max(0, this.eclipseT - rawDt);
+    this.time += dt;
+    for (const s of this.swipes) s.t += dt;
+    this.swipes = this.swipes.filter((s) => s.t < s.dur);
+    for (const b of this.bolts) b.t += dt;
+    this.bolts = this.bolts.filter((b) => b.t < b.dur);
+    for (const f of this.flashes) f.t += dt;
+    this.flashes = this.flashes.filter((f) => f.t < f.dur);
+    this.ambient();
+    this.focus = this.focusOf(this.viewers[0]);
     this.followCamera(rawDt);
   }
 
@@ -1023,8 +1067,7 @@ export class World {
    * co-op), zooming out a little when they spread apart.
    */
   private followCamera(rawDt: number): void {
-    const view = this.host.viewPlayers?.() ?? [this.players[0]];
-    const ps = view.length ? view : [this.players[0]];
+    const ps = this.viewers;
     let cx = 0;
     let cy = 0;
     for (const v of ps) {
@@ -1493,7 +1536,7 @@ export class World {
 
   private updateInteract(): void {
     // The prompt on screen is for this device's first hero.
-    const view = this.host.viewPlayers?.()[0] ?? this.players[0];
+    const view = this.viewers[0];
     this.focus = this.focusOf(view);
     for (const p of this.players) {
       if (p.state === 'dead') continue;

@@ -1095,9 +1095,10 @@ export class VoxelRenderer {
     let rig = this.rigs.get(a);
     if (rig) return rig;
     const b = new RigBuilder(this.quality === 'high');
-    if (a === w.player) {
-      rig = buildHeroRig(w.player, b, this.shadowMat);
-      rig.look = JSON.stringify(w.player.palette);
+    const hero = w.players.find((p) => p === a);
+    if (hero) {
+      rig = buildHeroRig(hero, b, this.shadowMat);
+      rig.look = JSON.stringify(hero.palette);
     } else if ((a as Ally).kind === 'wolf' || (a as Ally).kind === 'lantern') {
       rig = buildAllyRig(a as Ally, b, this.shadowMat);
     } else {
@@ -1441,7 +1442,7 @@ export class VoxelRenderer {
     const key = `${w.room.seed}:${w.room.w}:${w.room.h}:${w.doors.map((d) => d.x).join(',')}`;
     if (w !== this.world || key !== this.roomKey) {
       if (w !== this.world) {
-        for (const [a, r] of this.rigs) if (a !== w.player) this.dropRig(r), this.rigs.delete(a);
+        for (const [a, r] of this.rigs) if (!w.players.some((p) => p === a)) this.dropRig(r), this.rigs.delete(a);
       }
       this.world = w;
       this.roomKey = key;
@@ -1539,15 +1540,16 @@ export class VoxelRenderer {
     // Actors
     this.frame++;
     const seen = this.frame;
-    const p = w.player;
-    const old = this.rigs.get(p);
-    if (old && old.look !== JSON.stringify(p.palette)) {
-      this.dropRig(old);
-      this.rigs.delete(p);
+    for (const h of w.players) {
+      const old = this.rigs.get(h);
+      if (old && old.look !== JSON.stringify(h.palette)) {
+        this.dropRig(old);
+        this.rigs.delete(h);
+      }
+      const pr = this.rigFor(h, w);
+      pr.seen = seen;
+      w.as(h, () => this.posePlayer(pr, h, w, dt));
     }
-    const pr = this.rigFor(p, w);
-    pr.seen = seen;
-    this.posePlayer(pr, p, w, dt);
     for (const e of w.enemies) {
       const r = this.rigFor(e, w);
       r.seen = seen;
@@ -1576,7 +1578,7 @@ export class VoxelRenderer {
       l.distance = r;
       l.intensity = k;
     };
-    put(p.x, p.y, 70 + p.z, '#ffc8a0', high ? 480 : 520, high ? 1.6 : 1.9);
+    for (const h of w.players) put(h.x, h.y, 70 + h.z, '#ffc8a0', high ? 480 : 520, (high ? 1.6 : 1.9) * (h.state === 'dead' ? 0.5 : 1));
     if (high) {
       // Doors keep their own slots right after the hero, so flashes and
       // braziers never take their light away.
