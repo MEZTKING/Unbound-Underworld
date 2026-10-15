@@ -12,7 +12,7 @@ This is the readable overview of how the game works and how its parts fit togeth
 6. [Heroes and Wrath](#6-heroes-and-wrath)
 7. [Enemies](#7-enemies)
 8. [Guardians (bosses)](#8-guardians-bosses)
-9. [The Hall of Shades (hub)](#9-the-hall-of-shades-hub)
+9. [The Hall of Shades (hub)](#9-the-hall-of-shades-hub) · [Multiplayer](#9b-multiplayer)
 10. [Platforms, UI and settings](#10-platforms-ui-and-settings)
 11. [Where things live in the code](#11-where-things-live-in-the-code)
 12. [How to add content](#12-how-to-add-content)
@@ -27,9 +27,11 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
 **Loop:** Hall of Shades (hub) → walk through the gate → fight through 4 regions → slay each region's guardian → escape. When you die you return to the hub and keep **Ash** (a currency) and **experience**, then spend them on permanent growth and try again.
 
 **Design pillars**
-- **Readable, fair combat.** Every enemy attack is telegraphed on the ground. The dash has invulnerability frames and a cooldown (`dashRecharge`, 0.9 s a charge) that only boons (Hermes' Windstep), talents, gear and perks shorten. Hits have hit-stop and screen shake.
+- **Readable, fair combat.** Every enemy attack is telegraphed on the ground. The dash has invulnerability frames and a cooldown (`dashRecharge`, 0.9 s a charge) that only boons (Hermes' Windstep), the Altar, hero skills, gear and perks shorten. Hits have hit-stop and screen shake.
 - **A build every run.** Gods offer boons, and anvils, enchantments and artifacts stack on top, so no two runs play the same.
 - **Gentle onboarding, deep late game.** New players start with three buttons. Everything else unlocks one level at a time, ending in flashy ultimates, Mythic weapons and the Torment difficulty levels.
+- **Play together.** Up to four heroes on one screen (gamepads) or online (Wi-Fi, a hotspot or your own server), each keeping their own progress.
+- **Artifacts run on Echoes**, left behind by slain foes. The gauge starts every escape empty, so artifact play ramps up as a run goes on.
 
 ## 2. A run
 
@@ -50,18 +52,21 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
 - **Before each guardian** there is an *antechamber* with a shop and a fountain.
 - **Treasure chests** sometimes appear in combat rooms. 3% of them are Mimics; a slain Mimic always drops a Unique piece of gear (`rollStarred`).
 - **Saving:** the escape autosaves at the start of every chamber (`run.ts → snapshot/restore`, stored apart from the main save). *Save & Quit* and closing the app both resume from that chamber. Death, escape or abandoning clears it.
-- **Dying** ends the run. *Death's Reprieve* (an Altar upgrade) and the *Undying* talent let you cheat death once per rank.
+- **Dying** ends the run. *Death's Reprieve* (the last section of the Altar of Ashes) and *Undying* (the last section of the Deep Altar) let you cheat death once per rank; they're the dearest upgrades in the game. In a party, a fallen hero is downed instead until everyone is.
 
 ## 3. Long-term progression
 
-Four layers, all permanent:
+Five layers, all permanent. The split is deliberate: the **Altar** and your **level** make *every* hero stronger, while **Ascension** belongs to one hero at a time.
 
 | Layer | Currency | Where | What it gives |
 |---|---|---|---|
-| **Level & rank** | Experience (automatic) | — | Unlocks mechanics, heroes, weapons, forge tiers; 1 talent point per level |
-| **Talents** | Talent points | *Ascension* stone | 14 talents in 5 rows; each row opens with a rank tier (Shade → Wraith → Revenant → Champion → Unbound). Free respec |
-| **Altar of Ashes** | Ash | Altar (mirror) | 11 permanent stat upgrades |
-| **Armory** | Ash (+ level) | Weapon rack | Forge each class weapon from Tier I to Tier V |
+| **Level & rank** | Experience (automatic) | — | Max level 50, eleven ranks (Shade → Deathless). Unlocks mechanics, heroes and forge tiers; +1 max Health per level and +1% damage per five levels for every hero (`applyLevel`); opens Altar sections |
+| **Altar of Ashes** | Ash | Altar (mirror) | Two tables of permanent upgrades for every hero (`altar.ts`). Sections run weakest → strongest; each opens at a level *and* once enough Ash is spent on the sections above. The Deep Altar opens when the first table is complete. Paced to finish around level 50 |
+| **Hero skill trees** | Hero skill points | *Ascension* stone | Each hero's own tree (`herotree.ts`): 3 branches × 4 rows (capstone last). Points come from that hero's level (max 20, one point per level), raised by the experience earned while playing them. Rows open with points in the branch; more ranks than points. Free respec |
+| **Weapon forge** | Ash (+ level) | Blacksmith (needs the Whetstone) | Forge each class weapon from Tier I to Tier V |
+| **Gear** | Materials | Blacksmith, Hall of Heroes | See *Loot and gear*. The Blacksmith's forge parts come from guardians (`smith.ts`) and unlock reforging and crafting |
+
+Saves from before v0.9 (`progress < 2`) move their talents onto the matching Altar upgrades (anything without room is refunded as Ash), seed every hero's level from a share of their experience, and get the forge parts of guardians they already slew (`migrateTalents`, `normalizeSave`).
 
 **Onboarding order.** The full table is in GAME_DATA.md. The intent is that each new mechanic arrives once the previous one is familiar:
 
@@ -128,7 +133,7 @@ Eight heroes, each a class: a signature weapon, a guard style, perks, a distinct
 | Rook | Gunner | Thunderbuss | evade | Level 18 or 1 escape | Cannonade |
 | Selene | Duelist | Starsplitter | parry | Level 22 or 3 escapes | Starfall |
 
-The Wrath gauge fills from damage dealt and taken (talents and Kael speed it up). When full, press `V`, `R3` or the ☄ touch button. Every Wrath grants a moment of invulnerability and slow motion.
+The Wrath gauge fills from damage dealt and taken (Altar and hero skills, and Kael, speed it up). When full, press `V`, `R3` or the ☄ touch button. Every Wrath grants a moment of invulnerability and slow motion.
 
 ## 7. Enemies
 
@@ -211,21 +216,35 @@ Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (
 - **Gear** has a slot (helmet, armor, leggings, boots), one of seven tiers (Common, Uncommon, Rare, Epic, Legendary, Unique, Ghost: 1–5 random bonuses, stronger with each tier) and a star level. It drops from foes (12%), enchanted foes (35%), chests (30%) and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
 - **Plain and starred** (`rollDrop`, tables in `odds.ts`): a drop rolls its stars first: one star at the source's chance (foes 5%, enchanted foes 10%, chests 8%, guardians always), each further star half as likely, capped by `maxDropStars` (1, +1 every 3 player levels). No star = a *plain* Common/Uncommon piece that can't be starred up; a star = a Rare+ piece whose tier comes from `STARRED_TIER` (Legendary only from guardians, 20% against Epic's 30%). About 1–2 starred pieces per 80-kill run. Any kill also rolls a Ghost piece at 0.1%; Ghost bonuses roll 1.0–1.25 (`minRoll`) so even the weakest beats the best Legendary roll. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
 - **Stars** (1–10, Rare and better only): stars 2–5 are gold (+15% each), and stars 6–10 turn them purple one by one (+20% each, and they cost Titan Scales).
-- **Gear & Inventory** (Armory or pause menu): equip, star up, salvage for materials (or every plain piece at once), or craft a piece with one of three recipes (plain, 1★ Rare, 1★ Epic; Legendary can't be crafted).
-- Equipped bonuses are added in `Game.recomputeStats` after talents, hero and forge.
+- **Gear & Inventory** (Hall of Heroes or pause menu) equips gear. The **Blacksmith** stars pieces up, salvages them (or every plain piece at once), reforges their bonuses (Ember Tongs) and crafts new ones of a chosen slot: plain and 1★ Rare (Crucible), 1★ Epic (Great Bellows), 1★ Legendary (Anvil Heart). Unique and Ghost pieces can't be crafted.
+- **Tier colours** are distinct (`GEAR_RARITY`); Legendary and Ghost pieces get special frames in menus (a gilded double frame; a spectral frame that circles the piece) and on the ground (a studded double ring; a circling spectral ring).
+- Equipped bonuses are added in `Game.recomputeStats` after the Altar, level, hero, skills and forge.
 
 ## 9. The Hall of Shades (hub)
 
 | Station | Unlock | Purpose |
 |---|---|---|
-| Armory | Always | Forge class weapons (picking one picks its hero); Gear & Inventory from level 2 |
-| Altar of Ashes | Always | Permanent upgrades for Ash |
-| Hall of Heroes | Always | Choose your hero (class); customise their colours and headwear |
-| Ascension | Always | Spend talent points (the prompt shows unspent points) |
+| Blacksmith | Always | Star up, reforge, salvage and craft gear; forge the hero's weapon. More of it opens with each forge part brought back |
+| Altar of Ashes | Always | Permanent upgrades for every hero, for Ash (two tables, sectioned) |
+| Hall of Heroes | Always | The hero you play in one place: class, weapon, armour and skills; switch hero, change gear, customise their colours and headwear |
+| Ascension | Always | The selected hero's skill tree (the prompt shows their unspent points) |
 | Chronicle | Always | Records, bestiary (foes stay silhouettes until slain) and achievements |
 | Artifact Shelf | Level 4 | Choose (or buy) a starting artifact |
 | Oath of Torment | After a guardian kill | Choose a difficulty |
 | Old Bones | Always | Training dummy |
+
+## 9b. Multiplayer
+
+Up to four heroes (`MAX_PARTY`). The **party core** lets one `World` hold several heroes: `World.players`, and `w.player` / `w.stats` meaning *the hero acting now*. `World.as(p, fn)` switches the acting hero (and the host's active member), and `acting(p, fn)` also stamps that hero as the owner of zones, shots and summons it creates, so kills, damage and rewards go to the right player. Foes pick a target (`targetFor`: nearest living hero, held for a while), and every foe's own AI runs as if that hero were *the* player. `Run` keeps one `Build` per member (boons, hammers, enchants, artifacts, Death Defiance), switched with `setActive`.
+
+**Rules.** Foes get +40% health and +35% numbers per extra hero (`partyHp`, `PARTY_FOES`). A hero at 0 health is *downed*: a partner within 70 px for 2.5 s revives them, and a cleared chamber revives everyone; the escape ends only when all are down. Chamber rewards go to every member (local members take turns, online members choose on their own screens in parallel); chest rewards go to whoever opened it. Picking a door starts a 2-second countdown for the party. Each player's experience, Ash, loot, kills and forge parts go to their own save (`grant`).
+
+**Local co-op.** A second gamepad is claimed with `Input.capturePad` and drives its hero through `PadControl`; claimed pads only drive menus otherwise. The camera frames all local heroes and zooms out (to 70%) as they spread.
+
+**Online.** One device *hosts*: it runs the whole simulation. The others run a *mirror* of the room (`src/net/client.ts`) and draw it with the normal renderers.
+- **Relay** (`server/relay-core.cjs`): rooms with 5-letter codes, message routing host ↔ players, seats kept 2 minutes after a drop (rejoin with a token) and the room kept 1 minute if the host drops, plus a key → save store for save sync. It implements WebSocket itself (no dependencies), and the same code runs the standalone server, the Windows app's LAN hosting and the tests. The Android app has a Java port (`LanRelay.java`). Games on a LAN are found by a UDP broadcast on port 7778 (`server/lan.cjs`, `LanHostPlugin.java`).
+- **Host** (`src/net/host.ts`): remote players' controls arrive 30 times a second (`RemoteControl`, presses kept until the next step). Every 50 ms it sends a snapshot: for each kind of object (foes, heroes, allies, shots, zones, pickups, telegraphs) only what changed since the last one (`Track`, `encode`/`diff` in `sync.ts`), plus new slashes/bolts/flashes, room state, per-member stats and builds, and the particles, sounds and shakes made during the step (recorded by wrapping `Particles`, `audio.play` and `camera.shake`). WebSocket order is guaranteed, so deltas need no acknowledgements; a new or returning player resets the tracks so everyone gets a full snapshot.
+- **Client** (`src/net/client.ts`): builds the room from the host's layout, creates foes by name (`registry.ts`) and applies fields to live objects (`apply` never overwrites links or functions). Positions glide toward the host's (extrapolated by velocity); your own walking is predicted from your input and corrected by the host's acknowledgement. Choices, rewards and the end of an escape arrive as messages; Hall stations open locally on your own save, and changes to it are sent to the host (`profileForHost`) so your hero's stats follow.
 
 ## 10. Platforms, UI and settings
 
@@ -258,14 +277,18 @@ Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (
 
 | Area | File |
 |---|---|
-| Levels, ranks, unlocks, talents, forge, Wrath tuning | `src/game/progression.ts` |
+| Levels, ranks, unlocks, level bonuses, forge, Wrath tuning | `src/game/progression.ts` |
+| Altar of Ashes (two tables) / hero skill trees / Blacksmith parts | `src/game/altar.ts` / `src/game/herotree.ts` / `src/game/smith.ts` |
+| Party members, co-op scaling | `src/game/party.ts` |
+| Online play: relay link, host, client, state sync, LAN, save sync | `src/net/` |
+| Relay server (standalone, LAN, Docker) | `server/` (+ `android/.../LanRelay.java`, `LanHostPlugin.java`) |
 | Heroes, perks, Wrath ultimates | `src/game/characters.ts` |
 | Gods, boons, duos, anvil upgrades, stat assembly | `src/game/boons.ts` |
 | Weapons (sword, spear, bow) and shared weapon helpers | `src/game/weapons.ts` |
 | Late-game weapons (gauntlets, scythe) | `src/game/arsenal.ts` |
 | Class weapons (katana, blunderbuss, chains) | `src/game/kits.ts` |
 | Enchantments / Artifacts | `src/game/enchants.ts` / `src/game/artifacts.ts` |
-| Altar upgrades, save data, Torment scaling | `src/game/meta.ts` |
+| Save data, migrations, Torment scaling | `src/game/meta.ts` |
 | Regions, room layouts, encounter budgets | `src/game/rooms.ts` |
 | Enemies / Guardians | `src/game/enemies/types.ts` / `src/game/enemies/bosses.ts` |
 | Damage pipeline and status effects | `src/game/combat.ts` |
@@ -275,6 +298,7 @@ Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (
 | HUD / 2D world rendering and the 3D view's overlay | `src/game/hud.ts` / `src/game/render.ts` |
 | 3D voxel view (rooms, props, figures, lights) | `src/render3d/voxel.ts` |
 | Menus / touch controls | `src/ui/screens.ts` / `src/ui/touch.ts` |
+| Altar & Ascension / Blacksmith / Multiplayer & local co-op menus | `src/ui/progress.ts` / `src/ui/smith.ts` / `src/ui/multiplayer.ts`, `src/ui/party.ts` |
 | Bestiary and achievements | `src/game/codex.ts` |
 | Developer options | `src/ui/dev.ts` |
 | Loot, gear and crafting | `src/game/gear.ts` / `src/ui/gear.ts` |
@@ -289,7 +313,8 @@ After any change: run `npm test`, then `npm run docs`, and commit the regenerate
 - **An anvil upgrade:** add it to `HAMMERS`, then check `s.hammers.has('<id>')` inside the weapon's code.
 - **A weapon:** add the id to `WeaponId` (`types.ts`) and `WEAPON_IDS` (`meta.ts`), its card info to `WEAPON_INFO`, its unlock level to `WEAPON_LEVEL`, and a class implementing `Weapon` (`attack`, `held`, `special`, `slam`, `draw` …) registered in `createWeapon()`.
 - **A hero:** add it to `CHARACTERS` in `characters.ts`. Fields: palette and headwear (`crown`), `apply(stats)` for perks, an `unlock` condition and a `wrath.use(world)` ultimate.
-- **A talent:** add it to `TALENTS` in `progression.ts`. Its `tier` picks the row.
+- **An Altar upgrade:** add it to a section of `ALTAR` in `altar.ts` (weaker ones higher up), with its Ash costs and `apply`.
+- **A hero skill:** each hero's tree is in `HERO_TREES` (`herotree.ts`), built from the effects in `E`.
 - **A mechanic unlock:** add a `Feature` and an entry in `UNLOCKS`, set a stat flag in `applyFeatures()`, then gate the input in `player.ts`, the HUD in `hud.ts`, the touch button in `game.ts → syncTouch` and the reward pool in `run.ts`.
 - **An enemy:** subclass `Enemy` in `enemies/types.ts`, add its kind to `EnemyKind`, `ENEMY_COST` and `createEnemy()`, and put it in a region's `pool` in `rooms.ts`. For the 3D view, give its name a `LOOKS` entry in `render3d/voxel.ts` (body shape and colours); without one it is drawn as a plain humanoid.
 - **A guardian:** subclass `Boss` in `enemies/bosses.ts`, add it to `BossKind` and `createBoss()`, and set it as a region's `boss`. Add a `LOOKS` entry for the 3D view too.

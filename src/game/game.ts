@@ -966,9 +966,10 @@ export class Game implements WorldHost {
     // Autosave at the start of every chamber, so Save & Quit (or closing the
     // app) resumes here.
     // Party escapes aren't saved mid-way (everyone would have to come back).
-    if (this.members.length === 1) writeRun(run.snapshot(this.player.hp, this.player.souls));
-    else writeRun(null);
-    this.saveMark = SAVE_MARK;
+    if (this.members.length === 1) {
+      writeRun(run.snapshot(this.player.hp, this.player.souls));
+      this.saveMark = SAVE_MARK;
+    } else writeRun(null);
     this.particles.clear();
     const biome = run.biome;
     const layout = generateLayout(run.rng, biome, plan.kind, this.stats.chestChance);

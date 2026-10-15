@@ -110,7 +110,7 @@ Experience carries over between runs. Max level: **50**. Every level gives every
 
 | Level | Unlock | What it does | Keys (PC / touch) |
 |---|---|---|---|
-| 2 | Gear & Inventory | Equip the helmets, armor, leggings and boots foes drop, and craft or star them up with materials, at the Armory or from the pause menu. |  |
+| 2 | Gear & Inventory | Equip the helmets, armor, leggings and boots foes drop, in the Hall of Heroes or from the pause menu. The Blacksmith stars them up and salvages them. |  |
 | 2 | Guard & Parry | Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped. | F / ⛨ |
 | 2 | Healing Potion | Drink to restore health. It refills over time. | R / ⚗ |
 | 3 | Cast | Hurl a shard that lodges in foes. Walk over it to pick it up again. | Q / Middle mouse / ◆ |
@@ -121,7 +121,7 @@ Experience carries over between runs. Max level: **50**. Every level gives every
 | 8 | Second Artifact Slot | Carry two artifacts at once. | 2 / the artifact button |
 | 10 | Wrath | Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate. | V / ☄ |
 | 12 | Third Artifact Slot | Carry three artifacts at once. | 3 / the artifact button |
-| 13 | Awakened Weapons | Forge a weapon to Tier III at the Armory to awaken it. |  |
+| 13 | Awakened Weapons | Forge a weapon to Tier III at the Blacksmith to awaken it. |  |
 
 ## Hero skill trees (Ascension)
 

@@ -58,7 +58,7 @@ On touch screens, drag anywhere on the left half to move. The buttons on the rig
 ## Game documentation
 
 - **[docs/DESIGN.md](docs/DESIGN.md):** how the game works. Covers the run structure, progression and unlock order, combat, build systems, heroes, enemy and boss behaviour, where everything lives in the code, and how to add new content.
-- **[docs/GAME_DATA.md](docs/GAME_DATA.md):** every number in the game, generated from the code. This includes the level table, talents, heroes, weapons and forge tiers, every boon, enchantment and artifact, regions, enemies, guardians and Torment. Run `npm run docs` after changing game data; CI checks that it's up to date.
+- **[docs/GAME_DATA.md](docs/GAME_DATA.md):** every number in the game, generated from the code. This includes the level table, the Altar of Ashes, hero skill trees, the Blacksmith, heroes, weapons and forge tiers, every boon, enchantment and artifact, regions, enemies, guardians and Torment. Run `npm run docs` after changing game data; CI checks that it's up to date.
 
 ## Play from source
 
@@ -108,33 +108,53 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 ## What's in it
 
 ### Progression
-- **Levels and ranks.** Slain foes, cleared chambers, guardians and escapes earn experience that carries over between runs. There are 30 levels in five rank tiers: Shade, Wraith, Revenant, Champion and Unbound.
+- **Levels and ranks.** Slain foes, cleared chambers, guardians and escapes earn experience that carries over between runs. There are 50 levels and eleven ranks, from Shade to Deathless. Every level gives every hero +1 max Health (and every fifth level +1% damage), and levels open new sections of the Altar of Ashes.
 - **Gentle onboarding.** The first runs only have Attack, Special and Dash. New mechanics unlock one at a time, each announced with a short explanation: Guard & Parry, Healing Potion and Gear (level 2), Cast (3), Artifacts (4), Jump & Slam (5, or as soon as you slay the final guardian), Enchantments (6), Hephaestus' Anvil (7), a second artifact slot (8), Wrath (10) and a third artifact slot (12).
-- **Talents.** Every level gives a point to spend at *Ascension* in the hub. There are 14 talents in five rows, and each row opens with a new rank tier. Resetting your talents is free.
-- **Weapon forging.** At the Armory, spend Ash to forge each weapon from Tier I up to Tier V (Mythic) for more damage. From Tier III (Awakened), every fourth Attack also unleashes an arcane wave. The waves grow at Tier IV, and at Tier V they split in three and the weapon blazes.
-- **Heroes are classes.** Eight heroes, each with their own signature weapon, guard style, perks and **Wrath** ultimate. Pick them in the Hall of Heroes (or pick a weapon at the Armory). From the start: *Kael* the Warrior (Nightblade sword, blade parry), *Lyra* the Ranger (Moonbow, evasive sidestep) and *Doran* the Vanguard (Thornspear and a tower shield). The rest unlock slowly, by level or by slaying guardians and escaping, whichever comes first: *Gorran* the Brawler (Titan Gauntlets, level 7 or your first guardian), *Ione* the Monk (Riptide Chains nunchaku, level 10 or 3 guardians), *Erebos* the Reaper (Reaper's Crescent, level 14 or 6 guardians), *Rook* the Gunner (Thunderbuss blunderbuss, level 18 or your first escape) and *Selene* the Duelist (Starsplitter katana, level 22 or 3 escapes). If a save's chosen hero is locked under these rules, it switches back to Kael. Ash spent unlocking weapons in earlier versions is refunded.
+- **The Altar of Ashes** holds permanent strength for every hero, bought with Ash. It runs from the weakest upgrades at the top to the strongest at the bottom, in five sections (Embers, Cinders, Flames, Blaze, Inferno); each section opens once you reach its level *and* have spent enough Ash on the sections above, so the big ones (Death's Reprieve above all) come late and cost a lot. Completing it opens a second table, **the Deep Altar**, with fewer, far stronger and far dearer upgrades (gated up to level 48). Both tables together are paced to finish around level 50.
+- **Hero skill trees.** Each hero has their own tree at *Ascension*, with three branches (offence, endurance and a signature style) of four rows each, ending in a capstone. Points come from playing that hero: the experience you earn as them raises their own hero level (up to 20, one point per level), and nothing is shared between heroes. There are more ranks than points, so every hero is built one way or another. Resetting a tree is free.
+- **The Blacksmith** in the Hall stars up and salvages gear from the start, but his forge is in pieces. Each guardian guards one lost part, and each part he gets back lets him do more: the **Whetstone** (Vexa) lets him temper your hero's weapon with Ash, from Tier I up to Tier V (Mythic; from Tier III every fourth Attack unleashes an arcane wave); the **Ember Tongs** (the Many-Maw) reforge a piece's bonuses; the **Crucible** (Aurex) crafts plain and Rare gear of the slot you choose; the **Great Bellows** (Threefang) crafts Epic gear; and the **Anvil Heart** (any guardian under the Oath of Torment) crafts Legendary gear.
+- **Heroes are classes.** Eight heroes, each with their own signature weapon, guard style, perks and **Wrath** ultimate. The *Hall of Heroes* shows the hero you play in one place (class, perks and Wrath, their weapon and its forge tier, the armour they wear and their skill tree), with a button to switch hero. From the start: *Kael* the Warrior (Nightblade sword, blade parry), *Lyra* the Ranger (Moonbow, evasive sidestep) and *Doran* the Vanguard (Thornspear and a tower shield). The rest unlock slowly, by level or by slaying guardians and escaping, whichever comes first: *Gorran* the Brawler (Titan Gauntlets, level 7 or your first guardian), *Ione* the Monk (Riptide Chains nunchaku, level 10 or 3 guardians), *Erebos* the Reaper (Reaper's Crescent, level 14 or 6 guardians), *Rook* the Gunner (Thunderbuss blunderbuss, level 18 or your first escape) and *Selene* the Duelist (Starsplitter katana, level 22 or 3 escapes). If a save's chosen hero is locked under these rules, it switches back to Kael. Ash spent unlocking weapons in earlier versions is refunded.
 - **Wrath.** A golden gauge that fills as you deal and take damage. When it's full, press `V` to unleash your hero's screen-clearing ultimate.
-- **Loot and gear.** From your very first escape, foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Gate Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Gear comes in seven tiers: Common, Uncommon, Rare, Epic, Legendary, Unique and the very rare Ghost. Common and Uncommon pieces are *plain*: they drop often, have no stars and can't be starred up (salvage them; *Salvage all plain pieces* clears them in one go). Rare and better pieces are *starred*: they drop with one star (each extra star half as likely, capped by your level) and are much rarer, about one or two in a run of 80 kills. Legendary pieces drop only from guardians, Unique ones from enchanted foes, guardians and Mimics, and a Ghost piece (0.1% from any foe) never rolls a weak bonus. Unique and Ghost pieces carry a perk of their own (an extra dash, Death Defiance, healing on kills…). Star a starred piece up to 5 gold stars, then on to 10, as the stars turn purple one by one. Drops fly to you when you walk near them (and all of them when a chamber is cleared), a feed on the left lists what you picked up, and the end of each escape shows your **Spoils**. Manage it all in *Gear & Inventory* (level 2, at the Armory or in the pause menu): equip, star up with materials, salvage, or craft new pieces.
+- **Loot and gear.** From your very first escape, foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Gate Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Gear comes in seven tiers: Common, Uncommon, Rare, Epic, Legendary, Unique and the very rare Ghost. Common and Uncommon pieces are *plain*: they drop often, have no stars and can't be starred up (salvage them; *Salvage all plain pieces* clears them in one go). Rare and better pieces are *starred*: they drop with one star (each extra star half as likely, capped by your level) and are much rarer, about one or two in a run of 80 kills. Legendary pieces drop only from guardians, Unique ones from enchanted foes, guardians and Mimics, and a Ghost piece (0.1% from any foe) never rolls a weak bonus. Unique and Ghost pieces carry a perk of their own (an extra dash, Death Defiance, healing on kills…). Star a starred piece up to 5 gold stars, then on to 10, as the stars turn purple one by one. Drops fly to you when you walk near them (and all of them when a chamber is cleared), a feed on the left lists what you picked up, and the end of each escape shows your **Spoils**. Each tier has its own colour, and Legendary and Ghost pieces wear special frames (a gilded double frame with a gleam; a spectral frame that circles the piece). Equip gear in the Hall of Heroes or the pause menu (level 2); star it up, reforge, salvage and craft at the Blacksmith.
 - **Save slots.** Four independent journeys; switch on the title screen.
 - **Map.** The pause menu shows every region's chambers, where you are, the guardian ahead and your best run.
 
 ### The Hades-style core
-- **Combat.** Each weapon has a chain, a powered attack, a dash-strike, a special and a slam. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames and a cooldown (0.9 s for each charge to come back) that only boons (Hermes' *Windstep*), talents, gear and perks shorten; the DASH pips on the HUD refill like a clock. A dash leans the way it goes, so a backstep leans back. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
+- **Combat.** Each weapon has a chain, a powered attack, a dash-strike, a special and a slam. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames and a cooldown (0.9 s for each charge to come back) that only boons (Hermes' *Windstep*), the Altar, skills, gear and perks shorten; the DASH pips on the HUD refill like a clock. A dash leans the way it goes, so a backstep leans back. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
 - **Eight weapons, one per class.** *Nightblade* (Crescent Cleave), *Moonbow* (quick shots, Power Shot, Rain of Arrows), *Thornspear* (Skewer Lance, a spin, a spear you throw and recall), *Titan Gauntlets* (Titan Uppercut, Meteor Fist), *Riptide Chains* (Whirlpool, Tidal Snap), *Reaper's Crescent* (Harvest, Soul Reap), *Thunderbuss* (Grapeshot Cannon, Powder Keg) and *Starsplitter* (Moonlit Iaido, Thousand Cuts). Each weapon has three or more anvil upgrades.
 - **Foes that fight fair.** Foes turn at their own speed (circle a Brute to get behind it), lock their aim when a windup starts, take turns (only a few attack at once while the rest circle), come at you from different sides, and pause a moment after appearing. Higher Torment makes them more aggressive and more accurate.
 - **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity; the first boon of an escape is almost always Common, and higher rarities grow more likely region by region (every chance roll is listed in GAME_DATA.md → *Probabilities*). There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
 - **The run.** The Shackled Deep, then the Ember Fields, then the Gilded Groves, then the Last Gate: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices (and the pause menu) have a *Your build* page that lays out what you have: your Attack, Special, Cast and Dash boons side by side, your other boons grouped by god, then duos, anvil upgrades, enchantments and artifacts, and every one of them can be skipped for 25 obols. Shops never block the way: walk through any door. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
 - **Four guardians.** *Vexa*, Warden of Chains. *The Many-Maw*, which grows extra heads. *Aurex, the Gilded Colossus*: break his armor and he overheats, leaving him open. *Threefang*, Hound of the Last Gate, who charges, breathes fire and leap-slams.
-- **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your records, the **bestiary** (each foe stays a black silhouette until you slay it) and **achievements** in the Chronicle, customise your hero's colours and headwear (in the 3D view the preview is the voxel hero, seen from the game camera's angle; drag to turn it), raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
+- **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it at the Altar of Ashes and the Blacksmith, unlock starting artifacts, pick your hero in the Hall of Heroes, raise their skill tree at Ascension, read your records, the **bestiary** (each foe stays a black silhouette until you slay it) and **achievements** in the Chronicle, customise your hero's colours and headwear (in the 3D view the preview is the voxel hero, seen from the game camera's angle; drag to turn it), raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
 
 ### Inspired by Minecraft Dungeons II
 - **Jump and Slam.** Hop over lava, chasms, spike traps and boss shockwaves. Attack mid-air for a weapon-specific ground slam.
-- **Artifacts.** Three hotbar slots with 12 artifacts to find. Some run on cooldowns: Mending Totem, Thunder Rod, Gale Horn, Bone Whistle (summons a wolf), Ember Volley and others. Others spend **souls** gathered from fallen foes: Spirit Lantern, Soul Reaper, and the channeled Void Prism beam.
+- **Artifacts.** Three hotbar slots with 12 artifacts to find. Some run on cooldowns: Mending Totem, Thunder Rod, Gale Horn, Bone Whistle (summons a wolf), Ember Volley and others. Others spend **Echoes** left behind by fallen foes: Spirit Lantern, Echo Reaper, and the channeled Void Prism beam. The Echoes gauge starts every escape empty.
 - **Healing potion** on a cooldown.
 - **Enchantments.** A third build layer separate from the gods: 13 enchantments (Reverberation, Shackling, Combustion, Bloodthirst, Frenzy, Executioner, Singularity, Searing and more). Finding one again raises its tier, up to III.
 - **Enchanted foes.** Swift, Armored, Volatile and Regenerating variants with a violet aura.
 - **Treasure chests**, and very rarely (3%) a Mimic, which guards a Unique piece of gear.
 - **New foes.** Hisslings (fused exploders), Weavers (web spitters that slow you) and Bonecallers (summoners).
+
+### Multiplayer
+Up to four heroes play together. Everyone keeps their own progress: experience, Ash, loot and kills go to each player's own save on their own device. Foes get tougher (+40% health) and more numerous (+35%) with each extra hero. A hero who falls is **downed**, not dead: stand beside them for a moment to revive them, and everyone gets back up when the chamber is cleared; the escape ends only when every hero is down. Rewards come to each player (on their own screen online, in turn on a shared screen), and when someone picks a door the party goes through it together two seconds later. Open *Multiplayer* from the title screen or the pause menu.
+
+- **Local co-op (same screen).** *Multiplayer → Local co-op → Add a player*, then press any button on the new player's gamepad and pick their hero. Player 1 keeps the keyboard and mouse (or another gamepad). The camera keeps everyone in view, and player 2 gets their own HUD panel at the bottom right.
+- **Same Wi-Fi or hotspot.** In the Windows or Android app, *Host on this network* hosts from your device (allow it through the Windows firewall if asked). Others choose *Find games nearby* and join with one click, or type the host's address (shown when you start hosting). A phone sharing its hotspot can host, too. The web version can join by address when it's opened over `http` (browsers only allow secure `wss://` connections from the `https` site).
+- **Online, through your own server.** Run the server below on any machine with Node 18+, then everyone enters its address under *Online*: the host picks *Host here* and gets a 5-letter **room code**, and the others *Join* with it. Anyone can host this way, from Windows, Android or the browser. A player whose connection drops is reconnected into their seat automatically (the server keeps it for two minutes, and keeps the game for a minute if the host drops).
+- **Sync saves between devices.** *Multiplayer → Sync saves between devices*: pick a sync key (or make one), *Upload this save* on one device and *Download to this device* on the other, through your server. Turn on *Keep in sync* to upload after each escape and be offered the newer save when the game starts. Without a server, *Copy save code* and paste it on the other device.
+
+**Running the game server.** It's one folder with no packages to install: `server/` in this repository, also attached to every release as `Unbound-Underworld-Server-<version>.zip`.
+
+```bash
+node server/index.cjs                         # ws://<your address>:7777, saves kept in ./saves
+node server/index.cjs --port 8080 --name "Friday night"
+node server/index.cjs --cert cert.pem --key key.pem   # wss:// (needed by the https web version)
+docker build -t unbound-underworld-server server && docker run -d -p 7777:7777 -v uu-saves:/data unbound-underworld-server
+```
+
+For play over the internet, forward the port on your router (or run it on a VPS); `node server/index.cjs --help` lists every option. Players on the same network can also use it with `--lan`, which lets *Find games nearby* see it. Everyone must run the same game version.
 
 ### Settings
 *Settings* (on the title screen or in the pause menu) has:
@@ -216,8 +236,10 @@ These URL parameters are handy for testing:
 ### Project layout
 
 ```
-electron/        desktop app shell (window, app:// file serving, fullscreen toggle, self-updating)
-android/         Android app project (Capacitor): landscape, immersive fullscreen, icons
+electron/        desktop app shell (window, app:// file serving, fullscreen toggle, self-updating, LAN hosting)
+android/         Android app project (Capacitor): landscape, immersive fullscreen, icons, LAN hosting plugin (LanRelay)
+server/          the multiplayer relay: relay-core.cjs (rooms, codes, rejoining, save sync; a dependency-free WebSocket server),
+                 lan.cjs (finding games nearby), index.cjs (the standalone server), Dockerfile
 pwa/             service worker template for the installable web version
 public/          web manifest and home-screen icons
 build/           app icon used for the installers
@@ -230,7 +252,11 @@ src/
     player.ts    movement, dash, jump/slam, cast, potion, action state machine
     weapons.ts   sword, spear, bow (and shared weapon helpers)
     boons.ts     gods, boons, duos, rarities, offers, stat computation
-    progression.ts  levels, rank tiers, feature unlocks, talents, weapon forge
+    progression.ts  levels, rank tiers, feature unlocks, level bonuses, weapon forge
+    altar.ts     the Altar of Ashes: two tables of sectioned permanent upgrades
+    herotree.ts  each hero's skill tree and hero levels
+    smith.ts     the Blacksmith's forge parts
+    party.ts     party members (local co-op and online)
     characters.ts   heroes, their perks and Wrath ultimates
     arsenal.ts   late-game weapons (Titan Gauntlets, Reaper's Crescent)
     prefs.ts     live gameplay/display settings
@@ -239,11 +265,13 @@ src/
     enemies/     enemy base class, regular foes, bosses
     rooms.ts     biomes, procedural layouts, encounters
     run.ts       per-run state and door rewards
-    meta.ts      save data and permanent upgrades
+    meta.ts      save data, slots and migrations
     render.ts    2D room art, lighting, effects, and the overlay drawn over the 3D view     hud.ts  HUD
   render3d/
     voxel.ts     the 3D voxel view (three.js): block rooms, props, doors and animated figures
-  ui/            DOM menus (boon cards, altar, armory, pause…) and touch controls
+  net/           online play: relay link, host (snapshots, effects, remote controls), client (mirror world, prediction),
+                 state sync, LAN bridges, save sync
+  ui/            DOM menus (boon cards, Altar, Ascension, Hall of Heroes, Blacksmith, multiplayer, pause…) and touch controls
 tests/           Vitest suites
 scripts/         gen-docs.ts (writes docs/GAME_DATA.md)
 docs/            DESIGN.md (how the game works), GAME_DATA.md (generated reference), screenshots
