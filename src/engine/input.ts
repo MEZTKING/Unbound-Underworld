@@ -15,6 +15,7 @@ export type Action =
   | 'artifact1'
   | 'artifact2'
   | 'artifact3'
+  | 'wrath'
   | 'pause'
   | 'mute'
   | 'menuUp'
@@ -49,7 +50,8 @@ const KEYMAP: Record<string, Action[]> = {
   KeyQ: ['cast'],
   KeyL: ['cast'],
   KeyE: ['interact'],
-  KeyF: ['interact'],
+  KeyF: ['wrath'],
+  KeyV: ['wrath'],
   Escape: ['pause', 'back'],
   KeyP: ['pause'],
   KeyM: ['mute'],
@@ -72,7 +74,7 @@ const PADMAP: Record<number, Action[]> = {
   8: ['interact'], // Back / Select
   9: ['pause'], // Start
   10: ['artifact3'], // L3
-  11: ['interact'], // R3
+  11: ['wrath'], // R3
   12: ['menuUp', 'interact'],
   13: ['menuDown'],
   14: ['menuLeft'],

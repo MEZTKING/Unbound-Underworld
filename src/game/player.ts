@@ -3,12 +3,15 @@ import { angleOf, clamp, damp, fromAngle, fx, len, TAU } from '../engine/math';
 import { Actor } from './actor';
 import { useArtifact } from './artifacts';
 import { GODS } from './boons';
+import { CHARACTER_BY_ID, type CharacterDef, type CharacterId } from './characters';
 import { castLanded, damageEnemy, dashTriggered, deflectProjectiles } from './combat';
 import type { Enemy } from './enemies/enemy';
 import { Pickup, Projectile } from './entities';
+import { prefs } from './prefs';
+import { WRATH_MAX } from './progression';
 import type { PlayerStats } from './stats';
 import type { World } from './world';
-import { createWeapon, type ActionDef, type Weapon } from './weapons';
+import { createWeapon, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
 import type { WeaponId } from './types';
 
 export const MOVE_SPEED = 290;
@@ -73,13 +76,30 @@ export class Player extends Actor {
   beamTick = 0;
   /** Slowed by webs while > 0. */
   webT = 0;
+  /** Ultimate gauge (0..WRATH_MAX). */
+  wrath = 0;
+  /** Attacks fired, for Awakened-weapon waves. */
+  private attackCount = 0;
+  hero: CharacterDef;
   private noAmmoMsgT = -10;
 
-  constructor(weapon: WeaponId) {
+  constructor(weapon: WeaponId, character: CharacterId = 'kael') {
     super();
     this.r = 15;
     this.height = 50;
     this.weapon = createWeapon(weapon);
+    this.hero = CHARACTER_BY_ID[character] ?? CHARACTER_BY_ID.kael;
+  }
+
+  gainWrath(n: number): void {
+    if (this.state === 'dead') return;
+    const before = this.wrath;
+    this.wrath = Math.min(WRATH_MAX, this.wrath + n);
+    if (before < WRATH_MAX && this.wrath >= WRATH_MAX) audio.play('boon', 0.5);
+  }
+
+  get wrathReady(): boolean {
+    return this.wrath >= WRATH_MAX;
   }
 
   /** Re-syncs derived values after the build changes. */
@@ -174,13 +194,13 @@ export class Player extends Actor {
     this.updateAim(w);
     if (inp.pressed('attack')) this.buf.attack = BUFFER;
     if (inp.pressed('special')) this.buf.special = BUFFER;
-    if (inp.pressed('cast')) this.buf.cast = BUFFER;
+    // Mechanics you haven't unlocked yet simply don't respond.
+    if (inp.pressed('cast') && s.canCast) this.buf.cast = BUFFER;
     if (inp.pressed('dash')) this.buf.dash = 0.15;
-    if (inp.pressed('jump')) this.buf.jump = 0.15;
-    if (inp.pressed('potion')) this.drinkPotion(w);
-    if (inp.pressed('artifact1')) useArtifact(w, 0);
-    if (inp.pressed('artifact2')) useArtifact(w, 1);
-    if (inp.pressed('artifact3')) useArtifact(w, 2);
+    if (inp.pressed('jump') && s.canJump) this.buf.jump = 0.15;
+    if (inp.pressed('potion') && s.canPotion) this.drinkPotion(w);
+    for (let i = 0; i < 3; i++) if (inp.pressed(`artifact${i + 1}` as 'artifact1') && i < s.artifactSlots) useArtifact(w, i);
+    if (inp.pressed('wrath') && s.canWrath) this.unleashWrath(w);
 
     this.weapon.update(this, w, dt);
 
@@ -369,7 +389,7 @@ export class Player extends Actor {
     } else {
       if (len(this.moveDir) > 0.2) this.aim = angleOf(this.moveDir);
       // Gentle auto-aim toward a nearby foe in front when not using a mouse.
-      const target = w.nearestEnemy(this.x, this.y, 420, (e) => Math.abs(((Math.atan2(e.y - this.y, e.x - this.x) - this.aim + Math.PI * 3) % TAU) - Math.PI) < 0.6);
+      const target = prefs.aimAssist && w.nearestEnemy(this.x, this.y, 420, (e) => Math.abs(((Math.atan2(e.y - this.y, e.x - this.x) - this.aim + Math.PI * 3) % TAU) - Math.PI) < 0.6);
       if (target) this.aim = Math.atan2(target.y - this.y, target.x - this.x);
     }
   }
@@ -398,12 +418,57 @@ export class Player extends Actor {
       def = this.weapon.held(this, w);
     }
     if (!def) return;
+    if (def.slot === 'attack' && w.stats.forgeTier >= 3) def = this.awaken(def);
     this.state = 'action';
     this.action = { def, t: 0, fired: false, aim: this.aim, holdT: 0, released: false };
     if (def.windup <= 0 && !def.hold) {
       this.action.fired = true;
       def.fire?.(this, w, this.aim);
     }
+  }
+
+  /** Awakened weapons (forge Tier III+) unleash an arcane wave every 4th Attack. */
+  private awaken(def: ActionDef): ActionDef {
+    const fireWave = (w: World, aim: number) => {
+      this.attackCount++;
+      if (this.attackCount % 4 !== 0) return;
+      const tier = w.stats.forgeTier;
+      const color = WEAPON_INFO[this.weapon.id].color;
+      const angles = tier >= 5 ? [-0.22, 0, 0.22] : [0];
+      for (const off of angles) {
+        const a = aim + off;
+        const pr = new Projectile(this.x + Math.cos(a) * 24, this.y + Math.sin(a) * 24, Math.cos(a) * 900, Math.sin(a) * 900, 'player', tier >= 4 ? 45 : 35, 'attack');
+        pr.style = 'crescent';
+        pr.r = tier >= 4 ? 26 : 20;
+        pr.ttl = 0.55;
+        pr.pierce = 99;
+        pr.knock = 160;
+        pr.color = color;
+        pr.deflectable = false;
+        pr.hitsWalls = false;
+        pr.z = 24;
+        pr.owner = this;
+        w.projectiles.push(pr);
+      }
+      w.particles.directional(this.x, this.y - 24, aim, 0.4, color, 12, 420);
+      audio.play('cast');
+    };
+    if (def.hold) {
+      const release = def.hold.release;
+      return { ...def, hold: { ...def.hold, release: (p, w, c, h) => (release(p, w, c, h), fireWave(w, p.aim)) } };
+    }
+    const fire = def.fire;
+    return { ...def, fire: (p, w, aim) => (fire?.(p, w, aim), fireWave(w, aim)) };
+  }
+
+  /** Unleashes this hero's ultimate when the gauge is full. */
+  unleashWrath(w: World): void {
+    if (!this.wrathReady || this.state === 'dead' || this.state === 'falling') {
+      audio.play('deny');
+      return;
+    }
+    this.wrath = 0;
+    this.hero.wrath.use(w);
   }
 
   private endAction(): void {
@@ -514,9 +579,32 @@ export class Player extends Actor {
     if (!back) this.weapon.draw(ctx, this, w, true);
     ctx.save();
     ctx.rotate(lean);
+    const pal = this.hero.palette;
+    // Mythic weapons (forge Tier V) wreathe the hero in their colour.
+    if (w.stats.forgeTier >= 5) {
+      ctx.globalCompositeOperation = 'lighter';
+      const col = WEAPON_INFO[this.weapon.id].color;
+      const g = ctx.createRadialGradient(0, -24, 4, 0, -24, 44);
+      g.addColorStop(0, col);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.25 + Math.sin(this.t * 5) * 0.08;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, -24, 44, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = blink ? 0.45 : 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (this.wrathReady && w.stats.canWrath) {
+      ctx.strokeStyle = `rgba(255,208,74,${0.45 + Math.sin(this.t * 8) * 0.25})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 24, 10, 0, 0, TAU);
+      ctx.stroke();
+    }
     // Cloak
-    const cloak = white ? '#fff' : '#2b1830';
-    const trim = white ? '#fff' : '#c2263a';
+    const cloak = white ? '#fff' : pal.cloak;
+    const trim = white ? '#fff' : pal.trim;
     ctx.fillStyle = cloak;
     ctx.beginPath();
     ctx.moveTo(-14, -2);
@@ -532,7 +620,7 @@ export class Player extends Actor {
     ctx.quadraticCurveTo(0, 3, 14, -2);
     ctx.stroke();
     // Tunic / chest
-    ctx.fillStyle = white ? '#fff' : '#5b1a26';
+    ctx.fillStyle = white ? '#fff' : pal.tunic;
     ctx.beginPath();
     ctx.moveTo(-7, -36 + bob);
     ctx.lineTo(7, -36 + bob);
@@ -540,32 +628,21 @@ export class Player extends Actor {
     ctx.lineTo(-5, -14 + bob);
     ctx.fill();
     // Head
-    ctx.fillStyle = white ? '#fff' : '#e8c7a8';
+    ctx.fillStyle = white ? '#fff' : pal.skin;
     ctx.beginPath();
     ctx.arc(fxDir * 2, -45 + bob, 8, 0, TAU);
     ctx.fill();
-    // Hair of embers
-    ctx.fillStyle = white ? '#fff' : '#1a0d14';
+    // Hair
+    ctx.fillStyle = white ? '#fff' : pal.hair;
     ctx.beginPath();
     ctx.arc(fxDir * 1, -48 + bob, 8.5, Math.PI * 0.95, Math.PI * 2.05);
     ctx.fill();
     if (!back) {
-      ctx.fillStyle = '#ffd1a0';
+      ctx.fillStyle = pal.crown === 'horns' ? '#d090ff' : '#ffd1a0';
       ctx.fillRect(fxDir * 4 - 1.5, -46 + bob, 2, 2);
       ctx.fillRect(fxDir * 4 + 2.5 * Math.sign(fxDir || 1), -46 + bob, 2, 2);
     }
-    // Flame laurel
-    const fl = 0.6 + Math.sin(this.t * 14) * 0.2;
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = `rgba(255,${90 + Math.floor(fl * 80)},40,0.9)`;
-    for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      const hx = i * 4 + fxDir;
-      ctx.moveTo(hx - 2.5, -52 + bob);
-      ctx.quadraticCurveTo(hx, -60 - fl * 6 - (2 - Math.abs(i)) * 3 + bob, hx + 2.5, -52 + bob);
-      ctx.fill();
-    }
-    ctx.globalCompositeOperation = 'source-over';
+    if (!white) drawCrown(ctx, pal, fxDir, bob, this.t);
     ctx.restore();
     if (back) this.weapon.draw(ctx, this, w, false);
 
@@ -585,6 +662,96 @@ export class Player extends Actor {
     }
     ctx.restore();
   }
+}
+
+/** Headwear that sets each hero apart. */
+function drawCrown(ctx: CanvasRenderingContext2D, pal: CharacterDef['palette'], fxDir: number, bob: number, t: number): void {
+  const glow = pal.glow;
+  switch (pal.crown) {
+    case 'flame': {
+      const fl = 0.6 + Math.sin(t * 14) * 0.2;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,${90 + Math.floor(fl * 80)},40,0.9)`;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        const hx = i * 4 + fxDir;
+        ctx.moveTo(hx - 2.5, -52 + bob);
+        ctx.quadraticCurveTo(hx, -60 - fl * 6 - (2 - Math.abs(i)) * 3 + bob, hx + 2.5, -52 + bob);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'hood': {
+      ctx.fillStyle = pal.cloak;
+      ctx.beginPath();
+      ctx.moveTo(-11, -40 + bob);
+      ctx.quadraticCurveTo(fxDir * 2, -66 + bob, 11, -40 + bob);
+      ctx.quadraticCurveTo(fxDir * 2, -54 + bob, -11, -40 + bob);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(fxDir * 2, -59 + bob, 3, 0.4, Math.PI * 1.6);
+      ctx.fill();
+      break;
+    }
+    case 'helm': {
+      ctx.fillStyle = '#b07a30';
+      ctx.beginPath();
+      ctx.arc(fxDir * 1, -48 + bob, 9.5, Math.PI, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#c2263a';
+      ctx.fillRect(-1.5 + fxDir, -66 + bob, 3, 12);
+      ctx.beginPath();
+      ctx.ellipse(fxDir - fxDir * 4, -64 + bob, 9, 3, 0, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'circlet': {
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(fxDir, -51 + bob, 9, 3, 0, 0, TAU);
+      ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(fxDir * 3, -55 + bob - Math.abs(Math.sin(t * 3)) * 2, 2.5, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'horns': {
+      ctx.fillStyle = '#2a2030';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 5 + fxDir, -53 + bob);
+        ctx.quadraticCurveTo(side * 15, -58 + bob, side * 13, -68 + bob);
+        ctx.quadraticCurveTo(side * 10, -58 + bob, side * 2 + fxDir, -54 + bob);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(200,107,255,${0.3 + Math.sin(t * 4) * 0.15})`;
+      ctx.beginPath();
+      ctx.arc(fxDir, -48 + bob, 14, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'halo': {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(fxDir, -61 + bob + Math.sin(t * 2) * 1.5, 10, 3.5, 0, 0, TAU);
+      ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const a = t * 2 + (i * TAU) / 3;
+        ctx.fillStyle = glow;
+        ctx.fillRect(fxDir + Math.cos(a) * 10 - 1, -61 + bob + Math.sin(a) * 3.5 - 1, 2, 2);
+      }
+      break;
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 /** Fires a cast shard from the player along `aim`. */

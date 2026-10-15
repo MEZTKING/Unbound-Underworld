@@ -5,6 +5,7 @@ import { damageEnemy, playerBlast } from './combat';
 import type { Enemy } from './enemies/enemy';
 import { Projectile } from './entities';
 import type { Player } from './player';
+import { Gauntlets, Scythe } from './arsenal';
 import type { DamageSource, WeaponId } from './types';
 import type { World } from './world';
 
@@ -68,6 +69,18 @@ export const WEAPON_INFO: Record<WeaponId, { name: string; blurb: string; color:
     color: '#8ad0ff',
     cost: 60,
   },
+  fists: {
+    name: 'Titan Gauntlets',
+    blurb: 'A blur of punches with a crushing fifth blow. Special: Meteor Fist rockets you forward into a shockwave.',
+    color: '#c8ff5a',
+    cost: 90,
+  },
+  scythe: {
+    name: "Reaper's Crescent",
+    blurb: 'Wide, heavy sweeps that end in a full spin. Special: Soul Reap sends a spectral scythe whirling around you.',
+    color: '#b48cff',
+    cost: 140,
+  },
 };
 
 export function createWeapon(id: WeaponId): Weapon {
@@ -76,6 +89,10 @@ export function createWeapon(id: WeaponId): Weapon {
       return new Spear();
     case 'bow':
       return new Bow();
+    case 'fists':
+      return new Gauntlets();
+    case 'scythe':
+      return new Scythe();
     default:
       return new Sword();
   }
@@ -106,7 +123,7 @@ export function swirl(p: Player, w: World): void {
   w.addSwipe(p.x, p.y, 110, 0, Math.PI, 0.3, '#c9b8ff', 14, true);
 }
 
-function meleeHit(
+export function meleeHit(
   p: Player,
   w: World,
   aim: number,
@@ -132,7 +149,7 @@ function meleeHit(
   });
 }
 
-function thrust(
+export function thrust(
   p: Player,
   w: World,
   aim: number,
@@ -156,7 +173,7 @@ function thrust(
   });
 }
 
-function slamCommon(p: Player, w: World, dmg: number, color: string, r = 120): void {
+export function slamCommon(p: Player, w: World, dmg: number, color: string, r = 120): void {
   gravityPull(w, p.x, p.y, r);
   w.addHitbox({ team: 'player', shape: { type: 'circle', x: p.x, y: p.y, r }, damage: dmg, source: 'attack', knock: 480, ttl: 0.08, hit: new Set(), owner: p, hitstop: 0.06 });
   w.camera.shake(0.35);

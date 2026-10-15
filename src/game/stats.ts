@@ -49,6 +49,18 @@ export interface PlayerStats {
   potionHeal: number;
   artifactCdMult: number;
   chestChance: number;
+  // --- progression (level-gated mechanics, talents, heroes, forge)
+  canPotion: boolean;
+  canCast: boolean;
+  canJump: boolean;
+  canWrath: boolean;
+  artifactSlots: number;
+  wrathGain: number;
+  lifeOnKill: number;
+  /** Extra damage against guardians and enchanted foes. */
+  bigGameDmg: number;
+  knockMult: number;
+  forgeTier: number;
 }
 
 export function baseStats(): PlayerStats {
@@ -94,5 +106,15 @@ export function baseStats(): PlayerStats {
     potionHeal: 0.35,
     artifactCdMult: 1,
     chestChance: 0.25,
+    canPotion: true,
+    canCast: true,
+    canJump: true,
+    canWrath: false,
+    artifactSlots: 3,
+    wrathGain: 1,
+    lifeOnKill: 0,
+    bigGameDmg: 0,
+    knockMult: 1,
+    forgeTier: 1,
   };
 }

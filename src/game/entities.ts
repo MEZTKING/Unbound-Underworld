@@ -2,7 +2,7 @@ import type { Actor } from './actor';
 import type { DamageSource, GodId, RewardSpec, Shape, Team } from './types';
 import type { World } from './world';
 
-export type ProjStyle = 'orb' | 'arrow' | 'bolt' | 'glob' | 'shard' | 'spear' | 'fire' | 'needle' | 'bomb';
+export type ProjStyle = 'orb' | 'arrow' | 'bolt' | 'glob' | 'shard' | 'spear' | 'fire' | 'needle' | 'bomb' | 'crescent';
 
 export class Projectile {
   x: number;

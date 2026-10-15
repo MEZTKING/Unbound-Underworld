@@ -5,6 +5,12 @@ export interface TouchHud {
   /** Gameplay is running (no menu, not on the title screen). */
   active: boolean;
   artifacts: ({ glyph: string; color: string; cd: number; usable: boolean } | null)[];
+  /** Level-gated buttons are hidden until unlocked. */
+  cast: boolean;
+  jump: boolean;
+  potion: boolean;
+  /** Wrath gauge 0..1, or null while Wrath is locked. */
+  wrath: number | null;
   potionCd: number;
   castAmmo: number;
   interact: string | null;
@@ -22,6 +28,7 @@ const BUTTONS: { a: Action; cls: string; label: string }[] = [
   { a: 'dash', cls: 'dash', label: '»' },
   { a: 'jump', cls: 'jump', label: '⤒' },
   { a: 'potion', cls: 'potion small', label: '⚗' },
+  { a: 'wrath', cls: 'wrath small', label: '☄' },
   { a: 'artifact1', cls: 'art art1 small', label: '' },
   { a: 'artifact2', cls: 'art art2 small', label: '' },
   { a: 'artifact3', cls: 'art art3 small', label: '' },
@@ -51,6 +58,7 @@ export class TouchControls {
   private joyOrigin = { x: 0, y: 0 };
   private held = new Map<number, Held>();
   private last = '';
+  private lefty = false;
   /** Called on the first touch so audio can unlock inside the gesture. */
   onFirstTouch: (() => void) | null = null;
 
@@ -75,6 +83,20 @@ export class TouchControls {
     window.addEventListener('touchstart', () => this.enable(), { passive: true, capture: true });
     window.addEventListener('blur', () => this.releaseAll());
     if (window.matchMedia?.('(pointer: coarse)').matches) this.enable();
+  }
+
+  /** Button size, opacity and a mirrored layout for left-handed play. */
+  configure(size: number, opacity: number, leftHanded: boolean): void {
+    this.root.style.setProperty('--tscale', `${size}`);
+    this.root.style.setProperty('--topa', `${opacity}`);
+    this.lefty = leftHanded;
+    this.root.classList.toggle('lefty', leftHanded);
+    this.last = '';
+  }
+
+  /** Screen x as laid out (the layer is mirrored in left-handed mode). */
+  private lx(x: number): number {
+    return this.lefty ? window.innerWidth - x : x;
   }
 
   enable(): void {
@@ -106,11 +128,11 @@ export class TouchControls {
         this.held.set(t.identifier, { action, el: btn, ox: t.clientX, oy: t.clientY });
         btn.classList.add('down');
         this.input.virtualPress(action);
-      } else if (this.joyId === null && t.clientX < window.innerWidth * 0.5) {
+      } else if (this.joyId === null && this.lx(t.clientX) < window.innerWidth * 0.5) {
         this.joyId = t.identifier;
         this.joyOrigin = { x: t.clientX, y: t.clientY };
         this.base.classList.remove('idle');
-        this.base.style.left = `${t.clientX}px`;
+        this.base.style.left = `${this.lx(t.clientX)}px`;
         this.base.style.top = `${t.clientY}px`;
         this.knob.style.transform = 'translate(-50%, -50%)';
         this.input.lastTouchUse = performance.now();
@@ -130,12 +152,12 @@ export class TouchControls {
           const k = (d - JOY_RADIUS) / d;
           this.joyOrigin.x += dx * k;
           this.joyOrigin.y += dy * k;
-          this.base.style.left = `${this.joyOrigin.x}px`;
+          this.base.style.left = `${this.lx(this.joyOrigin.x)}px`;
           this.base.style.top = `${this.joyOrigin.y}px`;
           dx = t.clientX - this.joyOrigin.x;
           dy = t.clientY - this.joyOrigin.y;
         }
-        this.knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        this.knob.style.transform = `translate(calc(-50% + ${this.lefty ? -dx : dx}px), calc(-50% + ${dy}px))`;
         this.input.touchMove = { x: dx / JOY_RADIUS, y: dy / JOY_RADIUS };
         this.input.lastTouchUse = performance.now();
         continue;
@@ -199,8 +221,16 @@ export class TouchControls {
       el.classList.toggle('dim', !a.usable);
     });
     const potion = this.els.get('potion')!;
+    potion.classList.toggle('gone', !hud.potion);
     potion.style.setProperty('--cd', `${hud.potionCd}`);
-    this.els.get('cast')!.classList.toggle('dim', hud.castAmmo <= 0);
+    const cast = this.els.get('cast')!;
+    cast.classList.toggle('gone', !hud.cast);
+    cast.classList.toggle('dim', hud.castAmmo <= 0);
+    this.els.get('jump')!.classList.toggle('gone', !hud.jump);
+    const wrath = this.els.get('wrath')!;
+    wrath.classList.toggle('gone', hud.wrath === null);
+    wrath.style.setProperty('--cd', `${1 - (hud.wrath ?? 0)}`);
+    wrath.classList.toggle('ready', hud.wrath !== null && hud.wrath >= 1);
     const interact = this.els.get('interact')!;
     interact.classList.toggle('gone', !hud.interact);
     if (hud.interact) (interact.firstElementChild as HTMLElement).textContent = hud.interact;

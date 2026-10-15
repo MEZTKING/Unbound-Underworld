@@ -27,7 +27,7 @@ export type GodId =
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'heroic' | 'duo';
 
-export type WeaponId = 'sword' | 'spear' | 'bow';
+export type WeaponId = 'sword' | 'spear' | 'bow' | 'fists' | 'scythe';
 
 export type BiomeId = 'tartarus' | 'asphodel' | 'elysium' | 'styx';
 

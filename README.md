@@ -73,20 +73,32 @@ To try the touch controls on a computer, open the browser's device toolbar (phon
 | Jump (attack mid-air to **Slam**) | `Shift` or `C` | `B` |
 | Artifacts | `1` `2` `3` | `RT` · `LT` · `L3` |
 | Healing potion | `R` | `LB` |
+| Wrath (ultimate, when the gauge is full) | `F` | `R3` |
 | Interact | `E` | `Select` / `R3` |
 | Pause · Mute | `Esc` · `M` | `Start` |
 
 Menus work with the mouse, arrow keys with `Enter`/`Space`, or the D-pad with `A`/`B`. Number keys pick cards directly.
 
+New players start with just Attack, Special and Dash. The other controls unlock as you level up (see below), and the HUD, the touch buttons and the in-game control lists only show what you've unlocked.
+
 ## What's in it
+
+### Progression
+- **Levels and ranks.** Slain foes, cleared chambers, guardians and escapes earn experience that carries over between runs. There are 30 levels in five rank tiers: Shade, Wraith, Revenant, Champion and Unbound.
+- **Gentle onboarding.** The first runs only have Attack, Special and Dash. New mechanics unlock one at a time, each announced with a short explanation: Healing Potion (level 2), Cast (3), Jump & Slam (4), Artifacts (5), Enchantments (6), Hephaestus' Anvil (7), a second artifact slot (8), Wrath (10) and a third artifact slot (12).
+- **Talents.** Every level gives a point to spend at *Ascension* in the hub. There are 14 talents in five rows, and each row opens with a new rank tier. Resetting your talents is free.
+- **Weapon forging.** At the Armory, spend Ash to forge each weapon from Tier I up to Tier V (Mythic) for more damage. From Tier III (Awakened), every fourth Attack also unleashes an arcane wave. The waves grow at Tier IV, and at Tier V they split in three and the weapon blazes.
+- **Heroes.** Six heroes, each with their own look, perks and **Wrath** ultimate. You choose them in the Hall of Heroes. *Kael* (Inferno Nova), *Lyra* (Moonfall) and *Doran* (Titan's Quake) are available from the start. *Ione* (Tidal Surge) unlocks at level 8, *Erebos* (Eclipse) after slaying 2 guardians, and *Selene* (Starfall) after your first escape.
+- **Wrath.** A golden gauge that fills as you deal and take damage. When it's full, press `F` to unleash your hero's screen-clearing ultimate.
+- **Late-game weapons.** *Titan Gauntlets* (level 8): rapid punch combos and a rocketing Meteor Fist. *Reaper's Crescent* (level 14): wide sweeps and spectral scythes that orbit you. Each comes with its own anvil upgrades.
 
 ### The Hades-style core
 - **Combat.** Each weapon has a combo, a dash-strike and a special. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
-- **Three weapons.** *Nightblade* (sword: combo plus Nova Smash), *Thornspear* (thrusts, a charged spin, and a spear you throw and recall) and *Moonbow* (charged shots with a perfect-timing Power Shot, plus a volley). Each weapon has five anvil upgrades.
+- **Five weapons.** *Nightblade* (sword: combo plus Nova Smash), *Thornspear* (thrusts, a charged spin, and a spear you throw and recall) and *Moonbow* (charged shots with a perfect-timing Power Shot, plus a volley), followed later by the *Titan Gauntlets* and *Reaper's Crescent*. Each weapon has its own anvil upgrades.
 - **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity. There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
 - **The run.** Tartarus, then Asphodel, then Elysium, then the Gates of the Styx: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain). Charon sells wares, and an antechamber with a shop and a fountain comes before each guardian.
 - **Four guardians.** *Campe*, Jailer of Tartarus. *The Hydra*, which grows extra heads. *Talos, the Bronze Colossus*: break his armor and he overheats, leaving him open. *Cerberus*, Warden of the Gate, who charges, breathes fire and leap-slams.
-- **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock weapons and starting artifacts, read your stats in the Chronicle, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
+- **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your stats in the Chronicle, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
 
 ### Inspired by Minecraft Dungeons II
 - **Jump and Slam.** Hop over lava, chasms, spike traps and boss shockwaves. Attack mid-air for a weapon-specific ground slam.
@@ -96,6 +108,13 @@ Menus work with the mouse, arrow keys with `Enter`/`Space`, or the D-pad with `A
 - **Enchanted foes.** Swift, Armored, Volatile and Regenerating variants with a violet aura.
 - **Treasure chests**, and some of them are Mimics.
 - **New foes.** Hisslings (fused exploders), Weavers (web spitters that slow you) and Bonecallers (summoners).
+
+### Settings
+*Settings* (on the title screen or in the pause menu) has:
+- **Audio:** sound and music volume, mute.
+- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints.
+- **Display:** screen shake, flash intensity, hit-stop, an FPS counter and fullscreen.
+- **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 
 ## Development
 
@@ -151,7 +170,8 @@ These URL parameters are handy for testing:
 | `?god` | Take no damage |
 | `?biome=0..3` | Start runs in a later region |
 | `?room=boss` | Start a run in that region's guardian chamber |
-| `?weapon=sword\|spear\|bow` | Try a weapon for this session |
+| `?weapon=sword\|spear\|bow\|fists\|scythe` | Try a weapon for this session |
+| `?level=12` | Play at that level for this session (unlocks everything up to it) |
 | `?seed=123` | Use a fixed run seed |
 
 ### Project layout
@@ -169,8 +189,12 @@ src/
     game.ts      orchestrator: hub, run flow, rewards, shop, saves (implements WorldHost)
     world.ts     one room's simulation: actors, hitboxes, projectiles, zones, traps, doors, flow-field AI
     player.ts    movement, dash, jump/slam, cast, potion, action state machine
-    weapons.ts   sword, spear, bow
+    weapons.ts   sword, spear, bow (and shared weapon helpers)
     boons.ts     gods, boons, duos, rarities, offers, stat computation
+    progression.ts  levels, rank tiers, feature unlocks, talents, weapon forge
+    characters.ts   heroes, their perks and Wrath ultimates
+    arsenal.ts   late-game weapons (Titan Gauntlets, Reaper's Crescent)
+    prefs.ts     live gameplay/display settings
     enchants.ts  enchantments    artifacts.ts  artifacts & allies
     combat.ts    damage pipeline and status effects
     enemies/     enemy base class, regular foes, bosses

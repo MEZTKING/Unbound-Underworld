@@ -13,6 +13,8 @@ import { createEnemy } from './enemies';
 import { Enemy } from './enemies/enemy';
 import { Pickup, Projectile, Zone, type Hitbox, type Telegraph } from './entities';
 import { Player } from './player';
+import { prefs } from './prefs';
+import { WRATH_PER_TAKEN } from './progression';
 import { buildGrid, CELL, DOOR_W, hazardContains, TRAP_SIZE, type BiomeInfo, type RoomLayout, type Wave } from './rooms';
 import { renderWorld } from './render';
 import type { PlayerStats } from './stats';
@@ -158,6 +160,8 @@ export class World {
   boss: Enemy | null = null;
   banner: { title: string; sub: string; t: number } | null = null;
   hurtFlash = 0;
+  /** Darkness from Erebos' Eclipse. */
+  eclipseT = 0;
   exiting = false;
   /** Pre-rendered floor and walls. */
   roomCanvas: HTMLCanvasElement | null = null;
@@ -215,6 +219,7 @@ export class World {
   }
 
   hitstop(t: number): void {
+    if (!prefs.hitstop) return;
     this.hitstopT = Math.max(this.hitstopT, Math.min(0.12, t));
   }
 
@@ -590,6 +595,7 @@ export class World {
     amount = Math.max(1, Math.round(amount));
     if (this.host.godMode) amount = 0;
     p.hp -= amount;
+    if (s.canWrath && amount > 0) p.gainWrath(amount * WRATH_PER_TAKEN * s.wrathGain);
     if (environmental) {
       p.flash = 0.1;
     } else {
@@ -603,7 +609,7 @@ export class World {
         p.knock(p.x - src.x, p.y - src.y, 280);
       }
     }
-    if (amount > 0) this.particles.text(p.x, p.y - 70, `-${amount}`, '#ff4a4a', 20);
+    if (amount > 0 && prefs.damageNumbers) this.particles.text(p.x, p.y - 70, `-${amount}`, '#ff4a4a', 20);
     this.particles.burst(p.x, p.y - 25, '#ff3040', 12, 260);
     if (s.retaliate > 0 && src instanceof Enemy && !src.dead) lightningBolt(this, src, s.retaliate);
     if (p.hp <= 0) {
@@ -694,6 +700,7 @@ export class World {
       if (this.banner.t > 3.2) this.banner = null;
     }
     this.hurtFlash = Math.max(0, this.hurtFlash - rawDt);
+    this.eclipseT = Math.max(0, this.eclipseT - rawDt);
     if (this.hitstopT > 0) {
       this.hitstopT -= rawDt;
       this.camera.follow(this.player, rawDt, this.room);
