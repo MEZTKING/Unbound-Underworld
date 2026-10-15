@@ -11,7 +11,10 @@ A fast, top-down action roguelike for desktop, phones and the browser. You fight
 
 ## Download
 
-Get the latest build from the [Releases page](https://github.com/MEZTKING/Unbound-Underworld/releases):
+Get the latest build from the [Releases page](https://github.com/MEZTKING/Unbound-Underworld/releases).
+
+> For now, new releases include only the **Windows installer** and the **Android APK**. The portable Windows build, macOS, Linux and the web zip were last published in [v0.2.1](https://github.com/MEZTKING/Unbound-Underworld/releases/tag/v0.2.1). They can be built again at any time (see *App builds* below).
+
 
 | Platform | File | How to run |
 |---|---|---|
@@ -142,7 +145,7 @@ npm run dist:desktop -- --linux # or pick a platform: --win, --mac, --linux
 npm run android:apk             # Android debug APK (needs the Android SDK and Java 21)
 ```
 
-The **App builds** GitHub workflow builds Windows, macOS, Linux, Android and the web version zip. Push a version tag and it publishes everything on a GitHub Release:
+The **App builds** GitHub workflow builds the Windows installer and the Android APK. To also build the portable Windows exe, macOS, Linux and the web version zip, run it from the Actions tab with *all_platforms* ticked. Push a version tag and it publishes the builds on a GitHub Release:
 
 ```bash
 npm version patch               # bump the version in package.json and create a tag such as v0.1.1
