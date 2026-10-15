@@ -1703,3 +1703,103 @@ h3.section small {
 .choice-panel:has(.glossary) {
   width: min(940px, 100%);
 }
+
+/* ---------------------------------------------------------------- title screen fits one page
+   The title never scrolls: the update notice is a banner pinned to the top,
+   and short (phone) screens put the logo beside the menu. */
+.title-screen {
+  overflow: hidden;
+}
+.title-screen:has(.update-banner:not(:empty)) {
+  padding-top: 64px;
+}
+.update-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  flex-direction: row !important;
+  gap: 14px;
+  padding: 6px 8px 6px 18px;
+  margin: 0 !important;
+  white-space: nowrap;
+  background: linear-gradient(180deg, #3a2410, #1c1008);
+  border: 2px solid var(--gild-hi, #f2d38a);
+  border-radius: 6px;
+  box-shadow: 0 0 24px rgba(242, 211, 138, 0.45);
+  animation: update-glow 1.6s ease-in-out infinite alternate;
+}
+.update-banner .update-note {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 16px;
+  color: #ffe7a8;
+}
+.update-banner .btn {
+  margin: 0;
+  min-width: 0;
+  padding: 7px 16px;
+}
+@keyframes update-glow {
+  from {
+    box-shadow: 0 0 12px rgba(242, 211, 138, 0.3);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(242, 211, 138, 0.7);
+  }
+}
+.logo {
+  font-size: clamp(36px, min(8vw, 11vh), 92px);
+}
+.tagline {
+  margin: clamp(8px, 2.4vh, 18px) 0 clamp(10px, 3.6vh, 30px);
+}
+.title-screen .menu .btn {
+  margin: clamp(3px, 0.8vh, 6px);
+}
+.credits {
+  margin-top: clamp(10px, 3vh, 34px);
+}
+@media (max-height: 600px) {
+  .title-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'head menu' 'credits credits';
+    column-gap: 32px;
+    align-items: center;
+  }
+  .title-head {
+    grid-area: head;
+  }
+  .title-wrap .menu {
+    grid-area: menu;
+  }
+  .title-wrap .credits {
+    grid-area: credits;
+    margin-top: 8px;
+    font-size: 11px;
+    max-width: none;
+  }
+  .logo {
+    font-size: clamp(30px, 6.5vw, 60px);
+  }
+  .tagline {
+    font-size: 15px;
+  }
+  .title-screen .menu .btn {
+    padding: 6px 14px;
+    margin: 3px;
+    font-size: 14px;
+    min-width: 220px;
+  }
+  .title-screen .menu .btn small {
+    font-size: 11px;
+  }
+  .update-banner .update-note {
+    font-size: 14px;
+  }
+  .title-screen:has(.update-banner:not(:empty)) {
+    padding-top: 52px;
+  }
+}

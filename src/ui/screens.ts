@@ -115,9 +115,12 @@ export function title(g: Game): void {
   const saved = savedRunLabel(g);
   const el = g.ui.push(
     'title-screen',
-    `<div class="title-wrap">
-      <div class="logo">UNBOUND<span>UNDERWORLD</span></div>
-      <div class="tagline">Fight your way out of the realm of the dead.</div>
+    `<div class="update-box update-banner" data-box></div>
+    <div class="title-wrap">
+      <div class="title-head">
+        <div class="logo">UNBOUND<span>UNDERWORLD</span></div>
+        <div class="tagline">Fight your way out of the realm of the dead.</div>
+      </div>
       <div class="menu">
         ${saved ? `<button class="btn primary resume" data-nav data-a="resume">Resume Escape<small>${esc(saved)}</small></button>` : ''}
         <button class="btn${saved ? '' : ' primary'}" data-nav data-a="play">${saved ? 'Hall of Shades' : g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
@@ -126,7 +129,6 @@ export function title(g: Game): void {
         <button class="btn" data-nav data-a="settings">Settings</button>
         ${CAN_EXIT ? '<button class="btn" data-nav data-a="quit">Exit Game</button>' : ''}
       </div>
-      <div class="update-box" data-box></div>
       <div class="credits">An original action roguelike inspired by Hades &amp; Minecraft Dungeons. Not affiliated with either.</div>
     </div>
     <div class="version">v${APP_VERSION}</div>`,
