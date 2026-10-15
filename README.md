@@ -80,8 +80,8 @@ To try the touch controls on a computer, open the browser's device toolbar (phon
 | Attack (tap to chain; hold after a hit for the powered attack) | `LMB` or `J` | `X` |
 | Special | `RMB` or `K` | `Y` |
 | Cast a shard | `Q` or `L` | `RB` |
-| Dash (brief invulnerability) | `Space` | `A` |
-| Jump (attack mid-air to **Slam**) | `Shift` or `C` | `B` |
+| Dash (brief invulnerability) | `Shift` | `A` |
+| Jump (attack mid-air to **Slam**) | `Space` or `C` | `B` |
 | Guard (hold to block, tap just before a hit to parry) | `V` | `LT` |
 | Artifacts | `1` `2` `3` | `RT` · D-pad left · `L3` |
 | Healing potion | `R` or `4` | `LB` |
@@ -96,6 +96,8 @@ Every keyboard key can be changed under *Settings → Controls → Key bindings*
 You can walk while you fight: basic attacks keep most of your speed and never push you forward, and only moves that are meant to (dash-strikes, some specials) lunge.
 
 **The combat grammar.** Every weapon works the same way: tap Attack to chain hits; hold Attack after a chain hit to charge its **powered attack** (let go on the flash for a *Perfect*, +25%); use your Special straight out of a chain for a faster, stronger **combo special**. Hits in a row without getting hurt build the **combo meter** (+1% damage per 10 hits, up to +10%).
+
+**Seeing your reach.** A faint dashed outline in front of the hero shows where your next hit will land (it follows the chain: a wider sweep for a finisher, a line for a thrust or a shot). While a powered attack or a draw charges, the outline shows its full reach and fills up, and a **charge meter** over the hero shows how far it has powered up, the chain level it carries (pips), the gold *Perfect* window and the damage multiplier a release would deal now. Turn both off with *Attack range outline* in Settings.
 
 **Guard and parry** (level 2). Hold Guard to block hits from the front; blocking drains a guard meter, and an empty meter staggers you. Tap Guard just before a hit lands to **parry**: no damage, the foe staggers, shots fly back, and your next attack is a sure critical **riposte**. Ground shockwaves can't be guarded: jump or dash. Each class guards its own way (see Heroes).
 
@@ -118,7 +120,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Combat.** Each weapon has a chain, a powered attack, a dash-strike, a special and a slam. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
 - **Eight weapons, one per class.** *Nightblade* (Crescent Cleave), *Moonbow* (quick shots, Power Shot, Rain of Arrows), *Thornspear* (Skewer Lance, a spin, a spear you throw and recall), *Titan Gauntlets* (Titan Uppercut, Meteor Fist), *Riptide Chains* (Whirlpool, Tidal Snap), *Reaper's Crescent* (Harvest, Soul Reap), *Thunderbuss* (Grapeshot Cannon, Powder Keg) and *Starsplitter* (Moonlit Iaido, Thousand Cuts). Each weapon has three or more anvil upgrades.
 - **Foes that fight fair.** Foes turn at their own speed (circle a Brute to get behind it), lock their aim when a windup starts, take turns (only a few attack at once while the rest circle), come at you from different sides, and pause a moment after appearing. Higher Torment makes them more aggressive and more accurate.
-- **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity. There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
+- **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity; the first boon of an escape is almost always Common, and higher rarities grow more likely region by region (every chance roll is listed in GAME_DATA.md → *Probabilities*). There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
 - **The run.** The Shackled Deep, then the Ember Fields, then the Gilded Groves, then the Last Gate: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have, and every one of them can be skipped for 25 obols. Shops never block the way: walk through any door. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
 - **Four guardians.** *Vexa*, Warden of Chains. *The Many-Maw*, which grows extra heads. *Aurex, the Gilded Colossus*: break his armor and he overheats, leaving him open. *Threefang*, Hound of the Last Gate, who charges, breathes fire and leap-slams.
 - **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your records, the **bestiary** (each foe stays a black silhouette until you slay it) and **achievements** in the Chronicle, customise your hero's colours and headwear, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
@@ -135,7 +137,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 ### Settings
 *Settings* (on the title screen or in the pause menu) has:
 - **Audio:** sound and music volume, mute.
-- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints, and (on phones) door descriptions for every door or only the one you walk up to.
+- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, the attack range outline and charge meter, control hints, and (on phones) door descriptions for every door or only the one you walk up to.
 - **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus **UI size**, a **window mode** on desktop (Windowed, Borderless or Fullscreen), screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 

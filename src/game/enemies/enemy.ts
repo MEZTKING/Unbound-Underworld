@@ -85,6 +85,9 @@ export abstract class Enemy extends Actor {
   reactT = 0.15 + Math.random() * 0.45;
   /** The side of the player this foe likes to come from, so groups surround you. */
   readonly slot = Math.random() * TAU;
+  /** Seconds this foe has been stuck out of reach (see `World.unstick`). */
+  stuckT = 0;
+  lastPos = { x: 0, y: 0 };
 
   constructor(x: number, y: number, spec: EnemySpec, hpScale = 1) {
     super();

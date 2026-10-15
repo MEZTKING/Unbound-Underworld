@@ -2,12 +2,13 @@
 // always matches the code. Run with `npm run docs`; CI fails if it's stale.
 import { writeFileSync } from 'node:fs';
 import { ARTIFACTS } from '../src/game/artifacts';
-import { BOON_BY_ID, BOONS, boonValue, GODS, HAMMERS, RARITY_MULT } from '../src/game/boons';
+import { BOON_BY_ID, BOON_RARITY_BY_REGION, boonRarityOdds, BOONS, boonValue, GODS, HAMMERS, RARITY_MULT } from '../src/game/boons';
 import { CHARACTERS, heroForWeapon } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
-import { ENCHANTS, MAX_ENCHANT_TIER } from '../src/game/enchants';
+import { CHAINS, ECHO, ENCHANTS, MAX_ENCHANT_TIER, RADIANCE, RAMPAGING, STUNNING } from '../src/game/enchants';
 import { heatScale, UPGRADES, WEAPON_IDS } from '../src/game/meta';
-import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, PERKS, RARITY_ORDER, rarityOdds, SLOT_NAME, upgradeCost } from '../src/game/gear';
+import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, eliteChance, FOE_DROP, GEAR_LUCK, POM_DOUBLE, POT, SIPHON, type DoorReward } from '../src/game/odds';
+import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, PERKS, RARITY_ORDER, rarityOdds, regionMaterial, SLOT_NAME, upgradeCost } from '../src/game/gear';
 import { FORGE, levelFromXp, MAX_LEVEL, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
 import { BIOMES, ENEMY_COST } from '../src/game/rooms';
@@ -18,6 +19,8 @@ const out: string[] = [];
 const line = (s = '') => out.push(s);
 /** Escapes table cells. */
 const c = (v: unknown) => String(v).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+/** A chance as a percentage: 1 decimal under 10%, none above. */
+const pc = (v: number) => (v <= 0 ? '—' : `${+(v * 100).toFixed(v < 0.1 ? 1 : 0)}%`);
 function table(head: string[], rows: unknown[][]): void {
   line(`| ${head.join(' | ')} |`);
   line(`|${head.map(() => '---').join('|')}|`);
@@ -46,6 +49,7 @@ for (const [t, a] of [
   ['Enemies', 'enemies'],
   ['Torment (difficulty)', 'torment-difficulty'],
   ['Door rewards', 'door-rewards'],
+  ['Probabilities', 'probabilities'],
 ]) line(`- [${t}](#${a})`);
 line();
 
@@ -189,15 +193,14 @@ table(
 // ---------------------------------------------------------------- loot & gear
 line('## Loot and gear');
 line();
-line(`Unlocks at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Up to ${INVENTORY_SIZE} pieces are kept; a full inventory salvages new finds.`);
+line(`Unlocks at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}. Foes drop materials; gear drops from foes (${pc(FOE_DROP.gear)}), enchanted foes (${pc(FOE_DROP.eliteGear)}), chests (${pc(CHEST.gear)}) and guardians (always, Rare or better). Every drop chance is listed under *Probabilities*. Up to ${INVENTORY_SIZE} pieces are kept; a full inventory salvages new finds.`);
 line();
 table(
   ['Material', 'Source'],
   MATERIAL_IDS.map((k) => [`${MATERIALS[k].glyph} ${MATERIALS[k].name}`, MATERIALS[k].desc]),
 );
 const odds0 = rarityOdds(0);
-const oddsBoss = rarityOdds(0.6);
-const pc = (v: number) => `${(v * 100).toFixed(v < 0.01 ? 1 : 0)}%`;
+const oddsBoss = rarityOdds(GEAR_LUCK.guardian);
 table(
   ['Tier', 'Bonuses', 'Bonus strength ×', 'Chance (foe)', 'Chance (guardian luck)', 'Perk'],
   RARITY_ORDER.map((k) => [GEAR_RARITY[k].name, GEAR_RARITY[k].affixes, GEAR_RARITY[k].power, pc(odds0[k]), pc(oddsBoss[k]), k === 'unique' ? 'One Unique perk' : k === 'ghost' ? 'One Ghost perk' : '—']),
@@ -280,6 +283,122 @@ table(
 line('## Door rewards');
 line();
 table(['Reward', 'Shown on the door'], Object.values(REWARD_INFO).map((r) => [`${r.glyph} ${r.label}`, r.desc]));
+
+// ---------------------------------------------------------------- probabilities
+line('## Probabilities');
+line();
+line('Every chance roll in an escape. The weights and chances come from `src/game/odds.ts`, `boons.ts` (boon rarity), `gear.ts` (gear tiers) and `enchants.ts` (enchantment procs).');
+line();
+
+line('### Doors');
+line();
+const doorTotal = DOOR_COUNT.reduce((a, [, wt]) => a + wt, 0);
+table(['Doors after a chamber', 'Weight', 'Chance'], DOOR_COUNT.map(([n, wt]) => [n, wt, pc(wt / doorTotal)]));
+line('Each door then rolls its reward from the weights below, among the rewards allowed right now. A reward shows on at most one door of a set, and two boon doors never share a god. *Chance* is for one door when every reward is allowed.');
+line();
+const doorKinds = Object.keys(DOOR_WEIGHT) as DoorReward[];
+const weightTotal = doorKinds.reduce((a, k) => a + DOOR_WEIGHT[k], 0);
+table(
+  ['Reward', 'Weight', 'Chance', 'Allowed when'],
+  doorKinds.map((k) => [REWARD_INFO[k] ? `${REWARD_INFO[k].glyph} ${REWARD_INFO[k].label}` : k, DOOR_WEIGHT[k], pc(DOOR_WEIGHT[k] / weightTotal), DOOR_RULE[k]]),
+);
+line('Fixed doors: after the last chamber of a region comes the antechamber, then the guardian; after a guardian, a boon door into the next region.');
+line();
+
+line('### Boon rarity');
+line();
+line('Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike; deeper regions raise the odds. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon.');
+line();
+const rar = (o: { common: number; rare: number; epic: number; heroic: number }) => [pc(o.common), pc(o.rare), pc(o.epic), pc(o.heroic)];
+const favorMax = UPGRADES.find((u) => u.id === 'favor')?.costs.length ?? 3;
+table(
+  ['When', 'Common', 'Rare', 'Epic', 'Heroic'],
+  [
+    ['First boon of an escape', ...rar(boonRarityOdds(0, true))],
+    ...BOON_RARITY_BY_REGION.map((_, i) => [BIOMES[i]?.name ?? `Region ${i + 1}`, ...rar(boonRarityOdds(i))]),
+    ...BOON_RARITY_BY_REGION.map((_, i) => [`${BIOMES[i]?.name ?? `Region ${i + 1}`}, Favor ${favorMax}`, ...rar(boonRarityOdds(i, false, favorMax))]),
+  ],
+);
+line(`Boon offers: up to 3 of the god's boons you can take, drawn evenly. A Duo boon (when its two gods are both in your build) replaces one of them ${pc(DUO_CHANCE)} of the time. Duo boons have no rarity. Anvil upgrades: 3 drawn evenly from the ones you don't own. A Pomegranate levels a boon by 2 instead of 1 ${pc(POM_DOUBLE)} of the time.`);
+line();
+
+line('### Chambers and foes');
+line();
+line('Chamber 1 of a region has 1 wave, chambers 2–3 have 2 and later chambers 3. Foes are drawn by weight from the region\'s pool until the wave\'s budget is spent. A foe that costs 2 or more may carry an elite trait (Armored, Swift, Volatile or Regenerating, evenly). Chambers behind an Anvil or Artifact door hold *enchanted foes*: +30%, up to 45%.');
+line();
+const maxRooms = Math.max(...BIOMES.map((b) => b.combatRooms));
+const regions = BIOMES.map((b, i) => [b, i] as const).filter(([b]) => b.combatRooms > 0);
+table(
+  ['Chamber', ...regions.map(([b]) => b.name), ...regions.map(([b]) => `${b.name} (enchanted)`)],
+  Array.from({ length: maxRooms }, (_, d) => [d + 1, ...regions.map(([, i]) => pc(eliteChance(d, i, false))), ...regions.map(([, i]) => pc(eliteChance(d, i, true)))]),
+);
+
+line('### Foe drops');
+line();
+const regionMats = [...new Set(BIOMES.map((_, i) => MATERIALS[regionMaterial(i)].name))].join(' / ');
+const D = FOE_DROP;
+table(
+  ['Drop', 'Foe', 'Elite foe', 'Guardian'],
+  [
+    ['Obols (gold)', pc(D.gold), pc(D.gold), pc(D.gold)],
+    ['Souls', `1, +1 at ${pc(D.extraSoul)}`, '4', '25'],
+    [`${MATERIALS.bone.glyph} ${MATERIALS.bone.name}`, `${pc(D.bone)} (×2 at ${pc(D.extraBone)})`, `${pc(D.bone * D.eliteMult)} (×2 at ${pc(D.extraBone)})`, `${pc(Math.min(1, D.bone * D.guardianMult))} (×10)`],
+    [`Region material (${regionMats})`, pc(D.regional), pc(D.regional * D.eliteMult), `${pc(Math.min(1, D.regional * D.guardianMult))} (×6)`],
+    [`${MATERIALS.scale.glyph} ${MATERIALS.scale.name}`, '—', pc(D.eliteScale), '100% (×3–5)'],
+    ['Gear', pc(D.gear), pc(D.eliteGear), '100% (Rare or better)'],
+  ],
+);
+line('Breaking a pot: ' + `${pc(POT.gold)} obols (1–5), else ${pc(POT.souls)} two souls: ${pc((1 - POT.gold) * POT.souls)} overall, nothing ${pc((1 - POT.gold) * (1 - POT.souls))}.`);
+line();
+
+line('### Treasure chests');
+line();
+table(
+  ['Roll', 'Chance'],
+  [
+    ['A combat chamber holds a chest', `${pc(CHEST.spawn)} (+10% per Treasure Sense tier)`],
+    ['The chest is a Mimic (combat chambers)', pc(CHEST.mimic)],
+    ['Always inside', '15–35 obols, 6 souls, 3 Bone Dust'],
+    ['Also a piece of gear', pc(CHEST.gear)],
+    ['An artifact pops out', `${pc(CHEST.artifact)} (artifacts unlocked, one left to find)`],
+    ['Otherwise an enchantment', `${pc(CHEST.enchant - CHEST.artifact)} (${pc(CHEST.enchant)} when no artifact is left)`],
+  ],
+);
+
+line('### Gear tiers by source');
+line();
+line('Luck slides the tier odds toward the better tiers. Guardians then lift anything below Rare up to Rare.');
+line();
+const luckRows: [string, number][] = [
+  ...BIOMES.map((b, i) => [`Foe, ${b.name}`, i * GEAR_LUCK.perRegion] as [string, number]),
+  ['Chest', GEAR_LUCK.chest],
+  ['Guardian', GEAR_LUCK.guardian],
+];
+table(
+  ['Source', 'Luck', ...RARITY_ORDER.map((k) => GEAR_RARITY[k].name)],
+  luckRows.map(([name, luck]) => {
+    const o = rarityOdds(luck);
+    return [name, luck.toFixed(1), ...RARITY_ORDER.map((k) => pc(o[k]))];
+  }),
+);
+
+line('### Enchantment procs');
+line();
+const tiers = Array.from({ length: MAX_ENCHANT_TIER }, (_, i) => i + 1);
+const nameOf = (id: string) => ENCHANTS.find((e) => e.id === id)?.name ?? id;
+table(
+  ['Enchantment', 'Roll', ...tiers.map((t) => `Tier ${t}`)],
+  [
+    [nameOf('echo'), 'Attack strikes again', ...tiers.map((t) => pc(ECHO[t - 1]))],
+    [nameOf('chains'), 'Hit roots nearby foes', ...tiers.map((t) => pc(CHAINS[t - 1]))],
+    [nameOf('stunning'), 'Hit stuns for 1.5s', ...tiers.map((t) => pc(STUNNING[t - 1]))],
+    [nameOf('radiance'), 'Hit blooms a healing circle', ...tiers.map((t) => pc(RADIANCE[t - 1]))],
+    [nameOf('rampaging'), 'Kill grants +50% attack speed', ...tiers.map((t) => pc(RAMPAGING[t - 1]))],
+    [nameOf('siphon'), 'Hit grants souls', ...tiers.map(() => pc(SIPHON))],
+  ],
+);
+line('Critical hits come only from boons and riposte (a riposte is always critical).');
+line();
 
 writeFileSync(new URL('../docs/GAME_DATA.md', import.meta.url), out.join('\n'));
 console.log(`docs/GAME_DATA.md: ${out.length} lines`);

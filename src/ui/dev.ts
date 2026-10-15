@@ -145,7 +145,7 @@ export function devMenu(g: Game): void {
         case 'boons':
           for (let i = 0; i < 5; i++) {
             const god = r.rng.pick(availableGods(r.boons));
-            const offer = rollBoonOffers(r.rng, god, r.boons, 0, 1)[0];
+            const offer = rollBoonOffers(r.rng, god, r.boons, undefined, 1)[0];
             if (offer) r.boons = takeBoon(r.boons, offer);
           }
           g.recomputeStats();

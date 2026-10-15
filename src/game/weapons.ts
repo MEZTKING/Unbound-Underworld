@@ -7,7 +7,7 @@ import { Projectile } from './entities';
 import type { Player } from './player';
 import { Gauntlets, Scythe } from './arsenal';
 import { Katana, RiptideChains, Thunderbuss } from './kits';
-import type { DamageSource, WeaponId } from './types';
+import type { DamageSource, Shape, WeaponId } from './types';
 import type { World } from './world';
 
 export interface ActionDef {
@@ -26,6 +26,10 @@ export interface ActionDef {
   chain?: number;
   /** A special used straight out of a chain: hits 25% harder. */
   comboSpecial?: boolean;
+  /** Where this move will land, for the attack outline (world space, from the hero at `aim`). */
+  preview?: (p: Player, aim: number) => Shape[];
+  /** Charge moves: shown on the charge meter. `mult` is the damage multiplier a release now would deal. */
+  power?: { level: number; label: string; mult?: (holdT: number) => number };
   lockAim?: boolean;
   fire?: (p: Player, w: World, aim: number) => void;
   update?: (p: Player, w: World, dt: number, t: number) => void;
@@ -35,6 +39,8 @@ export interface ActionDef {
     moveMult: number;
     button: 'attack' | 'special';
     overhold?: number;
+    /** Seconds after a full charge that count as a Perfect release (shown on the charge meter). */
+    perfect?: number;
     release: (p: Player, w: World, charge: number, holdT: number) => void;
   };
 }
@@ -47,6 +53,8 @@ export interface Weapon {
   held(p: Player, w: World): ActionDef | null;
   /** The powered attack: Attack held after a chain hit. `level` (1–3) grows with the chain step. */
   powered?(p: Player, w: World, level: number): ActionDef | null;
+  /** Where the next Attack will land, for the attack outline. */
+  preview?(p: Player, w: World): Shape[];
   special(p: Player, w: World): ActionDef | null;
   /** Landing effect of the jump attack. */
   slam(p: Player, w: World): void;
@@ -147,6 +155,23 @@ export function crescentWave(p: Player, w: World, aim: number, dmg: number, colo
   w.projectiles.push(pr);
 }
 
+/** Attack-outline shapes: a sweep in front, a straight line, or a circle. */
+export function reachArc(p: { x: number; y: number }, aim: number, r: number, half: number): Shape {
+  if (half >= Math.PI - 0.01) return { type: 'circle', x: p.x, y: p.y, r };
+  return { type: 'arc', x: p.x, y: p.y, r, angle: aim, half };
+}
+export function reachLine(p: { x: number; y: number }, aim: number, len: number, width: number): Shape {
+  return { type: 'capsule', x1: p.x, y1: p.y, x2: p.x + Math.cos(aim) * len, y2: p.y + Math.sin(aim) * len, r: width };
+}
+export function reachCircle(x: number, y: number, r: number): Shape {
+  return { type: 'circle', x, y, r };
+}
+
+/** The chain step the next tap would land: the following one if still inside the window, else the first. */
+export function nextStep(w: World, lastFire: number, window: number, step: number, length: number): number {
+  return w.time - lastFire < window && step < length - 1 ? step + 1 : 0;
+}
+
 /** Chain step → powered level (1–3), for chains of any length. */
 export function powerLevel(step: number, chainLength: number): number {
   return Math.max(1, Math.min(3, Math.ceil(((step + 1) * 3) / chainLength)));
@@ -158,10 +183,22 @@ export function powerLevel(step: number, chainLength: number): number {
  * Perfect (+25%). `power` passed to `release` folds in the charge, the chain
  * level and the Perfect bonus (about 0.55 to 2.1).
  */
-export function poweredAttack(name: string, color: string, level: number, release: (p: Player, w: World, power: number, aim: number) => void, max = 0.42): ActionDef {
+export function poweredAttack(
+  name: string,
+  color: string,
+  level: number,
+  release: (p: Player, w: World, power: number, aim: number) => void,
+  preview?: (p: Player, aim: number) => Shape[],
+  label = name,
+  max = 0.42,
+): ActionDef {
   let flashed = false;
+  const perfectAt = (holdT: number) => holdT >= max && holdT <= max + 0.16;
+  const mult = (holdT: number) => (0.55 + 0.45 * clamp(holdT / max, 0, 1)) * (1 + (level - 1) * 0.3) * (perfectAt(holdT) ? 1.25 : 1);
   return {
     name,
+    preview,
+    power: { level, label, mult },
     slot: 'attack',
     windup: 0,
     active: 0.1,
@@ -172,9 +209,10 @@ export function poweredAttack(name: string, color: string, level: number, releas
       moveMult: 0.5,
       button: 'attack',
       overhold: 0.7,
-      release: (p, w, charge, holdT) => {
-        const perfect = holdT >= max && holdT <= max + 0.16;
-        const power = (0.55 + 0.45 * charge) * (1 + (level - 1) * 0.3) * (perfect ? 1.25 : 1);
+      perfect: 0.16,
+      release: (p, w, _charge, holdT) => {
+        const perfect = perfectAt(holdT);
+        const power = mult(holdT);
         if (perfect) {
           w.particles.text(p.x, p.y, 92, 'PERFECT', '#fff0b0', 18);
           audio.play('select');
@@ -363,6 +401,11 @@ class Sword implements Weapon {
     return this.attack(p, w, false);
   }
 
+  preview(p: Player, w: World): Shape[] {
+    const c = SWORD_COMBO[nextStep(w, this.lastFire, 0.6, this.combo, SWORD_COMBO.length)];
+    return [reachArc(p, p.aim, c.r, c.half)];
+  }
+
   /** Crescent Cleave: a full spinning slash that throws a blade wave ahead. */
   powered(_p: Player, _w: World, step: number): ActionDef {
     return poweredAttack('crescentCleave', '#ff8a9a', powerLevel(step, SWORD_COMBO.length), (pp, ww, power, aim) => {
@@ -375,7 +418,7 @@ class Sword implements Weapon {
       crescentWave(pp, ww, aim, 35 * power, '#ff8a9a', 26, 0.55);
       ww.camera.shake(0.25);
       audio.play('heavySwing');
-    });
+    }, (pp, aim) => [reachCircle(pp.x, pp.y, 135), reachLine(pp, aim, 520, 26)], 'Crescent Cleave');
   }
 
   private dashStrike(w: World): ActionDef {
@@ -567,7 +610,12 @@ class Spear implements Weapon {
       ww.addSwipe(pp.x, pp.y, len, aim, 0.1, 0.2, '#fff0c0', 20, false, 1);
       ww.camera.kick(fromAngle(aim), 8);
       audio.play('heavySwing');
-    });
+    }, (pp, aim) => [reachLine(pp, aim, 320 * this.reach(w), 34)], 'Skewer Lance');
+  }
+
+  preview(p: Player, w: World): Shape[] {
+    const c = SPEAR_COMBO[nextStep(w, this.lastFire, 0.55, this.combo, SPEAR_COMBO.length)];
+    return [reachLine(p, p.aim, c.len * this.reach(w), 20)];
   }
 
   held(_p: Player, w: World): ActionDef {
@@ -579,6 +627,8 @@ class Spear implements Weapon {
       active: 0.12,
       recover: 0.25,
       moveMult: 0.2,
+      preview: (pp) => [reachCircle(pp.x, pp.y, 140)],
+      power: { level: vicious ? 2 : 1, label: 'Spin' },
       hold: {
         max: vicious ? 0.3 : 0.6,
         moveMult: 0.45,
@@ -789,11 +839,14 @@ class Bow implements Weapon {
       active: 0.02,
       recover: 0.14,
       moveMult: 0.5,
+      preview: (pp, aim) => (chainAtStart > 0 ? [reachCircle(pp.x + Math.cos(aim) * 320, pp.y + Math.sin(aim) * 320, 110)] : [reachLine(pp, aim, 950, 9)]),
+      power: chainAtStart > 0 ? { level: Math.min(3, chainAtStart), label: 'Rain of Arrows' } : { level: 1, label: 'Power Shot' },
       hold: {
         max,
         moveMult: 0.45,
         button: 'attack',
         overhold: 2,
+        perfect: 0.2,
         release: (pp, ww, charge, holdT) => {
           this.drawing = false;
           this.drawT = 0;
@@ -837,6 +890,11 @@ class Bow implements Weapon {
         this.drawT += dt;
       },
     };
+  }
+
+  preview(p: Player, w: World): Shape[] {
+    const triple = w.time - this.lastQuick < 0.8 && this.quick >= 2;
+    return (triple ? [-0.12, 0, 0.12] : [0]).map((off) => reachLine(p, p.aim + off, 800, 7));
   }
 
   /** A tap: a quick shot. Every third one in a row is a triple shot. */

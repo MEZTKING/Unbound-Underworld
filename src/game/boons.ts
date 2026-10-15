@@ -1,6 +1,7 @@
 import type { Rng } from '../engine/math';
 import { baseStats, type PlayerStats } from './stats';
 import type { BoonSlot, GodId, Rarity, WeaponId } from './types';
+import { DUO_CHANCE } from './odds';
 
 export interface GodInfo {
   id: GodId;
@@ -868,14 +869,36 @@ export function godsInBuild(boons: readonly OwnedBoon[]): GodId[] {
   return [...gods];
 }
 
-export function rollRarity(rng: Rng, favor = 0): Rarity {
-  const heroic = 0.02 + favor * 0.01;
-  const epic = 0.08 + favor * 0.03;
-  const rare = 0.25 + favor * 0.05;
+export type RarityOdds = Record<'common' | 'rare' | 'epic' | 'heroic', number>;
+
+/**
+ * Boon rarity by region: early boons are mostly Common, and the rarer ones
+ * grow more likely the deeper the escape goes. The very first boon of an
+ * escape is at most Rare.
+ */
+export const BOON_RARITY_BY_REGION: RarityOdds[] = [
+  { common: 0.85, rare: 0.14, epic: 0.01, heroic: 0 },
+  { common: 0.7, rare: 0.24, epic: 0.05, heroic: 0.01 },
+  { common: 0.55, rare: 0.3, epic: 0.12, heroic: 0.03 },
+  { common: 0.42, rare: 0.33, epic: 0.19, heroic: 0.06 },
+];
+const FIRST_BOON_ODDS: RarityOdds = { common: 0.9, rare: 0.1, epic: 0, heroic: 0 };
+
+/** Rarity odds for a boon in region `region` (0–3). Each rank of Favor of the Gods moves 6.5% from Common to the rarer tiers. */
+export function boonRarityOdds(region: number, first = false, favor = 0): RarityOdds {
+  const base = first ? FIRST_BOON_ODDS : BOON_RARITY_BY_REGION[Math.max(0, Math.min(BOON_RARITY_BY_REGION.length - 1, region))];
+  const f = first ? 0 : favor;
+  const rare = base.rare + f * 0.04;
+  const epic = base.epic + f * 0.02;
+  const heroic = base.heroic + (region > 0 ? f * 0.005 : 0);
+  return { common: Math.max(0, 1 - rare - epic - heroic), rare, epic, heroic };
+}
+
+export function rollRarity(rng: Rng, odds: RarityOdds = boonRarityOdds(0)): Rarity {
   const r = rng.next();
-  if (r < heroic) return 'heroic';
-  if (r < heroic + epic) return 'epic';
-  if (r < heroic + epic + rare) return 'rare';
+  if (r < odds.heroic) return 'heroic';
+  if (r < odds.heroic + odds.epic) return 'epic';
+  if (r < odds.heroic + odds.epic + odds.rare) return 'rare';
   return 'common';
 }
 
@@ -898,20 +921,20 @@ export function needsCast(def: BoonDef): boolean {
   return def.slot === 'cast' || def.id === 'hermes_reload' || def.id === 'hermes_shard';
 }
 
-export function rollBoonOffers(rng: Rng, god: GodId, owned: readonly OwnedBoon[], favor = 0, count = 3, allow?: (def: BoonDef) => boolean): BoonOffer[] {
+export function rollBoonOffers(rng: Rng, god: GodId, owned: readonly OwnedBoon[], odds: RarityOdds = boonRarityOdds(0), count = 3, allow?: (def: BoonDef) => boolean): BoonOffer[] {
   const ok = (d: BoonDef) => isEligible(d, owned) && (!allow || allow(d));
   const pool = BOONS.filter((d) => d.slot !== 'duo' && d.god === god && ok(d));
   const duos = god === 'hermes' ? [] : BOONS.filter((d) => d.duoOf && d.duoOf.includes(god) && ok(d));
   // Prefer slot boons for empty slots early on.
   const picks: BoonDef[] = [];
   const shuffled = rng.shuffle([...pool]);
-  if (duos.length > 0 && rng.chance(0.4)) picks.push(rng.pick(duos));
+  if (duos.length > 0 && rng.chance(DUO_CHANCE)) picks.push(rng.pick(duos));
   for (const d of shuffled) {
     if (picks.length >= count) break;
     picks.push(d);
   }
   return picks.map((def) => {
-    const offer: BoonOffer = { id: def.id, rarity: def.slot === 'duo' ? 'duo' : def.fixed ? 'common' : rollRarity(rng, favor) };
+    const offer: BoonOffer = { id: def.id, rarity: def.slot === 'duo' ? 'duo' : def.fixed ? 'common' : rollRarity(rng, odds) };
     if (def.slot !== 'passive' && def.slot !== 'duo') {
       const clash = owned.find((b) => BOON_BY_ID[b.id]?.slot === def.slot);
       if (clash) offer.replaces = clash.id;

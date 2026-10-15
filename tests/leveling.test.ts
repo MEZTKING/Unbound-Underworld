@@ -68,7 +68,7 @@ describe('feature unlocks', () => {
     const rng = new Rng(3);
     for (let i = 0; i < 40; i++) {
       for (const god of ['zeus', 'hermes'] as const) {
-        const offers = rollBoonOffers(rng, god, [], 0, 3, (d) => !needsCast(d));
+        const offers = rollBoonOffers(rng, god, [], undefined, 3, (d) => !needsCast(d));
         for (const o of offers) expect(needsCast(BOONS.find((b) => b.id === o.id)!)).toBe(false);
       }
     }

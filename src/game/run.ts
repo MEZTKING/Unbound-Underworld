@@ -4,6 +4,7 @@ import { availableGods, computeStats, pomCandidates, rollHammerOffers, type Owne
 import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
 import type { GearRarity, MaterialId } from './gear';
 import { applyMetaExtras, heatScale, metaBonuses, rank, type SaveData } from './meta';
+import { DOOR_COUNT, DOOR_WEIGHT } from './odds';
 import { hasFeature } from './progression';
 import { BIOMES, type BiomeInfo } from './rooms';
 import type { PlayerStats } from './stats';
@@ -198,11 +199,7 @@ export class Run {
     if (this.current.kind === 'antechamber') return [{ kind: 'boss', reward: { kind: 'boss' } }];
     if (this.depth >= b.combatRooms) return [{ kind: 'antechamber', reward: { kind: 'antechamber' } }];
 
-    const n = this.rng.weighted<number>([
-      [1, 1],
-      [2, 5],
-      [3, 3],
-    ]);
+    const n = this.rng.weighted<number>([...DOOR_COUNT]);
     const plans: RoomPlan[] = [];
     const usedGods = new Set<GodId>();
     const usedKinds = new Set<RewardKind>();
@@ -220,18 +217,19 @@ export class Run {
     const gods = availableGods(this.boons).filter((g) => !usedGods.has(g));
     const freeArtifacts = hasFeature(this.level, 'artifacts') && ARTIFACTS.filter((a) => !this.artifacts.includes(a.id)).length > 0;
     const enchantRoom = hasFeature(this.level, 'enchants') && (this.enchants.length < 13 || this.enchants.some((e) => e.tier < MAX_ENCHANT_TIER));
+    const W = DOOR_WEIGHT;
     const options: [RewardKind, number][] = [
-      ['boon', gods.length ? 38 : 0],
-      ['pom', pomCandidates(this.boons).length && !usedKinds.has('pom') ? 12 : 0],
-      ['gold', usedKinds.has('gold') ? 0 : 9],
-      ['heart', usedKinds.has('heart') ? 0 : 7],
-      ['ash', usedKinds.has('ash') ? 0 : 9],
-      ['hammer', hasFeature(this.level, 'anvil') && !this.isUsed('hammer') && rollHammerOffers(this.rng, this.weapon, this.hammers).length && d >= 1 && !usedKinds.has('hammer') ? 6 : 0],
-      ['hermes', !this.isUsed('hermes') && d >= 1 && !usedKinds.has('hermes') ? 4 : 0],
-      ['enchant', enchantRoom && !usedKinds.has('enchant') ? 9 : 0],
-      ['artifact', freeArtifacts && !usedKinds.has('artifact') ? 6 : 0],
-      ['shop', !this.isUsed('shop') && d >= 2 && !usedKinds.has('shop') ? 7 : 0],
-      ['fountain', !this.isUsed('fountain') && d >= 2 && !usedKinds.has('fountain') ? 4 : 0],
+      ['boon', gods.length ? W.boon : 0],
+      ['pom', pomCandidates(this.boons).length && !usedKinds.has('pom') ? W.pom : 0],
+      ['gold', usedKinds.has('gold') ? 0 : W.gold],
+      ['heart', usedKinds.has('heart') ? 0 : W.heart],
+      ['ash', usedKinds.has('ash') ? 0 : W.ash],
+      ['hammer', hasFeature(this.level, 'anvil') && !this.isUsed('hammer') && rollHammerOffers(this.rng, this.weapon, this.hammers).length && d >= 1 && !usedKinds.has('hammer') ? W.hammer : 0],
+      ['hermes', !this.isUsed('hermes') && d >= 1 && !usedKinds.has('hermes') ? W.hermes : 0],
+      ['enchant', enchantRoom && !usedKinds.has('enchant') ? W.enchant : 0],
+      ['artifact', freeArtifacts && !usedKinds.has('artifact') ? W.artifact : 0],
+      ['shop', !this.isUsed('shop') && d >= 2 && !usedKinds.has('shop') ? W.shop : 0],
+      ['fountain', !this.isUsed('fountain') && d >= 2 && !usedKinds.has('fountain') ? W.fountain : 0],
     ];
     if (options.every(([, w]) => w <= 0)) return null;
     const kind = this.rng.weighted(options);

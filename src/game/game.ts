@@ -16,6 +16,7 @@ import {
   computeStats,
   needsCast,
   pomCandidates,
+  boonRarityOdds,
   rollBoonOffers,
   rollHammerOffers,
   takeBoon,
@@ -42,6 +43,7 @@ import type { PlayerStats } from './stats';
 import type { GodId, RewardSpec } from './types';
 import { createWeapon, WEAPON_INFO } from './weapons';
 import { World, type Door, type Interactable, type WorldHost } from './world';
+import { CHEST, FOE_DROP, GEAR_LUCK, POM_DOUBLE } from './odds';
 
 const STEP = 1 / 60;
 
@@ -226,6 +228,7 @@ export class Game implements WorldHost {
     prefs.hints = st.hints;
     prefs.assist = st.assist;
     prefs.doorInfo = st.doorInfo;
+    prefs.attackPreview = st.attackPreview;
     this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
     this.input.setBindings(st.keys as Partial<Record<Action, string[]>>);
     // The HUD shows the first key bound to each action (keyboard play only).
@@ -835,12 +838,14 @@ export class Game implements WorldHost {
     if (!run || e.isDummy || e.passive) return;
     const rng = run.rng;
     const region = regionMaterial(run.biomeIndex);
-    const big = e.isBoss ? 3 : e.isElite || e.eliteMod ? 1.6 : 1;
-    if (rng.next() < 0.3 * big) w.dropLoot(e.x, e.y, { material: 'bone', count: e.isBoss ? 10 : 1 + (rng.next() < 0.3 ? 1 : 0) });
-    if (rng.next() < 0.14 * big) w.dropLoot(e.x, e.y, { material: region, count: e.isBoss ? 6 : 1 });
-    if (e.isBoss || ((e.isElite || e.eliteMod) && rng.next() < 0.25)) w.dropLoot(e.x, e.y, { material: 'scale', count: e.isBoss ? 3 + Math.floor(rng.next() * 3) : 1 });
-    const gearChance = e.isBoss ? 1 : e.isElite || e.eliteMod ? 0.12 : 0.012;
-    if (rng.next() < gearChance) w.dropLoot(e.x, e.y, { gear: rollGear(rng, e.isBoss ? 0.6 : run.biomeIndex * 0.1, undefined, e.isBoss ? 'rare' : 'common') });
+    const D = FOE_DROP;
+    const elite = !!(e.isElite || e.eliteMod);
+    const big = e.isBoss ? D.guardianMult : elite ? D.eliteMult : 1;
+    if (rng.next() < D.bone * big) w.dropLoot(e.x, e.y, { material: 'bone', count: e.isBoss ? 10 : 1 + (rng.next() < D.extraBone ? 1 : 0) });
+    if (rng.next() < D.regional * big) w.dropLoot(e.x, e.y, { material: region, count: e.isBoss ? 6 : 1 });
+    if (e.isBoss || (elite && rng.next() < D.eliteScale)) w.dropLoot(e.x, e.y, { material: 'scale', count: e.isBoss ? 3 + Math.floor(rng.next() * 3) : 1 });
+    const gearChance = e.isBoss ? 1 : elite ? D.eliteGear : D.gear;
+    if (rng.next() < gearChance) w.dropLoot(e.x, e.y, { gear: rollGear(rng, e.isBoss ? GEAR_LUCK.guardian : run.biomeIndex * GEAR_LUCK.perRegion, undefined, e.isBoss ? 'rare' : 'common') });
   }
 
   onLoot(w: World, loot: Loot): void {
@@ -931,7 +936,7 @@ export class Game implements WorldHost {
     const run = this.run;
     it.used = true;
     audio.play('door');
-    if (run && run.current.kind === 'combat' && Math.random() < 0.15) {
+    if (run && run.current.kind === 'combat' && Math.random() < CHEST.mimic) {
       const sc = run.scales();
       const m = w.spawn('mimic', it.x, it.y, null, sc.hp, sc.dmg);
       m.spawnT = 0.2;
@@ -945,12 +950,12 @@ export class Game implements WorldHost {
     w.dropSouls(it.x, it.y, 6);
     if (run) {
       w.dropLoot(it.x, it.y, { material: 'bone', count: 3 });
-      if (Math.random() < 0.3) w.dropLoot(it.x, it.y, { gear: rollGear(run.rng, 0.2) });
+      if (Math.random() < CHEST.gear) w.dropLoot(it.x, it.y, { gear: rollGear(run.rng, GEAR_LUCK.chest) });
     }
     w.particles.burst(it.x, it.y - 20, '#ffd890', 30, 320);
     const r = Math.random();
-    if (run && r < 0.35 && this.has('artifacts') && ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) w.spawnReward({ kind: 'artifact', bonus: true }, it.x, it.y + 60);
-    else if (run && r < 0.6 && this.has('enchants')) w.spawnReward({ kind: 'enchant', bonus: true }, it.x, it.y + 60);
+    if (run && r < CHEST.artifact && this.has('artifacts') && ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) w.spawnReward({ kind: 'artifact', bonus: true }, it.x, it.y + 60);
+    else if (run && r < CHEST.enchant && this.has('enchants')) w.spawnReward({ kind: 'enchant', bonus: true }, it.x, it.y + 60);
     else if (run && r < 0.6) w.dropGold(it.x, it.y, Math.round(fx.range(20, 40) * this.stats.goldMult));
   }
 
@@ -1056,7 +1061,8 @@ export class Game implements WorldHost {
 
   private offerBoons(god: GodId, after: () => void): void {
     const run = this.run!;
-    const offers = rollBoonOffers(run.rng, god, run.boons, run.favor(this.save), 3, this.stats.canCast ? undefined : (d) => !needsCast(d));
+    const odds = boonRarityOdds(run.biomeIndex, run.roomsCleared === 0, run.favor(this.save));
+    const offers = rollBoonOffers(run.rng, god, run.boons, odds, 3, this.stats.canCast ? undefined : (d) => !needsCast(d));
     const g = GODS[god];
     if (offers.length === 0) {
       // Nothing left from this god: compensate with obols.
@@ -1088,7 +1094,7 @@ export class Game implements WorldHost {
       this.resolveReward({ kind: 'gold' }, after);
       return;
     }
-    const gain = run.rng.chance(0.2) ? 2 : 1;
+    const gain = run.rng.chance(POM_DOUBLE) ? 2 : 1;
     this.ui.choice({
       title: 'Pomegranate',
       info: this.buildInfo(),

@@ -1,5 +1,6 @@
 import { circleCircle, circleRect, type Circle, type Rect } from '../engine/collision';
 import type { Rng } from '../engine/math';
+import { CHEST, eliteChance as eliteOdds } from './odds';
 import type { BiomeId, BossKind, EliteMod, EnemyKind, RoomKind } from './types';
 
 export interface BiomeInfo {
@@ -397,7 +398,7 @@ function addDecor(rng: Rng, l: RoomLayout, chestChance: number): void {
   if (l.h > 950) l.braziers.push({ x: 40, y: l.h * 0.6 }, { x: l.w - 40, y: l.h * 0.6 });
 }
 
-export function generateLayout(rng: Rng, biome: BiomeInfo, kind: RoomKind, chestChance = 0.25): RoomLayout {
+export function generateLayout(rng: Rng, biome: BiomeInfo, kind: RoomKind, chestChance = CHEST.spawn): RoomLayout {
   const seed = Math.floor(rng.next() * 1e9);
   if (kind === 'boss') {
     const l = baseLayout(kind, biome.id, 1700, 1300, seed);
@@ -460,7 +461,7 @@ export function generateEncounter(rng: Rng, biome: BiomeInfo, biomeIndex: number
   const waves = depth === 0 ? 1 : depth < 3 ? 2 : 3;
   const budget = 6 + depth * 2.2 + biomeIndex * 4 + (elite ? 6 : 0);
   const perWave = budget / waves;
-  const eliteChance = Math.min(0.45, 0.05 + depth * 0.04 + biomeIndex * 0.08 + (elite ? 0.3 : 0));
+  const eliteChance = eliteOdds(depth, biomeIndex, elite);
   const mods: EliteMod[] = ['armored', 'swift', 'volatile', 'regenerating'];
   const out: Wave[] = [];
   for (let wv = 0; wv < waves; wv++) {

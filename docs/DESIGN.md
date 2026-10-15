@@ -78,6 +78,7 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
 
 - **Inputs.**
   - Attack and Special. **Combat grammar:** taps chain (`ActionDef.chain` = the step); holding Attack for `POWER_HOLD` (0.22 s) after a chain hit swaps into `Weapon.powered(step)`, a charge built by `poweredAttack()` (level 1–3 from the chain step, a Perfect for releasing on the flash). Still holding after that = `Weapon.held()` (repeat, a spin, the bow's draw, the katana's ready stance…). A Special within 0.6 s of a chain hit is a combo special (30% faster windup, +25% damage).
+  - **Attack outline and charge meter** (`render.ts`: `drawAttackPreview`, `drawChargeMeter`; setting `attackPreview`): `Weapon.preview()` returns the shapes the next tap would hit (it reads the chain step without advancing it, `nextStep()`); a charging `ActionDef` shows its own `preview` filled by charge, and its `power` (label, chain level, `mult(holdT)`) drives the meter. `hold.perfect` marks the Perfect window. The outline shows only while foes are about; the charge outline always.
   - Cast: a shard that lodges in foes; walk over it to pick it up again.
   - Dash: brief invulnerability. Attacking right after a dash gives a *Dash-Strike*.
   - Jump: attack mid-air to *Slam*.
@@ -102,7 +103,7 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
 
 | System | Source | Notes |
 |---|---|---|
-| **Boons** | God doors, shops | 8 Olympians + Hermes. Slots: Attack/Special/Cast/Dash (a new one replaces the old), unlimited passives, 6 duo boons. Max 4 Olympians per run. Rarity Common/Rare/Epic/Heroic multiplies values |
+| **Boons** | God doors, shops | 8 Olympians + Hermes. Slots: Attack/Special/Cast/Dash (a new one replaces the old), unlimited passives, 6 duo boons. Max 4 Olympians per run. Rarity Common/Rare/Epic/Heroic multiplies values; odds by region, first boon held to 90% Common (`boonRarityOdds`) |
 | **Pomegranates** | Doors, shops | Level up a boon (+1, sometimes +2) |
 | **Anvil upgrades** | Anvil doors (elite rooms) | Weapon-specific modifiers, one per region |
 | **Enchantments** | Tomes, chests | 13, each up to Tier III by finding it again |
@@ -131,6 +132,8 @@ The Wrath gauge fills from damage dealt and taken (talents and Kael speed it up)
 ## 7. Enemies
 
 Base values; foes get tougher with region and Torment. The full stat table is in GAME_DATA.md → *Enemies*.
+
+**Stuck foes** (`World.unstick`, checked once a second): a foe out of bounds, inside a wall, or that hasn't moved 20 px while it can't see or reach you for 6 s (`STUCK_TIME`) vanishes in smoke and reappears at a spawn point. Bosses, dummies and turrets are left alone.
 
 **AI rules** (`enemies/enemy.ts`): foes turn at `turnRate` (5 rad/s; Brutes 2.5, Gorgehorns 2.2, guardians 3) and attacks lock to `aimAtPlayer()`: their facing pulled toward you by at most a snap angle, plus aim error for shots (`World.foeAimError`, smaller with Torment). `canAttack()` hands out **attack tokens**: 2 melee and 2 ranged at once, +1 per two Torment levels (`World.tokenBonus`); a foe without one circles at ~175 px. From afar, `chase()` heads for the foe's own `slot` around you so groups surround. Foes pause 0.15–0.6 s after spawning (`reactT`).
 
@@ -205,7 +208,7 @@ Slaying Threefang is an **escape**. It raises the Torment cap, gives a large amo
 Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (`feature: 'gear'`). Pickups fly to you within 120 px and all of them when a chamber is cleared; `World.feed()` lists them on the HUD, and `Run.spoils` is shown when the escape ends. Numbers are in GAME_DATA.md → *Loot and gear*; the code is `src/game/gear.ts` (data) and `src/ui/gear.ts` (screen).
 - **Materials** drop from foes during escapes and are kept forever (`save.materials`): Bone Dust everywhere, a region material (Ember Shard, Golden Ichor, Gate Pearl), and Titan Scales from guardians and enchanted foes.
 - **Gear** has a slot (helmet, armor, leggings, boots), one of seven tiers (Common, Uncommon, Rare, Epic, Legendary, Unique, Ghost: 1–5 random bonuses, stronger with each tier) and a star level. It drops from foes (rarely), enchanted foes, chests and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
-- **Tiers** (`rarityOdds`): Ghost is the rarest at any luck (0.3%, at most 1%); Unique is next. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
+- **Tiers** (`rarityOdds`): each tier is rarer than the one below at any luck; luck (foes 0.1 per region, chests 0.2, guardians 0.6) moves odds from Common to the better tiers, the best most. Ghost is the rarest (0.3%, at most 1%); Unique is next. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
 - **Stars** (1–10): stars 1–5 are gold (+15% each), and stars 6–10 turn them purple one by one (+20% each, and they cost Titan Scales).
 - **Gear & Inventory** (Armory or pause menu): equip, star up, salvage for materials, or craft a random piece with one of four recipes.
 - Equipped bonuses are added in `Game.recomputeStats` after talents, hero and forge.
@@ -259,12 +262,14 @@ Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (
 | Gods, boons, duos, anvil upgrades, stat assembly | `src/game/boons.ts` |
 | Weapons (sword, spear, bow) and shared weapon helpers | `src/game/weapons.ts` |
 | Late-game weapons (gauntlets, scythe) | `src/game/arsenal.ts` |
+| Class weapons (katana, blunderbuss, chains) | `src/game/kits.ts` |
 | Enchantments / Artifacts | `src/game/enchants.ts` / `src/game/artifacts.ts` |
 | Altar upgrades, save data, Torment scaling | `src/game/meta.ts` |
 | Regions, room layouts, encounter budgets | `src/game/rooms.ts` |
 | Enemies / Guardians | `src/game/enemies/types.ts` / `src/game/enemies/bosses.ts` |
 | Damage pipeline and status effects | `src/game/combat.ts` |
 | Run state and door rewards | `src/game/run.ts` |
+| Chance rolls: doors, drops, chests, elites (tabled in GAME_DATA.md → *Probabilities*) | `src/game/odds.ts` |
 | Orchestration (hub, rewards, level-ups, settings) | `src/game/game.ts` |
 | HUD / 2D world rendering and the 3D view's overlay | `src/game/hud.ts` / `src/game/render.ts` |
 | 3D voxel view (rooms, props, figures, lights) | `src/render3d/voxel.ts` |

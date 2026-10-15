@@ -9,7 +9,8 @@ import { damageEnemy, deflectProjectiles, playerBlast } from './combat';
 import type { Enemy } from './enemies/enemy';
 import { Projectile } from './entities';
 import type { Player } from './player';
-import { gravityPull, meleeHit, poweredAttack, powerLevel, slamCommon, swirl, thrust, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
+import type { Shape } from './types';
+import { gravityPull, meleeHit, nextStep, poweredAttack, powerLevel, reachArc, reachCircle, reachLine, slamCommon, swirl, thrust, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
 import type { World } from './world';
 
 // ---------------------------------------------------------------- Starsplitter (katana)
@@ -79,6 +80,11 @@ export class Katana implements Weapon {
     };
   }
 
+  preview(p: Player, w: World): Shape[] {
+    const c = KATANA_COMBO[nextStep(w, this.lastFire, 0.55, this.combo, KATANA_COMBO.length)];
+    return [reachArc(p, p.aim, c.r, c.half)];
+  }
+
   /** Ready stance: while held, any hit is parried (it drains the guard meter); release with a quick cut. */
   held(_p: Player, _w: World): ActionDef {
     return {
@@ -88,6 +94,7 @@ export class Katana implements Weapon {
       active: 0.08,
       recover: 0.2,
       moveMult: 0.2,
+      preview: (pp, aim) => [reachArc(pp, aim, 115, 1.1)],
       hold: {
         max: 0.3,
         moveMult: 0.25,
@@ -138,7 +145,7 @@ export class Katana implements Weapon {
         }
         audio.play('heavySwing');
       });
-    });
+    }, (pp, aim) => [reachLine(pp, aim, 260, 36)], 'Moonlit Iaido');
   }
 
   /** Thousand Cuts: a flurry of slashes in a cone. */
@@ -301,6 +308,11 @@ export class Thunderbuss implements Weapon {
     };
   }
 
+  preview(p: Player, w: World): Shape[] {
+    const slug = nextStep(w, this.lastFire, 0.7, this.combo, 3) === 2;
+    return [slug ? reachLine(p, p.aim, 700, 10) : reachArc(p, p.aim, 380, 0.32)];
+  }
+
   /** Aimed slug: hold to steady a long-range shot. */
   held(_p: Player, _w: World): ActionDef {
     return {
@@ -310,6 +322,8 @@ export class Thunderbuss implements Weapon {
       active: 0.04,
       recover: 0.3,
       moveMult: 0.4,
+      preview: (pp, aim) => [reachLine(pp, aim, 950, 10)],
+      power: { level: 1, label: 'Aimed Slug' },
       hold: {
         max: 0.6,
         moveMult: 0.4,
@@ -333,7 +347,7 @@ export class Thunderbuss implements Weapon {
       pp.knock(-Math.cos(aim), -Math.sin(aim), 520);
       ww.camera.kick(fromAngle(aim + Math.PI), 10);
       ww.camera.shake(0.35);
-    });
+    }, (pp, aim) => [reachArc(pp, aim, 460, 0.6)], 'Grapeshot Cannon');
   }
 
   /** Powder Keg: lob a keg that blows up after a short fuse. */
@@ -493,6 +507,11 @@ export class RiptideChains implements Weapon {
     };
   }
 
+  preview(p: Player, w: World): Shape[] {
+    const c = CHAIN_COMBO[nextStep(w, this.lastFire, 0.45, this.combo, CHAIN_COMBO.length)];
+    return [reachArc(p, p.aim, c.r, c.half)];
+  }
+
   /** Windmill: spin the chains to bat away shots and pepper anything close. */
   held(_p: Player, _w: World): ActionDef {
     return {
@@ -534,7 +553,7 @@ export class RiptideChains implements Weapon {
           audio.play('swing', 0.7);
         });
       }
-    });
+    }, (pp) => [reachCircle(pp.x, pp.y, strong ? 330 : 220), reachCircle(pp.x, pp.y, 120)], 'Whirlpool');
   }
 
   /** Tidal Snap: a long lash that drags the first foe it hits to you. */
