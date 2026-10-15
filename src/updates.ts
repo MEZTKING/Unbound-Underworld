@@ -7,7 +7,6 @@ declare const __APP_VERSION__: string;
 
 export const APP_VERSION = __APP_VERSION__;
 export const RELEASES_REPO = 'MEZTKING/Unbound-Underworld';
-const RELEASES_PAGE = `https://github.com/${RELEASES_REPO}/releases/latest`;
 const LATEST_API = `https://api.github.com/repos/${RELEASES_REPO}/releases/latest`;
 
 /** Exposed by electron/preload.cjs inside the desktop app. */
@@ -97,24 +96,36 @@ export async function check(): Promise<void> {
       return;
     }
     const version = rel.tag_name.replace(/^v/, '');
+    // Releases don't always include every platform, so only offer an update
+    // when this platform's file is actually there.
     if (desktop) {
       const info = await desktop.info();
       if (info.canSelfUpdate) {
-        set({ kind: 'available', version, action: 'install', url: rel.html_url });
+        const feed = info.platform === 'linux' ? 'latest-linux.yml' : 'latest.yml';
+        if (rel.assets.some((a) => a.name === feed)) set({ kind: 'available', version, action: 'install', url: rel.html_url });
+        else set({ kind: 'current' });
         return;
       }
-      const pattern = info.platform === 'darwin' ? /-mac-universal\.dmg$/ : info.platform === 'win32' ? /-Portable\.exe$/ : /\.AppImage$/;
-      set({ kind: 'available', version, action: 'download', url: assetUrl(rel, pattern) });
+      // Portable Windows players fall back to the installer if there's no new portable exe.
+      const patterns = info.platform === 'darwin' ? [/-mac-universal\.dmg$/] : info.platform === 'win32' ? [/-Portable\.exe$/, /Setup-.*\.exe$/] : [/\.AppImage$/];
+      const url = findAsset(rel, patterns);
+      set(url ? { kind: 'available', version, action: 'download', url } : { kind: 'current' });
     } else {
-      set({ kind: 'available', version, action: 'download', url: assetUrl(rel, /-android\.apk$/) });
+      const url = findAsset(rel, [/-android\.apk$/]);
+      set(url ? { kind: 'available', version, action: 'download', url } : { kind: 'current' });
     }
   } catch {
     set({ kind: 'error', message: "Couldn't reach the update server." });
   }
 }
 
-function assetUrl(rel: Release, pattern: RegExp): string {
-  return rel.assets.find((a) => pattern.test(a.name))?.browser_download_url ?? rel.html_url ?? RELEASES_PAGE;
+/** The first asset matching any pattern, in order of preference. */
+function findAsset(rel: Release, patterns: RegExp[]): string | null {
+  for (const p of patterns) {
+    const a = rel.assets.find((x) => p.test(x.name));
+    if (a) return a.browser_download_url;
+  }
+  return null;
 }
 
 /** The one-button update: installs, downloads or reloads depending on the build. */

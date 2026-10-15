@@ -13,6 +13,33 @@ export interface RoomPlan {
   reward: RewardSpec | null;
 }
 
+/** A saved escape: the run as it stood when its current chamber began. */
+export interface RunSnapshot {
+  v: 1;
+  seed: number;
+  rng: number;
+  weapon: WeaponId;
+  biomeIndex: number;
+  depth: number;
+  roomsCleared: number;
+  boons: OwnedBoon[];
+  hammers: string[];
+  enchants: OwnedEnchant[];
+  artifacts: (string | null)[];
+  gold: number;
+  ash: number;
+  kills: number;
+  bonusHp: number;
+  deathDefiance: number;
+  heat: number;
+  time: number;
+  current: RoomPlan;
+  used: string[];
+  /** Player state carried between chambers. */
+  hp: number;
+  souls: number;
+}
+
 /** Everything that lives for the duration of one escape attempt. */
 export class Run {
   readonly seed: number;
@@ -37,7 +64,7 @@ export class Run {
   level = 99;
   current: RoomPlan = { kind: 'combat', reward: { kind: 'boon' } };
   /** Per-biome once-only rooms and rewards. */
-  private used = new Set<string>();
+  used = new Set<string>();
 
   constructor(save: SaveData, seed = (Math.random() * 2 ** 31) | 0) {
     this.seed = seed;
@@ -47,6 +74,58 @@ export class Run {
     this.deathDefiance = rank(save, 'defiance');
     this.gold = rank(save, 'fortune') * 40;
     if (save.startArtifact) this.artifacts[0] = save.startArtifact;
+  }
+
+  /** Captures the run (plus the player's health and souls) for saving. */
+  snapshot(hp: number, souls: number): RunSnapshot {
+    return {
+      v: 1,
+      seed: this.seed,
+      rng: this.rng.state,
+      weapon: this.weapon,
+      biomeIndex: this.biomeIndex,
+      depth: this.depth,
+      roomsCleared: this.roomsCleared,
+      boons: this.boons.map((b) => ({ ...b })),
+      hammers: [...this.hammers],
+      enchants: this.enchants.map((e) => ({ ...e })),
+      artifacts: [...this.artifacts],
+      gold: this.gold,
+      ash: this.ash,
+      kills: this.kills,
+      bonusHp: this.bonusHp,
+      deathDefiance: this.deathDefiance,
+      heat: this.heat,
+      time: this.time,
+      current: { kind: this.current.kind, reward: this.current.reward ? { ...this.current.reward } : null },
+      used: [...this.used],
+      hp,
+      souls,
+    };
+  }
+
+  /** Rebuilds a run from a snapshot. */
+  static restore(save: SaveData, snap: RunSnapshot): Run {
+    const run = new Run(save, snap.seed);
+    run.rng.state = snap.rng;
+    run.weapon = snap.weapon;
+    run.biomeIndex = Math.max(0, Math.min(BIOMES.length - 1, snap.biomeIndex));
+    run.depth = snap.depth;
+    run.roomsCleared = snap.roomsCleared;
+    run.boons = snap.boons.map((b) => ({ ...b }));
+    run.hammers = [...snap.hammers];
+    run.enchants = snap.enchants.map((e) => ({ ...e }));
+    run.artifacts = [...snap.artifacts];
+    run.gold = snap.gold;
+    run.ash = snap.ash;
+    run.kills = snap.kills;
+    run.bonusHp = snap.bonusHp;
+    run.deathDefiance = snap.deathDefiance;
+    run.heat = snap.heat;
+    run.time = snap.time;
+    run.current = snap.current;
+    run.used = new Set(snap.used);
+    return run;
   }
 
   get biome(): BiomeInfo {

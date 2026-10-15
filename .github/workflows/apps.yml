@@ -1,8 +1,12 @@
 name: App builds
 
-# Builds the Windows, macOS, Linux and Android apps plus a zip of the web
-# version. Pushing a tag like `v0.1.0`, or running this workflow from the
-# Actions tab with a version, also publishes them on a GitHub Release.
+# Builds the Windows installer and the Android APK. Pushing a tag like
+# `v0.1.0`, or running this workflow from the Actions tab with a version, also
+# publishes them on a GitHub Release.
+#
+# For now only those two are built, to save build time and Actions storage. Tick
+# "all_platforms" when running it from the Actions tab to also build the
+# portable Windows exe, macOS, Linux and the web version zip.
 on:
   push:
     tags: ['v*']
@@ -12,6 +16,10 @@ on:
         description: 'Publish a release for this version (must match package.json, e.g. 0.1.0). Leave empty to only build.'
         required: false
         default: ''
+      all_platforms:
+        description: 'Also build Windows portable, macOS, Linux and the web zip'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'electron/**'
@@ -31,16 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Linux
-            os: ubuntu-latest
-            flag: --linux
-          - name: Windows
-            os: windows-latest
-            flag: --win
-          - name: macOS
-            os: macos-latest
-            flag: --mac
+        include: ${{ fromJSON(inputs.all_platforms && '[{"name":"Windows","os":"windows-latest","flag":"--win"},{"name":"macOS","os":"macos-latest","flag":"--mac"},{"name":"Linux","os":"ubuntu-latest","flag":"--linux"}]' || '[{"name":"Windows","os":"windows-latest","flag":"--win nsis"}]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -54,9 +53,12 @@ jobs:
         env:
           # Builds are unsigned; don't look for signing certificates.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # Artifacts only pass files to the release job: skip them on PRs and keep them a day.
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
           name: Unbound-Underworld-${{ matrix.name }}
+          retention-days: 1
           # latest*.yml and the blockmaps tell the in-app updater what to download.
           path: |
             release/*.AppImage
@@ -108,8 +110,10 @@ jobs:
           mkdir -p ../release
           cp "$APK" "../release/Unbound-Underworld-$VERSION-android.apk"
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
           name: Unbound-Underworld-Android
+          retention-days: 1
           path: release/*.apk
           if-no-files-found: error
       # Google Play needs an app bundle signed with your key. This build leaves
@@ -126,14 +130,16 @@ jobs:
           mkdir -p ../play
           cp app/build/outputs/bundle/release/app-release.aab "../play/Unbound-Underworld-$VERSION-play.aab"
       - uses: actions/upload-artifact@v4
-        if: env.ANDROID_KEYSTORE_PATH != ''
+        if: env.ANDROID_KEYSTORE_PATH != '' && github.event_name != 'pull_request'
         with:
           name: Play-Store-Bundle
+          retention-days: 7
           path: play/*.aab
           if-no-files-found: error
 
   web:
     name: Package (Web)
+    if: inputs.all_platforms
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,18 +156,22 @@ jobs:
           mkdir -p release
           (cd dist && zip -qr "../release/Unbound-Underworld-$VERSION-web.zip" .)
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
           name: Unbound-Underworld-Web
+          retention-days: 1
           path: release/*.zip
           if-no-files-found: error
 
   release:
     name: Publish release
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
+    # The web zip is optional (only built with all_platforms).
+    if: always() && needs.desktop.result == 'success' && needs.android.result == 'success' && needs.web.result != 'failure' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != ''))
     needs: [desktop, android, web]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
     steps:
@@ -189,3 +199,12 @@ jobs:
           name: Unbound Underworld ${{ env.TAG }}
           files: artifacts/*
           generate_release_notes: true
+      # The files now live on the release, so free the Actions storage they used.
+      - name: Delete this run's installer artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({ ...context.repo, run_id: context.runId, per_page: 100 });
+            for (const a of data.artifacts) {
+              if (a.name.startsWith('Unbound-Underworld-')) await github.rest.actions.deleteArtifact({ ...context.repo, artifact_id: a.id });
+            }

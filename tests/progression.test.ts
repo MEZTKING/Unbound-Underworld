@@ -134,3 +134,26 @@ describe('save data', () => {
     expect(metaBonuses(save).dashCharges).toBe(1);
   });
 });
+
+describe('saved escapes', () => {
+  it('restores a run exactly from its snapshot', () => {
+    const save = defaultSave();
+    const run = new Run(save, 4242);
+    run.boons = [{ id: 'zeus_attack', rarity: 'rare', level: 2 }];
+    run.hammers = ['sword_double'];
+    run.gold = 123;
+    run.biomeIndex = 1;
+    run.depth = 3;
+    run.markUsed('shop');
+    run.rng.next();
+    const snap = JSON.parse(JSON.stringify(run.snapshot(42, 17)));
+    const back = Run.restore(save, snap);
+    expect(back.boons).toEqual(run.boons);
+    expect(back.hammers).toEqual(run.hammers);
+    expect([back.gold, back.biomeIndex, back.depth]).toEqual([123, 1, 3]);
+    expect(back.isUsed('shop')).toBe(true);
+    // The random sequence continues where it left off.
+    expect(back.rng.next()).toBe(run.rng.next());
+    expect([snap.hp, snap.souls]).toEqual([42, 17]);
+  });
+});

@@ -11,7 +11,10 @@ A fast, top-down action roguelike for desktop, phones and the browser. You fight
 
 ## Download
 
-Get the latest build from the [Releases page](https://github.com/MEZTKING/Unbound-Underworld/releases):
+Get the latest build from the [Releases page](https://github.com/MEZTKING/Unbound-Underworld/releases).
+
+> For now, new releases include only the **Windows installer** and the **Android APK**. The portable Windows build, macOS, Linux and the web zip were last published in [v0.2.1](https://github.com/MEZTKING/Unbound-Underworld/releases/tag/v0.2.1). They can be built again at any time (see *App builds* below).
+
 
 | Platform | File | How to run |
 |---|---|---|
@@ -28,6 +31,8 @@ The builds are **not code-signed** by a store, so your system will warn you the 
 - **Android:** allow "Install unknown apps" for your browser or file manager.
 
 In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
+
+**Saving and quitting.** An escape in progress is saved automatically at the start of every chamber. In the pause menu, *Save & Quit to Title* (or *Save & Exit Game* in the desktop and Android apps) lets you stop at any time. *Resume Escape* on the title screen picks up at the start of that chamber, even if the app was closed.
 
 ### Updates
 
@@ -140,12 +145,14 @@ npm run dist:desktop -- --linux # or pick a platform: --win, --mac, --linux
 npm run android:apk             # Android debug APK (needs the Android SDK and Java 21)
 ```
 
-The **App builds** GitHub workflow builds Windows, macOS, Linux, Android and the web version zip. Push a version tag and it publishes everything on a GitHub Release:
+The **App builds** GitHub workflow builds the Windows installer and the Android APK. To also build the portable Windows exe, macOS, Linux and the web version zip, run it from the Actions tab with *all_platforms* ticked. Push a version tag and it publishes the builds on a GitHub Release:
 
 ```bash
 npm version patch               # bump the version in package.json and create a tag such as v0.1.1
 git push --follow-tags
 ```
+
+Build artifacts are kept for only one day and aren't uploaded for pull requests. After a release is published, the release job deletes them, because the downloads live on the Release. The **Clean up artifacts** workflow runs weekly and can be started from the Actions tab: it removes leftovers to keep the account's Actions storage low.
 
 You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts.
 

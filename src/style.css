@@ -1103,3 +1103,20 @@ h3.section small {
   justify-content: center;
   flex-wrap: wrap;
 }
+
+/* ---------------------------------------------------------------- saving */
+
+.btn.resume small {
+  display: block;
+  font-family: var(--body, inherit);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.save-note {
+  max-width: 240px;
+  margin: 8px auto 0;
+}
