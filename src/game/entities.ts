@@ -1,3 +1,4 @@
+import type { GearItem, MaterialId } from './gear';
 import type { Actor } from './actor';
 import type { DamageSource, GodId, RewardSpec, Shape, Team } from './types';
 import type { World } from './world';
@@ -89,7 +90,14 @@ export class Zone {
   }
 }
 
-export type PickupKind = 'gold' | 'heal' | 'shard' | 'reward' | 'ash' | 'soul';
+export type PickupKind = 'gold' | 'heal' | 'shard' | 'reward' | 'ash' | 'soul' | 'loot';
+
+/** What a 'loot' pickup holds: crafting materials or a piece of gear. */
+export interface Loot {
+  material?: MaterialId;
+  count?: number;
+  gear?: GearItem;
+}
 
 export class Pickup {
   x: number;
@@ -101,6 +109,7 @@ export class Pickup {
   kind: PickupKind;
   value: number;
   reward: RewardSpec | null = null;
+  loot: Loot | null = null;
   collected = false;
   t = 0;
   /** Seconds before it can be collected (lets drops pop out first). */

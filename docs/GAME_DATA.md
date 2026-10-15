@@ -56,7 +56,7 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 7 | 438 | 1200 | Wraith | 6 | Hephaestus' Anvil |
 | 8 | 522 | 1638 | Wraith | 7 | Second Artifact Slot, Hero: Ione, Weapon: Titan Gauntlets |
 | 9 | 612 | 2160 | Wraith | 8 |  |
-| 10 | 708 | 2772 | Revenant | 9 | Wrath |
+| 10 | 708 | 2772 | Revenant | 9 | Wrath, Loot & Gear |
 | 11 | 810 | 3480 | Revenant | 10 |  |
 | 12 | 918 | 4290 | Revenant | 11 | Third Artifact Slot |
 | 13 | 1032 | 5208 | Revenant | 12 | Awakened Weapons, Forge: Tier III · Awakened |
@@ -90,6 +90,7 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 7 | Hephaestus' Anvil | Anvils that reforge your weapon now appear in the Underworld. |  |
 | 8 | Second Artifact Slot | Carry two artifacts at once. | 2 / the artifact button |
 | 10 | Wrath | Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate. | F / ☄ |
+| 10 | Loot & Gear | Foes now drop materials and gear. Equip helmets, armor, leggings and boots, and craft or upgrade them, at the Armory. |  |
 | 12 | Third Artifact Slot | Carry three artifacts at once. | 3 / the artifact button |
 | 13 | Awakened Weapons | Forge a weapon to Tier III at the Armory to awaken it. |  |
 
@@ -371,6 +372,47 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 | ⚗ Alchemy | 2 | 25 / 60 | Potion recharges 40% faster and heals +20% |
 | ✧ Soulcraft | 2 | 20 / 50 | +50 max souls, +40% souls gathered |
 | ⚙ Tinkerer | 3 | 20 / 45 / 80 | Artifacts recharge 30% faster |
+
+## Loot and gear
+
+Unlocks at level 10. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Up to 40 pieces are kept; a full inventory salvages new finds.
+
+| Material | Source |
+|---|---|
+| ☗ Bone Dust | Dropped by foes everywhere. The basic crafting material. |
+| ♦ Ember Shard | Dropped by foes in Tartarus and Asphodel. |
+| ✹ Golden Ichor | Dropped by foes in Elysium. |
+| ● Styx Pearl | Dropped by foes at the Gates of the Styx. |
+| ⬢ Titan Scale | Dropped by guardians and enchanted foes. Rare. |
+
+| Rarity | Bonuses | Bonus strength × |
+|---|---|---|
+| Common | 1 | 1 |
+| Rare | 2 | 1.3 |
+| Epic | 3 | 1.6 |
+| Legendary | 4 | 2 |
+
+| Bonus | Common, level 1 (typical) | Slots |
+|---|---|---|
+| +8 max health | 8 | Helmet, Armor, Leggings, Boots |
+| +4% damage | 4% | Helmet, Armor, Leggings, Boots |
+| +3% move speed | 3% | Leggings, Boots |
+| +2% critical chance | 2% | Helmet, Armor |
+| −3% damage taken | 3% | Armor, Leggings, Helmet |
+| −6% dash recharge | 6% | Boots |
+| +6% obols found | 6% | Helmet, Armor, Leggings, Boots |
+| +8% souls gathered | 8% | Helmet, Armor |
+| +6% Wrath gain | 6% | Helmet |
+| +6% potion healing | 6% | Armor |
+
+Each upgrade level adds 15% to every bonus (max level 5). Upgrades cost Bone Dust, plus Ember Shards (Rare), Golden Ichor and Titan Scales (Epic) or Styx Pearls and Titan Scales (Legendary).
+
+| Recipe | Rarity | Cost |
+|---|---|---|
+| Craft a piece | Common or better | 25 ☗ · 6 ♦ |
+| Craft a fine piece | Rare or better | 40 ☗ · 6 ✹ |
+| Craft a grand piece | Epic or better | 60 ☗ · 6 ● · 3 ⬢ |
+
 
 ## Regions and guardians
 
