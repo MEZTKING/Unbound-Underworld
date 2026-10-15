@@ -150,6 +150,9 @@ export class NetHost implements NetSession {
   private install(): void {
     const g = this.g;
     g.net = this;
+    // Your hero carries your name for the others.
+    g.me.name = this.name;
+    g.me.player.tag = this.name;
     g.remoteControl = (m) => this.peerOf(m)?.ctl ?? new RemoteControl();
     g.remoteChoice = (m, opts) => this.sendChoice(m, opts);
     g.grant = (m, grant) => this.sendGrant(m, grant);
@@ -401,7 +404,7 @@ export class NetHost implements NetSession {
   }
 
   private memberInfo(): MemberInfo[] {
-    return this.g.members.map((m) => ({ id: m.id, name: m.kind === 'local' && m.name === 'You' ? this.name : m.name, color: MEMBER_COLORS[m.id % MEMBER_COLORS.length], peer: m.peer ?? -1, kind: m.kind === 'remote' ? 'remote' : m.kind === 'pad' ? 'pad' : 'host' }));
+    return this.g.members.map((m) => ({ id: m.id, name: m.name, color: MEMBER_COLORS[m.id % MEMBER_COLORS.length], peer: m.peer ?? -1, kind: m.kind === 'remote' ? 'remote' : m.kind === 'pad' ? 'pad' : 'host' }));
   }
 
   private sendWorld(w: World): void {
@@ -517,5 +520,7 @@ export class NetHost implements NetSession {
     g.remoteChoice = null;
     g.grant = null;
     g.net = null;
+    g.me.name = 'You';
+    if (g.members.length === 1) g.me.player.tag = '';
   }
 }
