@@ -28,6 +28,8 @@ import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
 import { drawHUD, drawHudTooltip } from './hud';
 import { newAchievements } from './codex';
+import { applyGear, costText, equippedItems, GEAR_RARITY, INVENTORY_SIZE, MATERIALS, regionMaterial, rollGear, salvageValue, SLOT_NAME, type MaterialId } from './gear';
+import type { Loot } from './entities';
 import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, type SaveData } from './meta';
 import { Player, useHeroLooks } from './player';
 import { prefs } from './prefs';
@@ -510,6 +512,7 @@ export class Game implements WorldHost {
     applyTalents(this.save.talents, s);
     this.player.hero.apply(s);
     applyForge(this.save.forge[this.player.weapon.id] ?? 1, s);
+    if (this.has('gear')) applyGear(equippedItems(this.save.gear), s);
     if (prefs.assist) s.damageTaken *= 0.5;
     s.maxHp = Math.max(20, s.maxHp);
     this.stats = s;
@@ -790,8 +793,48 @@ export class Game implements WorldHost {
     this.save.stats.kills++;
     this.save.bestiary[e.name] = (this.save.bestiary[e.name] ?? 0) + 1;
     this.checkAchievements();
+    this.dropLoot(w, e);
     if (this.stats.lifeOnKill > 0) w.healPlayer(this.stats.lifeOnKill, false);
     if (this.run && !e.isBoss) this.gainXp(e.isElite ? XP.eliteKill : XP.kill);
+  }
+
+  /** Loot (from level 10): materials from most foes, gear now and then. */
+  private dropLoot(w: World, e: Enemy): void {
+    const run = this.run;
+    if (!run || !this.has('gear') || e.isDummy || e.passive) return;
+    const rng = run.rng;
+    const region = regionMaterial(run.biomeIndex);
+    const big = e.isBoss ? 3 : e.isElite || e.eliteMod ? 1.6 : 1;
+    if (rng.next() < 0.3 * big) w.dropLoot(e.x, e.y, { material: 'bone', count: e.isBoss ? 10 : 1 + (rng.next() < 0.3 ? 1 : 0) });
+    if (rng.next() < 0.14 * big) w.dropLoot(e.x, e.y, { material: region, count: e.isBoss ? 6 : 1 });
+    if (e.isBoss || ((e.isElite || e.eliteMod) && rng.next() < 0.25)) w.dropLoot(e.x, e.y, { material: 'scale', count: e.isBoss ? 3 + Math.floor(rng.next() * 3) : 1 });
+    const gearChance = e.isBoss ? 1 : e.isElite || e.eliteMod ? 0.12 : 0.012;
+    if (rng.next() < gearChance) w.dropLoot(e.x, e.y, { gear: rollGear(rng, e.isBoss ? 0.6 : run.biomeIndex * 0.1, undefined, e.isBoss ? 'rare' : 'common') });
+  }
+
+  onLoot(w: World, loot: Loot): void {
+    const p = this.player;
+    if (loot.material) {
+      const m = MATERIALS[loot.material];
+      const n = loot.count ?? 1;
+      this.save.materials[loot.material] = (this.save.materials[loot.material] ?? 0) + n;
+      w.particles.text(p.x, p.y, 70, `+${n} ${m.glyph} ${m.name}`, m.color, 15);
+    }
+    if (loot.gear) {
+      const item = loot.gear;
+      const color = GEAR_RARITY[item.rarity].color;
+      if (this.save.gear.items.length >= INVENTORY_SIZE) {
+        // Full: salvage it on the spot.
+        const back = salvageValue(item);
+        for (const [k, v] of Object.entries(back)) this.save.materials[k as MaterialId] = (this.save.materials[k as MaterialId] ?? 0) + (v ?? 0);
+        this.ui.toast(`Inventory full: ${item.name} salvaged for ${costText(back)}`, 3000);
+      } else {
+        this.save.gear.items.push(item);
+        this.ui.toast(`Found ${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}: ${item.name}`, 2600);
+      }
+      w.particles.text(p.x, p.y, 80, item.name, color, 18);
+    }
+    this.persist();
   }
 
   tryDeathDefiance(): boolean {
@@ -859,6 +902,10 @@ export class Game implements WorldHost {
     }
     w.dropGold(it.x, it.y, Math.round(fx.range(15, 35) * this.stats.goldMult));
     w.dropSouls(it.x, it.y, 6);
+    if (run && this.has('gear')) {
+      w.dropLoot(it.x, it.y, { material: 'bone', count: 3 });
+      if (Math.random() < 0.3) w.dropLoot(it.x, it.y, { gear: rollGear(run.rng, 0.2) });
+    }
     w.particles.burst(it.x, it.y - 20, '#ffd890', 30, 320);
     const r = Math.random();
     if (run && r < 0.35 && this.has('artifacts') && ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) w.spawnReward({ kind: 'artifact', bonus: true }, it.x, it.y + 60);

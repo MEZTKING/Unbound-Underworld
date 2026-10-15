@@ -13,6 +13,29 @@ export interface Card {
   disabled?: boolean;
 }
 
+/** Short explanations shown beside card choices for the terms their text uses. */
+const GLOSSARY: [RegExp, string, string][] = [
+  [/\bDoom/, 'Doom', 'A delayed blow: after a moment, the foe takes a burst of damage.'],
+  [/\bWeak/, 'Weak', 'The foe deals less damage while it lasts.'],
+  [/\bChill/, 'Chill', 'Slows the foe; stacks build up and can shatter.'],
+  [/\bHangover/, 'Hangover', 'Damage over time that stacks with each hit.'],
+  [/\bcritical/i, 'Critical', 'A critical hit deals triple damage.'],
+  [/\bdeflect/i, 'Deflect', "Sends foes' projectiles flying back at them."],
+  [/\bCast\b/, 'Cast', 'Throw a shard that lodges in foes. Pick it up again to keep using it.'],
+  [/\bshards?\b/i, 'Shard', 'Ammunition for your Cast. Retrieve it from where it lands, or from slain foes.'],
+  [/\bWrath\b/, 'Wrath', "Fill the gauge by fighting, then unleash your hero's ultimate."],
+  [/\barmor\b/i, 'Armor', 'Must be broken before health takes damage. Breaking it stuns.'],
+  [/\bencounter|chamber/i, 'Chamber', 'One room of the Underworld. Most must be cleared of foes to go on.'],
+  [/\bsouls?\b/i, 'Souls', 'Gathered from fallen foes; some artifacts spend them.'],
+];
+
+function glossaryFor(texts: string[]): string {
+  const all = texts.join(' ');
+  const hits = GLOSSARY.filter(([re]) => re.test(all)).slice(0, 4);
+  if (!hits.length) return '';
+  return `<aside class="glossary">${hits.map(([, t, d]) => `<div class="gloss"><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('')}</aside>`;
+}
+
 /** How long a new card choice ignores picks (ms). */
 export const CHOICE_LOCK_MS = 2000;
 
@@ -225,7 +248,7 @@ export class UI {
         <h2 class="title" style="color:${opts.color}">${esc(opts.title)}</h2>
         ${opts.subtitle ? `<div class="subtitle">${esc(opts.subtitle)}</div>` : ''}
         ${opts.quote ? `<div class="quote">“${esc(opts.quote)}”</div>` : ''}
-        <div class="cards locked">${cards}</div>
+        <div class="choice-body"><div class="cards locked">${cards}</div>${glossaryFor(opts.cards.map((c) => `${c.desc} ${c.note ?? ''}`))}</div>
         <div class="choice-lock"><i></i></div>
         ${opts.skip ? `<button class="btn ghost" data-nav data-skip>${esc(opts.skip.label)}</button>` : ''}
       </div>`,

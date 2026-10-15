@@ -6,16 +6,20 @@ import { ACHIEVEMENTS, BESTIARY, foeRegions, type FoeEntry } from '../game/codex
 import { ENCHANT_BY_ID } from '../game/enchants';
 import type { Game, RunSummary } from '../game/game';
 import { CHARACTERS, characterUnlocked, type CharacterId, type Palette } from '../game/characters';
-import { clearSave, heatScale, nextCost, rank, UPGRADES, WEAPON_IDS } from '../game/meta';
+import { clearSave, currentSlot, eraseSlot, heatScale, loadSave, nextCost, peekSlot, rank, setSlot, slotHasRun, SLOTS, UPGRADES, WEAPON_IDS, writeSave } from '../game/meta';
 import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, WEAPON_LEVEL } from '../game/progression';
 import type { WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
-import { CAN_EXIT, exitGame } from '../platform';
+import { CAN_EXIT, exitGame, getWindowMode, HAS_WINDOW_MODES, setWindowMode, type WindowMode } from '../platform';
 import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
 import { devMenu } from './dev';
+import { gearScreen } from './gear';
+import { mapScreen } from './map';
 import { esc, type Card } from './overlay';
 
 export type CardData = Card;
+
+const WINDOW_LABEL: Record<WindowMode, string> = { windowed: 'Windowed', borderless: 'Borderless', fullscreen: 'Fullscreen' };
 
 /** Control reference listing only what you've unlocked. */
 function keyControls(g: Game): string {
@@ -117,6 +121,7 @@ export function title(g: Game): void {
       <div class="menu">
         ${saved ? `<button class="btn primary resume" data-nav data-a="resume">Resume Escape<small>${esc(saved)}</small></button>` : ''}
         <button class="btn${saved ? '' : ' primary'}" data-nav data-a="play">${saved ? 'Hall of Shades' : g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
+        <button class="btn" data-nav data-a="slots">Save Slot ${currentSlot()}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
         <button class="btn" data-nav data-a="settings">Settings</button>
         ${CAN_EXIT ? '<button class="btn" data-nav data-a="quit">Exit Game</button>' : ''}
@@ -146,8 +151,73 @@ export function title(g: Game): void {
       }
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
+    else if (a === 'slots') saveSlots(g);
     else if (a === 'quit') exitGame();
     else settings(g);
+  });
+}
+
+/** Four independent save slots. Switching reloads the game into the chosen slot. */
+export function saveSlots(g: Game): void {
+  const cur = currentSlot();
+  const card = (n: number) => {
+    const s = n === cur ? g.save : peekSlot(n);
+    const fresh = !s || (s.stats.runs === 0 && s.xp === 0);
+    const hero = s ? CHARACTERS.find((c) => c.id === s.character) : null;
+    const when = s?.lastPlayed ? new Date(s.lastPlayed).toLocaleDateString() : '';
+    const body = fresh
+      ? '<div class="card-desc">Empty: start a new journey.</div>'
+      : `<div class="card-sub">Level ${levelFromXp(s!.xp).level} · ${esc(hero?.name ?? '')}</div>
+         <div class="card-desc">${s!.stats.runs} escape attempts · ${s!.stats.escapes} escapes · ${s!.ash} Ash${slotHasRun(n) ? ' · an escape in progress' : ''}</div>
+         ${when ? `<div class="card-note">Last played ${esc(when)}</div>` : ''}`;
+    return `<button class="card slot" data-nav data-slot="${n}" style="--c:${n === cur ? '#7dff8a' : '#ffd890'}">
+      <div class="card-body"><div class="card-head"><span class="card-title">Slot ${n}</span><span class="card-tag" style="--t:${n === cur ? '#7dff8a' : '#ffd890'}">${n === cur ? 'In use' : fresh ? 'Empty' : 'Load'}</span></div>${body}</div></button>`;
+  };
+  const el = g.ui.push(
+    'station',
+    `<div class="panel wide"><h2 class="title">Save Slots</h2>
+      <div class="subtitle">Each slot is a separate journey with its own progress.</div>
+      <div class="cards grid">${Array.from({ length: SLOTS }, (_, i) => card(i + 1)).join('')}</div>
+      <div class="row-btns"><button class="btn danger" data-nav data-a="erase">Erase a slot…</button><button class="btn primary" data-nav data-a="back">Back</button></div></div>`,
+    { onBack: () => g.ui.pop(), cols: 2 },
+  );
+  let erasing = false;
+  bind(el, '[data-slot]', (b) => {
+    const n = Number(b.dataset.slot);
+    if (erasing) {
+      if (n === cur) {
+        audio.play('deny');
+        g.ui.toast('Switch to another slot to erase this one.');
+        return;
+      }
+      if (b.dataset.armed) {
+        eraseSlot(n);
+        g.ui.pop();
+        saveSlots(g);
+      } else {
+        b.dataset.armed = '1';
+        b.querySelector('.card-tag')!.textContent = 'Tap again to erase';
+      }
+      return;
+    }
+    if (n === cur) {
+      g.ui.pop();
+      return;
+    }
+    // Settings follow the device, not the slot.
+    g.persist();
+    setSlot(n);
+    const target = loadSave();
+    target.settings = { ...g.save.settings };
+    writeSave(target);
+    location.reload();
+  });
+  bind(el, '[data-a]', (b) => {
+    if (b.dataset.a === 'erase') {
+      erasing = !erasing;
+      b.textContent = erasing ? 'Cancel erasing' : 'Erase a slot…';
+      g.ui.toast(erasing ? 'Pick the slot to erase.' : 'Erasing cancelled.');
+    } else g.ui.pop();
   });
 }
 
@@ -212,7 +282,13 @@ export function settings(g: Game): void {
       ${slider('flashes', 'Flash intensity', 0, 1, 0.1)}
       ${toggle('hitstop')}
       ${toggle('showFps')}
-      ${canFullscreen ? '<button class="btn toggle" data-nav data-a="fullscreen"><span>Fullscreen</span><b>⛶</b></button>' : ''}
+      ${
+        HAS_WINDOW_MODES
+          ? '<button class="btn toggle" data-nav data-a="window"><span>Window</span><b data-wmode>…</b></button>'
+          : canFullscreen
+            ? '<button class="btn toggle" data-nav data-a="fullscreen"><span>Fullscreen</span><b>⛶</b></button>'
+            : ''
+      }
       <h3 class="section">Touch controls</h3>
       ${slider('touchSize', 'Button size', 0.8, 1.3, 0.05)}
       ${slider('touchOpacity', 'Button opacity', 0.4, 1, 0.05)}
@@ -230,6 +306,8 @@ export function settings(g: Game): void {
     { onBack: () => g.ui.pop() },
   );
   if (updatesSupported) updateBox(g, el, el.querySelector<HTMLElement>('[data-box]')!, true);
+  const wm = el.querySelector<HTMLElement>('[data-wmode]');
+  if (wm) void getWindowMode().then((m) => (wm.textContent = WINDOW_LABEL[m]));
   // The secret way in to the developer options: tap the version seven times.
   let taps = 0;
   const ver = el.querySelector<HTMLElement>('[data-ver]');
@@ -268,7 +346,16 @@ export function settings(g: Game): void {
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
     if (a === 'dev') devMenu(g);
-    else if (a === 'fullscreen') {
+    else if (a === 'window') {
+      // Windowed → Borderless → Fullscreen. Borderless reopens the window, so save first.
+      const order: WindowMode[] = ['windowed', 'borderless', 'fullscreen'];
+      void getWindowMode().then((m) => {
+        const next = order[(order.indexOf(m) + 1) % order.length];
+        g.persist();
+        b.querySelector('b')!.textContent = WINDOW_LABEL[next];
+        void setWindowMode(next);
+      });
+    } else if (a === 'fullscreen') {
       if (document.fullscreenElement) void document.exitFullscreen?.();
       else void document.documentElement.requestFullscreen?.().catch(() => {});
     } else if (a === 'reset') {
@@ -333,6 +420,8 @@ export function pause(g: Game): void {
         <div class="menu">
           <button class="btn primary" data-nav data-a="resume">Resume</button>
           <button class="btn" data-nav data-a="help">Controls</button>
+          <button class="btn" data-nav data-a="map">Map</button>
+          ${g.has('gear') ? '<button class="btn" data-nav data-a="gear">Gear &amp; Inventory</button>' : ''}
           <button class="btn" data-nav data-a="codex">Bestiary &amp; Achievements</button>
           <button class="btn" data-nav data-a="settings">Settings</button>
           ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
@@ -351,6 +440,8 @@ export function pause(g: Game): void {
     if (a === 'resume') g.ui.pop();
     else if (a === 'help') help(g);
     else if (a === 'codex') codex(g);
+    else if (a === 'gear') gearScreen(g);
+    else if (a === 'map') mapScreen(g);
     else if (a === 'dev') devMenu(g);
     else if (a === 'settings') settings(g);
     else if (a === 'title') g.quitToTitle();
@@ -451,7 +542,9 @@ export function weapons(g: Game): void {
     }).join('');
   const el = g.ui.push(
     'station',
-    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Choose your weapon, and forge it stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards list" data-list>${render()}</div><button class="btn" data-nav data-a="back">Back</button></div>`,
+    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Choose your weapon, and forge it stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards list" data-list>${render()}</div>
+      ${g.has('gear') ? '<button class="btn primary" data-nav data-a="gear">Gear &amp; Inventory</button>' : '<p class="small">Gear (helmets, armor, leggings and boots) unlocks here at level 10.</p>'}
+      <button class="btn" data-nav data-a="back">Back</button></div>`,
     { onBack: () => g.ui.pop() },
   );
   const refresh = () => {
@@ -491,7 +584,7 @@ export function weapons(g: Game): void {
       g.ui.toast(`${WEAPON_INFO[id].name} forged to ${next.name}!`);
       refresh();
     });
-    bind(el, '[data-a]', () => g.ui.pop());
+    bind(el, '[data-a]', (b) => (b.dataset.a === 'gear' ? gearScreen(g) : g.ui.pop()));
   };
   wire();
 }

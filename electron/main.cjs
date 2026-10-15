@@ -1,7 +1,7 @@
 // Desktop shell for Unbound Underworld. Serves the Vite build from an `app://`
 // origin (so ES modules and localStorage behave exactly like on the web) and
 // opens it in a plain, menu-less window.
-const { app, BrowserWindow, ipcMain, net, protocol, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, net, protocol, screen, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -12,10 +12,37 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-function createWindow() {
+// Window mode: 'windowed' (normal frame), 'borderless' (no frame, covering the
+// screen) or 'fullscreen'. Saved next to the game's data and restored at start.
+const MODES = ['windowed', 'borderless', 'fullscreen'];
+const modeFile = () => path.join(app.getPath('userData'), 'window.json');
+function loadMode() {
+  try {
+    const m = JSON.parse(fs.readFileSync(modeFile(), 'utf8')).mode;
+    return MODES.includes(m) ? m : 'windowed';
+  } catch {
+    return 'windowed';
+  }
+}
+function saveMode(mode) {
+  try {
+    fs.writeFileSync(modeFile(), JSON.stringify({ mode }));
+  } catch {
+    /* read-only profile: the mode just isn't remembered */
+  }
+}
+let windowMode = 'windowed';
+
+function createWindow(near) {
+  const borderless = windowMode === 'borderless';
+  // Borderless covers the whole display the window was on.
+  const display = near ? screen.getDisplayMatching(near) : screen.getPrimaryDisplay();
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    ...(borderless ? display.bounds : {}),
+    frame: !borderless,
+    fullscreen: windowMode === 'fullscreen',
     minWidth: 800,
     minHeight: 500,
     title: 'Unbound Underworld',
@@ -37,7 +64,7 @@ function createWindow() {
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     if (input.key === 'F11' || (input.alt && input.key === 'Enter')) {
-      win.setFullScreen(!win.isFullScreen());
+      setWindowMode(win, windowMode === 'fullscreen' ? 'windowed' : 'fullscreen');
       event.preventDefault();
     }
   });
@@ -54,6 +81,24 @@ function createWindow() {
   void win.loadURL('app://game/index.html');
 }
 
+/**
+ * Switches window mode. A window's frame can't change once it exists, so going
+ * to or from borderless opens a fresh window (the game reloads; an escape in
+ * progress resumes from its current chamber).
+ */
+function setWindowMode(win, mode) {
+  if (!MODES.includes(mode) || mode === windowMode) return windowMode;
+  const frameChanges = (mode === 'borderless') !== (windowMode === 'borderless');
+  windowMode = mode;
+  saveMode(mode);
+  if (frameChanges) {
+    const bounds = win.getBounds();
+    createWindow(bounds);
+    win.destroy();
+  } else win.setFullScreen(mode === 'fullscreen');
+  return windowMode;
+}
+
 // The Windows installer and the Linux AppImage can replace themselves with a new
 // version. The portable .exe and the unsigned macOS app can't, so the game
 // offers their new download in the browser instead.
@@ -62,6 +107,14 @@ function canSelfUpdate() {
   if (process.platform === 'win32') return !process.env.PORTABLE_EXECUTABLE_DIR;
   if (process.platform === 'linux') return !!process.env.APPIMAGE;
   return false;
+}
+
+function registerWindowMode() {
+  ipcMain.handle('window:get', () => windowMode);
+  ipcMain.handle('window:set', (event, mode) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win ? setWindowMode(win, mode) : windowMode;
+  });
 }
 
 function registerUpdates() {
@@ -104,6 +157,8 @@ if (!app.requestSingleInstanceLock()) {
       return net.fetch(pathToFileURL(file).toString());
     });
     registerUpdates();
+    registerWindowMode();
+    windowMode = loadMode();
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

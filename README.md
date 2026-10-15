@@ -100,6 +100,9 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Weapon forging.** At the Armory, spend Ash to forge each weapon from Tier I up to Tier V (Mythic) for more damage. From Tier III (Awakened), every fourth Attack also unleashes an arcane wave. The waves grow at Tier IV, and at Tier V they split in three and the weapon blazes.
 - **Heroes.** Six heroes, each with their own look, perks and **Wrath** ultimate. You choose them in the Hall of Heroes. *Kael* (Inferno Nova), *Lyra* (Moonfall) and *Doran* (Titan's Quake) are available from the start. *Ione* (Tidal Surge) unlocks at level 8, *Erebos* (Eclipse) after slaying 2 guardians, and *Selene* (Starfall) after your first escape.
 - **Wrath.** A golden gauge that fills as you deal and take damage. When it's full, press `F` to unleash your hero's screen-clearing ultimate.
+- **Loot and gear** (level 10). Foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Styx Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots in four rarities with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Manage it in *Gear & Inventory* (at the Armory or in the pause menu): equip, upgrade with materials, salvage, or craft new pieces.
+- **Save slots.** Four independent journeys; switch on the title screen.
+- **Map.** The pause menu shows every region's chambers, where you are, the guardian ahead and your best run.
 - **Late-game weapons.** *Titan Gauntlets* (level 8): rapid punch combos and a rocketing Meteor Fist. *Reaper's Crescent* (level 14): wide sweeps and spectral scythes that orbit you. Each comes with its own anvil upgrades.
 
 ### The Hades-style core
@@ -123,7 +126,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 *Settings* (on the title screen or in the pause menu) has:
 - **Audio:** sound and music volume, mute.
 - **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints, and (on phones) door descriptions for every door or only the one you walk up to.
-- **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus **UI size**, screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
+- **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus **UI size**, a **window mode** on desktop (Windowed, Borderless or Fullscreen), screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 
 On PC, point at a HUD icon (boons, enchantments, artifacts, potion) to see what it does. Each guardian has its own battle music, which intensifies in phase 2.

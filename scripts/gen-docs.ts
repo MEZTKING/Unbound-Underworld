@@ -7,6 +7,7 @@ import { CHARACTERS } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
 import { ENCHANTS, MAX_ENCHANT_TIER } from '../src/game/enchants';
 import { heatScale, UPGRADES, WEAPON_IDS } from '../src/game/meta';
+import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, SLOT_NAME } from '../src/game/gear';
 import { FORGE, levelFromXp, MAX_LEVEL, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
 import { BIOMES, ENEMY_COST } from '../src/game/rooms';
@@ -180,6 +181,28 @@ table(
   ['Upgrade', 'Ranks', 'Ash per rank', 'At max rank'],
   UPGRADES.map((u) => [`${u.glyph} ${u.name}`, u.costs.length, u.costs.join(' / '), u.desc(u.costs.length)]),
 );
+
+// ---------------------------------------------------------------- loot & gear
+line('## Loot and gear');
+line();
+line(`Unlocks at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Up to ${INVENTORY_SIZE} pieces are kept; a full inventory salvages new finds.`);
+line();
+table(
+  ['Material', 'Source'],
+  MATERIAL_IDS.map((k) => [`${MATERIALS[k].glyph} ${MATERIALS[k].name}`, MATERIALS[k].desc]),
+);
+table(
+  ['Rarity', 'Bonuses', 'Bonus strength ×'],
+  Object.values(GEAR_RARITY).map((r) => [r.name, r.affixes, r.power]),
+);
+table(
+  ['Bonus', 'Common, level 1 (typical)', 'Slots'],
+  (Object.keys(AFFIXES) as (keyof typeof AFFIXES)[]).map((k) => [AFFIXES[k].name(AFFIXES[k].base), AFFIXES[k].flat ? AFFIXES[k].base : `${Math.round(AFFIXES[k].base * 100)}%`, (AFFIXES[k].slots ?? GEAR_SLOTS).map((s) => SLOT_NAME[s]).join(', ')]),
+);
+line(`Each upgrade level adds 15% to every bonus (max level ${MAX_GEAR_LEVEL}). Upgrades cost Bone Dust, plus Ember Shards (Rare), Golden Ichor and Titan Scales (Epic) or Styx Pearls and Titan Scales (Legendary).`);
+line();
+table(['Recipe', 'Rarity', 'Cost'], CRAFTS.map((c) => [c.name, `${GEAR_RARITY[c.min].name} or better`, costText(c.cost)]));
+line();
 
 // ---------------------------------------------------------------- world
 const bossKinds = new Map<BossKind, ReturnType<typeof createBoss>>();

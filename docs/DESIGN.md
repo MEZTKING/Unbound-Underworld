@@ -186,11 +186,19 @@ Doesn't move.
 
 Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amount of experience and unlocks Jump (if it isn't already) and the hero Selene.
 
+## 8b. Loot and gear
+
+Unlocks at level 10 (`feature: 'gear'`). Numbers are in GAME_DATA.md → *Loot and gear*; the code is `src/game/gear.ts` (data) and `src/ui/gear.ts` (screen).
+- **Materials** drop from foes during escapes and are kept forever (`save.materials`): Bone Dust everywhere, a region material (Ember Shard, Golden Ichor, Styx Pearl), and Titan Scales from guardians and enchanted foes.
+- **Gear** has a slot (helmet, armor, leggings, boots), a rarity (1–4 random bonuses) and a level (1–5, +15% per level). It drops from foes (rarely), enchanted foes, chests and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
+- **Gear & Inventory** (Armory or pause menu): equip, upgrade, salvage for materials, or craft a random piece with one of three recipes.
+- Equipped bonuses are added in `Game.recomputeStats` after talents, hero and forge.
+
 ## 9. The Hall of Shades (hub)
 
 | Station | Unlock | Purpose |
 |---|---|---|
-| Armory | Always | Buy, equip and forge weapons |
+| Armory | Always | Buy, equip and forge weapons; Gear & Inventory from level 10 |
 | Altar of Ashes | Always | Permanent upgrades for Ash |
 | Hall of Heroes | Always | Choose your hero; customise their colours and headwear |
 | Ascension | Always | Spend talent points (the prompt shows unspent points) |
@@ -208,6 +216,10 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
 - **Touch:** a floating joystick on the left and an action cluster on the right: Attack, Special above it, Dash beside it, Cast, Jump, Wrath, potion and artifacts. Buttons appear as their mechanics unlock.
 - **Views:** the 3D voxel view (default) renders the world with three.js, which is only loaded when this view is used. It has a Hades-style camera: the room is turned 45° and seen from about 40° up, so rooms show as diamonds with the doors on the far edges. Movement, sticks and mouse aim are turned to match, so up on the keyboard is up on screen. Effects, damage numbers, health bars, pickups and prompts are drawn by a 2D layer on top. That layer uses the same angle (`Camera.setAngle`), and heights go through `Camera.lift`, so the effects line up with the 3D scene. The classic 2D view looks straight down and draws everything on the canvas. On desktop the 3D view has shadows and point lights; phones get no shadows and a lower resolution.
 - **Scaling:** the HUD and menus scale with screen size (1 at 1280×760, up to ×3 on 4K). Phones get compact layouts: a narrower health panel and boon choices that fit without scrolling.
+- **Save slots:** four, chosen on the title screen. Slot 1 uses the original storage keys, so older saves land there; settings follow the device, not the slot. Switching reloads the game.
+- **Map** (pause menu): each region's chambers, antechamber and guardian; where you are; your best run.
+- **Window modes (desktop):** Windowed, Borderless (frameless, covering the screen) and Fullscreen. Saved by the desktop shell; switching to or from Borderless reopens the window, and an escape resumes from its chamber.
+- **Menu style:** gilded double frames, banner titles with spaced capitals, lacquered card rows, and keyword notes beside card choices (`GLOSSARY` in `overlay.ts`). It's all CSS, with no image assets.
 - **Tooltips (PC):** pointing at a HUD icon shows what it is; a door's description pops up when you point at its icon (or walk up to it). Phones show door descriptions on the floor.
 - **Card choices** ignore input for 2s (`CHOICE_LOCK_MS`), so a click meant for the reward doesn't pick a card by accident.
 - **Charon's wares** show what they do once you've bought that kind before (`save.shopSeen`); until then the text is blurred.
@@ -241,6 +253,9 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
 | Menus / touch controls | `src/ui/screens.ts` / `src/ui/touch.ts` |
 | Bestiary and achievements | `src/game/codex.ts` |
 | Developer options | `src/ui/dev.ts` |
+| Loot, gear and crafting | `src/game/gear.ts` / `src/ui/gear.ts` |
+| Map | `src/ui/map.ts` |
+| Save slots | `src/game/meta.ts` (`currentSlot`, `setSlot`) / `saveSlots` in `screens.ts` |
 
 ## 12. How to add content
 

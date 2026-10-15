@@ -1,4 +1,5 @@
 import type { MetaBonuses } from './boons';
+import { MATERIAL_IDS, normalizeGear, type GearState, type MaterialId, type Materials } from './gear';
 import { isCharacterId, type CharacterId, type Palette } from './characters';
 import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
@@ -119,6 +120,12 @@ export interface SaveData {
   shopSeen: string[];
   /** Each hero's chosen colours and headwear. */
   looks: Partial<Record<CharacterId, HeroLook>>;
+  /** When this save was last written (ms since 1970), for the slot picker. */
+  lastPlayed: number;
+  /** Crafting materials from loot. */
+  materials: Materials;
+  /** Gear owned and equipped. */
+  gear: GearState;
 }
 
 /** A hero's customised appearance; anything unset uses the hero's default. */
@@ -129,7 +136,62 @@ export interface HeroLook {
   crown?: Palette['crown'];
 }
 
-const KEY = 'unbound-underworld-save-v1';
+const BASE_KEY = 'unbound-underworld-save-v1';
+const BASE_RUN_KEY = 'unbound-underworld-run-v1';
+const SLOT_KEY = 'unbound-underworld-slot';
+
+/** Four save slots. Slot 1 keeps the original storage keys, so older saves land there. */
+export const SLOTS = 4;
+
+export function currentSlot(): number {
+  try {
+    const n = Number(localStorage.getItem(SLOT_KEY));
+    return n >= 1 && n <= SLOTS ? n : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/** Picks the slot used from the next load (the game reloads to switch). */
+export function setSlot(n: number): void {
+  try {
+    localStorage.setItem(SLOT_KEY, String(Math.max(1, Math.min(SLOTS, n))));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+const saveKey = (slot = currentSlot()) => (slot === 1 ? BASE_KEY : `${BASE_KEY}-slot${slot}`);
+const runKey = (slot = currentSlot()) => (slot === 1 ? BASE_RUN_KEY : `${BASE_RUN_KEY}-slot${slot}`);
+
+/** What a slot holds, for the slot picker (null when empty). */
+export function peekSlot(slot: number): SaveData | null {
+  try {
+    const raw = localStorage.getItem(saveKey(slot));
+    return raw ? normalizeSave(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Empties a slot (its progress and any escape in progress). */
+export function eraseSlot(slot: number): void {
+  try {
+    localStorage.removeItem(saveKey(slot));
+    localStorage.removeItem(runKey(slot));
+  } catch {
+    /* nothing stored */
+  }
+}
+
+/** True when the slot has an escape in progress. */
+export function slotHasRun(slot: number): boolean {
+  try {
+    return !!localStorage.getItem(runKey(slot));
+  } catch {
+    return false;
+  }
+}
 
 export function defaultSave(): SaveData {
   return {
@@ -154,6 +216,9 @@ export function defaultSave(): SaveData {
     achievements: [],
     shopSeen: [],
     looks: {},
+    lastPlayed: 0,
+    materials: {},
+    gear: { items: [], equipped: {} },
   };
 }
 
@@ -194,12 +259,15 @@ export function normalizeSave(raw: unknown): SaveData {
     achievements: Array.isArray(r.achievements) ? r.achievements.filter((a) => typeof a === 'string') : [],
     shopSeen: Array.isArray(r.shopSeen) ? r.shopSeen.filter((a) => typeof a === 'string') : [],
     looks: typeof r.looks === 'object' && r.looks ? { ...r.looks } : {},
+    lastPlayed: num(r.lastPlayed, 0),
+    materials: typeof r.materials === 'object' && r.materials ? Object.fromEntries(Object.entries(r.materials).filter(([k, v]) => MATERIAL_IDS.includes(k as MaterialId) && typeof v === 'number' && v > 0)) : {},
+    gear: normalizeGear(r.gear),
   };
 }
 
 export function loadSave(): SaveData {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(saveKey());
     return normalizeSave(raw ? JSON.parse(raw) : null);
   } catch {
     return defaultSave();
@@ -208,7 +276,7 @@ export function loadSave(): SaveData {
 
 export function writeSave(s: SaveData): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(saveKey(), JSON.stringify({ ...s, lastPlayed: Date.now() }));
   } catch {
     /* storage unavailable (private mode) — progress lasts for this session only */
   }
@@ -216,8 +284,8 @@ export function writeSave(s: SaveData): void {
 
 export function clearSave(): void {
   try {
-    localStorage.removeItem(KEY);
-    localStorage.removeItem(RUN_KEY);
+    localStorage.removeItem(saveKey());
+    localStorage.removeItem(runKey());
   } catch {
     /* nothing stored */
   }
@@ -261,13 +329,12 @@ export function heatScale(heat: number): { hp: number; dmg: number; ash: number 
 
 // ---------------------------------------------------------------- saved escape
 
-const RUN_KEY = 'unbound-underworld-run-v1';
 
 /** Saves the escape in progress (or clears it with null). */
 export function writeRun(snap: RunSnapshot | null): void {
   try {
-    if (snap) localStorage.setItem(RUN_KEY, JSON.stringify(snap));
-    else localStorage.removeItem(RUN_KEY);
+    if (snap) localStorage.setItem(runKey(), JSON.stringify(snap));
+    else localStorage.removeItem(runKey());
   } catch {
     /* storage unavailable */
   }
@@ -276,7 +343,7 @@ export function writeRun(snap: RunSnapshot | null): void {
 /** The saved escape, if there is a valid one. */
 export function loadRun(): RunSnapshot | null {
   try {
-    const raw = localStorage.getItem(RUN_KEY);
+    const raw = localStorage.getItem(runKey());
     if (!raw) return null;
     const snap = JSON.parse(raw) as RunSnapshot;
     if (snap?.v !== 1 || !snap.current || !Array.isArray(snap.boons) || !isWeaponId(snap.weapon)) return null;

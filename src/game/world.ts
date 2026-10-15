@@ -11,7 +11,7 @@ import { damageEnemy, deflect, hostileBlast, lightningBolt } from './combat';
 import { onEnemyKilled } from './enchants';
 import { createEnemy } from './enemies';
 import { Enemy } from './enemies/enemy';
-import { Pickup, Projectile, Zone, type Hitbox, type Telegraph } from './entities';
+import { Pickup, Projectile, Zone, type Hitbox, type Loot, type Telegraph } from './entities';
 import { Player } from './player';
 import { prefs } from './prefs';
 import { WRATH_PER_TAKEN } from './progression';
@@ -71,6 +71,8 @@ export interface WorldHost {
   onPlayerHurt?(): void;
   addGold(n: number): void;
   addAsh(n: number): void;
+  /** Materials or gear picked up (loot unlocks at level 10). */
+  onLoot?(w: World, loot: Loot): void;
 }
 
 interface Swipe {
@@ -554,6 +556,19 @@ export class World {
       this.pickups.push(pk);
       if (left <= 0) break;
     }
+  }
+
+  /** Drops loot that pops out and waits to be picked up. */
+  dropLoot(x: number, y: number, loot: Loot): void {
+    const pk = new Pickup('loot', x, y);
+    pk.loot = loot;
+    const a = Math.random() * TAU;
+    pk.vx = Math.cos(a) * fx.range(40, 120);
+    pk.vy = Math.sin(a) * fx.range(40, 120);
+    pk.vz = fx.range(200, 300);
+    pk.r = loot.gear ? 16 : 11;
+    pk.delay = 0.5;
+    this.pickups.push(pk);
   }
 
   dropShard(x: number, y: number): void {
@@ -1127,7 +1142,7 @@ export class World {
       pk.y = clamp(pk.y + pk.vy * dt, 16, this.room.h - 16);
       if (pk.delay > 0 || p.state === 'dead') continue;
       const d = Math.hypot(p.x - pk.x, p.y - pk.y);
-      const magnetRange = pk.kind === 'soul' ? 360 : pk.kind === 'gold' ? 140 : pk.kind === 'shard' ? 120 : pk.kind === 'ash' ? 120 : 0;
+      const magnetRange = pk.kind === 'soul' ? 360 : pk.kind === 'gold' ? 140 : pk.kind === 'shard' || pk.kind === 'ash' || pk.kind === 'loot' ? 120 : 0;
       if (pk.kind === 'shard' && pk.t > 6) pk.magnet = true;
       if (pk.magnet || d < magnetRange) {
         const sp = pk.kind === 'soul' ? 700 : 900;
@@ -1159,6 +1174,11 @@ export class World {
             this.host.addAsh(pk.value);
             audio.play('pickup');
             this.particles.text(pk.x, pk.y, 40, `+${pk.value} Ash`, '#c8a8ff', 18);
+            break;
+          case 'loot':
+            pk.collected = true;
+            if (pk.loot) this.host.onLoot?.(this, pk.loot);
+            audio.play(pk.loot?.gear ? 'boon' : 'pickup');
             break;
           case 'reward':
             if (pk.reward) {

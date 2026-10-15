@@ -70,7 +70,7 @@ export const WRATH_PER_TAKEN = 0.8;
 
 // ---------------------------------------------------------------- feature unlocks
 
-export type Feature = 'potion' | 'cast' | 'jump' | 'artifacts' | 'enchants' | 'anvil' | 'artifact2' | 'wrath' | 'artifact3' | 'forgeAwaken';
+export type Feature = 'potion' | 'cast' | 'jump' | 'artifacts' | 'enchants' | 'anvil' | 'artifact2' | 'wrath' | 'gear' | 'artifact3' | 'forgeAwaken';
 
 export interface Unlock {
   level: number;
@@ -91,6 +91,7 @@ export const UNLOCKS: Unlock[] = [
   { level: 7, feature: 'anvil', title: "Hephaestus' Anvil", desc: 'Anvils that reforge your weapon now appear in the Underworld.' },
   { level: 8, feature: 'artifact2', title: 'Second Artifact Slot', desc: 'Carry two artifacts at once.', keys: { pc: '2', touch: 'the artifact button' } },
   { level: 10, feature: 'wrath', title: 'Wrath', desc: "Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate.", keys: { pc: 'F', touch: '☄' } },
+  { level: 10, feature: 'gear', title: 'Loot & Gear', desc: 'Foes now drop materials and gear. Equip helmets, armor, leggings and boots, and craft or upgrade them, at the Armory.' },
   { level: 12, feature: 'artifact3', title: 'Third Artifact Slot', desc: 'Carry three artifacts at once.', keys: { pc: '3', touch: 'the artifact button' } },
   { level: 13, feature: 'forgeAwaken', title: 'Awakened Weapons', desc: 'Forge a weapon to Tier III at the Armory to awaken it.' },
 ];

@@ -6,6 +6,7 @@ import { DOOR_W, TRAP_SIZE, WALL_H, type Obstacle } from './rooms';
 import type { RewardSpec, Shape } from './types';
 import type { Interactable, World } from './world';
 import { prefs } from './prefs';
+import { GEAR_RARITY, MATERIALS, SLOT_GLYPH } from './gear';
 import { isSpear } from './weapons';
 
 const PAD = 90;
@@ -627,6 +628,40 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
     case 'reward':
       if (pk.reward) drawRewardIcon(ctx, pk.reward, pk.x, y, 24, w.time);
       break;
+    case 'loot': {
+      const l = pk.loot;
+      if (!l) break;
+      const color = l.gear ? GEAR_RARITY[l.gear.rarity].color : MATERIALS[l.material ?? 'bone'].color;
+      const glyph = l.gear ? SLOT_GLYPH[l.gear.slot] : MATERIALS[l.material ?? 'bone'].glyph;
+      const size = l.gear ? 15 : 10;
+      const hover = y - 10 + Math.sin(w.time * 4 + pk.x) * 3;
+      // A soft beam marks gear so it isn't missed.
+      if (l.gear) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createLinearGradient(0, hover - 60, 0, hover);
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        g.addColorStop(1, color);
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = g;
+        ctx.fillRect(pk.x - 6, hover - 60, 12, 60);
+        ctx.restore();
+      }
+      ctx.fillStyle = 'rgba(10,6,14,0.85)';
+      ctx.beginPath();
+      ctx.arc(pk.x, hover, size, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = `700 ${Math.round(size * 1.1)}px Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(glyph, pk.x, hover + 1);
+      ctx.textBaseline = 'alphabetic';
+      break;
+    }
   }
 }
 
