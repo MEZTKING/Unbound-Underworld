@@ -59,6 +59,8 @@ export class Game implements WorldHost {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
   dpr = 1;
+  /** HUD and menu scale: 1 at the 1280×760 design size, larger on bigger screens. */
+  uiScale = 1;
   readonly input: Input;
   readonly camera = new Camera();
   readonly particles = new Particles();
@@ -130,6 +132,10 @@ export class Game implements WorldHost {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.camera.resize(w, h);
+    // Grow the HUD and menus with the screen so they keep their proportions on
+    // 1440p and 4K displays. Smaller screens keep the compact layouts.
+    this.uiScale = Math.max(1, Math.min(3, Math.min(w / 1280, h / 760)));
+    document.documentElement.style.setProperty('--ui', this.uiScale.toFixed(3));
   }
 
   /** Pause and go quiet when the tab or app is backgrounded. */
@@ -286,17 +292,19 @@ export class Game implements WorldHost {
     if (w) {
       w.render(ctx, this.dpr);
       if (this.mode !== 'title') {
-        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        drawHUD(ctx, w, this.run, this.save, this.camera.vw, this.camera.vh, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
+        const k = this.dpr * this.uiScale;
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        drawHUD(ctx, w, this.run, this.save, this.camera.vw / this.uiScale, this.camera.vh / this.uiScale, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
       }
       this.syncTouch(w);
     }
     if (prefs.showFps) {
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      const k = this.dpr * this.uiScale;
+      ctx.setTransform(k, 0, 0, k, 0, 0);
       ctx.font = '600 12px monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(200,255,200,0.8)';
-      ctx.fillText(`${Math.round(this.fps)} FPS`, this.camera.vw / 2, this.camera.vh - 8);
+      ctx.fillText(`${Math.round(this.fps)} FPS`, this.camera.vw / this.uiScale / 2, this.camera.vh / this.uiScale - 8);
     }
     if (this.fade > 0) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);

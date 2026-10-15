@@ -44,6 +44,8 @@ canvas#game {
 #overlay {
   position: fixed;
   inset: 0;
+  /* --ui is set from the screen size: menus keep their proportions on big displays. */
+  zoom: var(--ui, 1);
   z-index: 10;
   pointer-events: none;
   display: flex;
@@ -95,7 +97,7 @@ canvas#game {
   padding: 28px 32px;
   border-radius: 6px;
   width: min(560px, 100%);
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh / var(--ui, 1) - 32px);
   overflow-y: auto;
   text-align: center;
 }
@@ -558,6 +560,7 @@ kbd {
 }
 
 .toast {
+  zoom: var(--ui, 1);
   position: fixed;
   left: 50%;
   bottom: 120px;
@@ -677,7 +680,7 @@ kbd {
   --size: 62px;
   --c: #ffd890;
   --cd: 0;
-  zoom: var(--tscale);
+  zoom: calc(var(--tscale) * var(--ui, 1));
   opacity: var(--topa);
   position: absolute;
   width: var(--size);
