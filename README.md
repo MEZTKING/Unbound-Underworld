@@ -29,14 +29,15 @@ The builds are **not code-signed** by a store, so your system will warn you the 
 
 In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
 
-### iPhone and iPad (or any phone without installing a file)
+### iPhone and iPad (the web version)
 
-Play the web version at **https://meztking.github.io/Unbound-Underworld/**, then add it to your home screen:
+iPhones only install apps from the App Store, so on iOS you play the web version instead. Each release includes `Unbound-Underworld-<version>-web.zip`. Put it on a free static host once, and you get a link you can open on any phone or computer:
 
-- **iPhone / iPad (Safari):** tap *Share → Add to Home Screen*.
-- **Android (Chrome):** tap *⋮ → Add to Home screen* or *Install app*.
+- **Cloudflare Pages** (free, recommended): sign up at [cloudflare.com](https://dash.cloudflare.com/sign-up), then go to *Workers & Pages → Create → Pages → Upload assets*. Name the project and drop in the zip. You get an address like `https://unbound-underworld.pages.dev`. To update it later, upload the newer zip to the same project.
+- **Netlify Drop:** drag the unzipped folder onto [app.netlify.com/drop](https://app.netlify.com/drop). Create a free account when it asks, or the site is deleted after an hour.
+- **itch.io:** create a project, set *Kind of project* to *HTML*, upload the zip and tick *This file will be played in the browser*. This is the easiest place to share the game with friends. The game runs inside the itch.io page, though, so it doesn't open fullscreen from the home screen like the options above.
 
-It then opens fullscreen like an app and works offline. Hold your phone sideways to play.
+Open your link in Safari and tap *Share → Add to Home Screen* (in Chrome on Android: *⋮ → Add to Home screen*). The game then opens fullscreen like an app, works offline and keeps its saves on the phone. Hold your phone sideways to play.
 
 On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (hold to repeat or charge, drag to aim), **✦** Special, **◆** Cast, **»** Dash and **⤒** Jump. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
 
@@ -50,7 +51,7 @@ npm run desktop    # or play in the desktop app window
 
 To try the touch controls on a computer, open the browser's device toolbar (phone emulation) and reload.
 
-`npm run build` writes a static site to `dist/`. It uses relative paths, so you can host it on GitHub Pages, itch.io or any static server.
+`npm run build` writes a static site to `dist/`. It uses relative paths, so you can host it on any static server, in a subfolder too.
 
 ## Controls
 
@@ -106,16 +107,14 @@ npm run dist:desktop -- --linux # or pick a platform: --win, --mac, --linux
 npm run android:apk             # Android debug APK (needs the Android SDK and Java 21)
 ```
 
-The **App builds** GitHub workflow builds Windows, macOS, Linux and Android. Push a version tag and it publishes everything on a GitHub Release:
+The **App builds** GitHub workflow builds Windows, macOS, Linux, Android and the web version zip. Push a version tag and it publishes everything on a GitHub Release:
 
 ```bash
 npm version patch               # bump the version in package.json and create a tag such as v0.1.1
 git push --follow-tags
 ```
 
-You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts. A release made this way doesn't trigger the web version automatically, so also run *Actions → Web version (GitHub Pages) → Run workflow*.
-
-**Web version.** The **Web version (GitHub Pages)** workflow publishes the installable browser version on every version tag. It needs a one-time setup: in the repository's *Settings → Pages*, set the source to *GitHub Actions*.
+You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts.
 
 **Android signing.** Without extra setup, the APK is signed with a throwaway debug key. Each build gets a different key, so installing a newer version means uninstalling the old one first, which loses your saves. To sign every build with the same key, create one once:
 

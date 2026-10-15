@@ -1,8 +1,8 @@
 name: App builds
 
-# Builds the Windows, macOS, Linux and Android apps. Pushing a tag like
-# `v0.1.0`, or running this workflow from the Actions tab with a version,
-# also publishes them as downloads on a GitHub Release.
+# Builds the Windows, macOS, Linux and Android apps plus a zip of the web
+# version. Pushing a tag like `v0.1.0`, or running this workflow from the
+# Actions tab with a version, also publishes them on a GitHub Release.
 on:
   push:
     tags: ['v*']
@@ -110,10 +110,33 @@ jobs:
           path: release/*.apk
           if-no-files-found: error
 
+  web:
+    name: Package (Web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # index.html sits at the root of the zip, as itch.io and other static hosts expect.
+      - name: Zip the web version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p release
+          (cd dist && zip -qr "../release/Unbound-Underworld-$VERSION-web.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Unbound-Underworld-Web
+          path: release/*.zip
+          if-no-files-found: error
+
   release:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
-    needs: [desktop, android]
+    needs: [desktop, android, web]
     runs-on: ubuntu-latest
     permissions:
       contents: write
