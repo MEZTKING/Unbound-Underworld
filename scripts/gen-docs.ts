@@ -3,7 +3,7 @@
 import { writeFileSync } from 'node:fs';
 import { ARTIFACTS } from '../src/game/artifacts';
 import { BOON_BY_ID, BOONS, boonValue, GODS, HAMMERS, RARITY_MULT } from '../src/game/boons';
-import { CHARACTERS } from '../src/game/characters';
+import { CHARACTERS, heroForWeapon } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
 import { ENCHANTS, MAX_ENCHANT_TIER } from '../src/game/enchants';
 import { heatScale, UPGRADES, WEAPON_IDS } from '../src/game/meta';
@@ -110,16 +110,20 @@ line();
 line(`Choose a hero in the *Hall of Heroes*. Wrath (unlocks at level ${UNLOCKS.find((u) => u.feature === 'wrath')?.level}) fills by ${(WRATH_PER_DEALT * 100).toFixed(2)} per 100 damage dealt and ${WRATH_PER_TAKEN} per damage taken; ${WRATH_MAX} unleashes the hero's ultimate.`);
 line();
 table(
-  ['Hero', 'Title', 'Unlock', 'Perks', 'Wrath', 'Wrath effect'],
-  CHARACTERS.map((h) => [h.name, h.title, h.unlock?.text ?? 'Start', h.perks.join('; '), h.wrath.name, h.wrath.desc]),
+  ['Hero', 'Class', 'Weapon', 'Guard', 'Unlock', 'Perks', 'Wrath', 'Wrath effect'],
+  CHARACTERS.map((h) => [`${h.name}, ${h.title}`, h.role, WEAPON_INFO[h.weapon].name, h.guard, h.unlock?.text ?? 'Start', h.perks.join('; '), h.wrath.name, h.wrath.desc]),
 );
+line('Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes souls).');
+line();
 
 // ---------------------------------------------------------------- weapons
 line('## Weapons, forging and anvil upgrades');
 line();
+line('Each weapon belongs to one class (hero): picking the hero picks the weapon. Every weapon chains on taps, and holding Attack after a chain hit starts its powered attack.');
+line();
 table(
-  ['Weapon', 'Id', 'Ash to unlock', 'Level needed', 'Description'],
-  WEAPON_IDS.map((w) => [WEAPON_INFO[w].name, w, WEAPON_INFO[w].cost || 'Owned', WEAPON_LEVEL[w], WEAPON_INFO[w].blurb]),
+  ['Weapon', 'Id', 'Class', 'Hero', 'Description'],
+  WEAPON_IDS.map((w) => [WEAPON_INFO[w].name, w, heroForWeapon(w).role, heroForWeapon(w).name, WEAPON_INFO[w].blurb]),
 );
 line('**Forge tiers** (per weapon, at the Armory)');
 line();

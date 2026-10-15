@@ -1530,6 +1530,7 @@ function drawPlayerRings(ctx: CanvasRenderingContext2D, w: World): void {
   if (p.state === 'dead') return;
   ctx.save();
   ctx.translate(p.x, p.y);
+  p.drawGuard(ctx, false);
   if (p.wrathReady && w.stats.canWrath) {
     ctx.strokeStyle = `rgba(255,208,74,${0.45 + Math.sin(p.t * 8) * 0.25})`;
     ctx.lineWidth = 3;

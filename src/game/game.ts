@@ -37,7 +37,7 @@ import { applyFeatures, applyForge, applyTalents, hasFeature, levelFromXp, tierF
 import { REWARD_INFO, renderOpts, renderOverlay } from './render';
 import type { VoxelQuality, VoxelRenderer } from '../render3d/voxel';
 import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
-import { Run, type RoomPlan } from './run';
+import { Run, type RoomPlan, type Spoils } from './run';
 import type { PlayerStats } from './stats';
 import type { GodId, RewardSpec } from './types';
 import { createWeapon, WEAPON_INFO } from './weapons';
@@ -47,6 +47,8 @@ const STEP = 1 / 60;
 
 type Mode = 'title' | 'hub' | 'run' | 'over';
 const SAVE_MARK = 1.8;
+/** Obols for skipping a card choice. */
+const SKIP_OBOLS = 25;
 
 export interface RunSummary {
   victory: boolean;
@@ -56,6 +58,7 @@ export interface RunSummary {
   ash: number;
   biome: string;
   cause: string;
+  spoils: Spoils;
 }
 
 /** The 3D view's camera: yaw turns the room, pitch is how far it looks down. */
@@ -144,6 +147,11 @@ export class Game implements WorldHost {
     this.enterHub(true);
     this.mode = 'title';
     screens.title(this);
+    if (this.save.notice) {
+      this.ui.toast(this.save.notice, 7000);
+      this.save.notice = '';
+      this.persist();
+    }
     requestAnimationFrame((t) => this.frame(t));
   }
 
@@ -474,6 +482,7 @@ export class Game implements WorldHost {
       active: !this.ui.open && (this.mode === 'hub' || this.mode === 'run') && p.state !== 'dead',
       cast: s.canCast,
       jump: s.canJump,
+      guard: s.canGuard,
       potion: s.canPotion,
       wrath: s.canWrath ? Math.min(1, p.wrath / 100) : null,
       artifacts: this.artifacts.map((id, i) => {
@@ -607,6 +616,9 @@ export class Game implements WorldHost {
     const w = new World(this, layout, biome, this.camera, this.particles, p);
     this.world = w;
     this.pendingDoors = [];
+    // Higher Torment: more foes attack at once, and they aim better.
+    w.tokenBonus = Math.floor(run.heat / 2);
+    w.foeAimError = Math.max(0.35, 1 - run.heat * 0.1);
     const sc = run.scales();
     switch (plan.kind) {
       case 'combat': {
@@ -630,7 +642,7 @@ export class Game implements WorldHost {
         this.setupShop(w, 4);
         w.cleared = true;
         this.openExitDoors(w);
-        w.showBanner("Charon's Wares", 'The ferryman will trade.');
+        w.showBanner("Charon's Wares", 'Buy something, or walk on through any door.');
         break;
       case 'fountain':
         w.interactables.push({ id: 'fountain', x: layout.w / 2, y: layout.h / 2, r: 90, label: 'Fountain of Lethe', prompt: 'Drink', kind: 'fountain' });
@@ -773,6 +785,7 @@ export class Game implements WorldHost {
       ash: run.ash,
       biome: run.biome.name,
       cause: this.lastHit,
+      spoils: run.spoils,
     };
     w.later(1.8, () => screens.death(this, summary));
   }
@@ -802,6 +815,7 @@ export class Game implements WorldHost {
       ash: run.ash,
       biome: run.biome.name,
       cause: '',
+      spoils: run.spoils,
     });
   }
 
@@ -818,7 +832,7 @@ export class Game implements WorldHost {
   /** Loot (from level 10): materials from most foes, gear now and then. */
   private dropLoot(w: World, e: Enemy): void {
     const run = this.run;
-    if (!run || !this.has('gear') || e.isDummy || e.passive) return;
+    if (!run || e.isDummy || e.passive) return;
     const rng = run.rng;
     const region = regionMaterial(run.biomeIndex);
     const big = e.isBoss ? 3 : e.isElite || e.eliteMod ? 1.6 : 1;
@@ -831,15 +845,20 @@ export class Game implements WorldHost {
 
   onLoot(w: World, loot: Loot): void {
     const p = this.player;
+    const spoils = this.run?.spoils;
     if (loot.material) {
       const m = MATERIALS[loot.material];
       const n = loot.count ?? 1;
       this.save.materials[loot.material] = (this.save.materials[loot.material] ?? 0) + n;
+      if (spoils) spoils.materials[loot.material] = (spoils.materials[loot.material] ?? 0) + n;
       w.particles.text(p.x, p.y, 70, `+${n} ${m.glyph} ${m.name}`, m.color, 15);
+      w.feed(`+${n} ${m.glyph} ${m.name}`, m.color);
     }
     if (loot.gear) {
       const item = loot.gear;
       const color = GEAR_RARITY[item.rarity].color;
+      spoils?.gear.push({ name: item.name, rarity: item.rarity });
+      w.feed(`${GEAR_RARITY[item.rarity].name} ${SLOT_NAME[item.slot]}: ${item.name}`, color);
       if (this.save.gear.items.length >= INVENTORY_SIZE) {
         // Full: salvage it on the spot.
         const back = salvageValue(item);
@@ -924,7 +943,7 @@ export class Game implements WorldHost {
     }
     w.dropGold(it.x, it.y, Math.round(fx.range(15, 35) * this.stats.goldMult));
     w.dropSouls(it.x, it.y, 6);
-    if (run && this.has('gear')) {
+    if (run) {
       w.dropLoot(it.x, it.y, { material: 'bone', count: 3 });
       if (Math.random() < 0.3) w.dropLoot(it.x, it.y, { gear: rollGear(run.rng, 0.2) });
     }
@@ -1058,6 +1077,7 @@ export class Game implements WorldHost {
         this.recomputeStats();
         after();
       },
+      skip: this.skipChoice(after),
     });
   }
 
@@ -1095,6 +1115,7 @@ export class Game implements WorldHost {
         this.recomputeStats();
         after();
       },
+      skip: this.skipChoice(after),
     });
   }
 
@@ -1116,6 +1137,7 @@ export class Game implements WorldHost {
         this.recomputeStats();
         after();
       },
+      skip: this.skipChoice(after),
     });
   }
 
@@ -1140,6 +1162,7 @@ export class Game implements WorldHost {
         this.recomputeStats();
         after();
       },
+      skip: this.skipChoice(after),
     });
   }
 
@@ -1172,8 +1195,21 @@ export class Game implements WorldHost {
         }
         screens.replaceArtifact(this, chosen.id, after);
       },
-      skip: { label: 'Leave it', onSkip: after },
+      skip: this.skipChoice(after, 'Leave it'),
     });
+  }
+
+  /** Every card choice can be skipped for a few obols, so nothing is forced on you. */
+  private skipChoice(after: () => void, label = 'Skip'): { label: string; onSkip: () => void } {
+    return {
+      label: `${label} (+${SKIP_OBOLS} obols)`,
+      onSkip: () => {
+        if (this.run) this.run.gold += SKIP_OBOLS;
+        audio.play('gold');
+        this.ui.toast(`Skipped. +${SKIP_OBOLS} obols.`);
+        after();
+      },
+    };
   }
 
   // ---------------------------------------------------------------- menus helpers
@@ -1195,7 +1231,11 @@ export class Game implements WorldHost {
     const def = CHARACTER_BY_ID[id];
     if (!def || !characterUnlocked(def, this.save, this.level)) return;
     this.save.character = id;
+    // Each hero fights with their own class weapon.
+    this.save.weapon = def.weapon;
+    if (!this.save.weapons.includes(def.weapon)) this.save.weapons.push(def.weapon);
     this.persist();
+    this.player.weapon = createWeapon(def.weapon);
     this.player.hero = def;
     this.player.wrath = 0;
     this.recomputeStats(true);

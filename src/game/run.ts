@@ -2,6 +2,7 @@ import { Rng } from '../engine/math';
 import { ARTIFACTS } from './artifacts';
 import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
 import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
+import type { GearRarity, MaterialId } from './gear';
 import { applyMetaExtras, heatScale, metaBonuses, rank, type SaveData } from './meta';
 import { hasFeature } from './progression';
 import { BIOMES, type BiomeInfo } from './rooms';
@@ -38,6 +39,14 @@ export interface RunSnapshot {
   /** Player state carried between chambers. */
   hp: number;
   souls: number;
+  /** Loot gathered so far (added in v0.7). */
+  spoils?: Spoils;
+}
+
+/** What an escape has gathered, for the Spoils list at its end. */
+export interface Spoils {
+  materials: Partial<Record<MaterialId, number>>;
+  gear: { name: string; rarity: GearRarity }[];
 }
 
 /** Everything that lives for the duration of one escape attempt. */
@@ -65,6 +74,7 @@ export class Run {
   current: RoomPlan = { kind: 'combat', reward: { kind: 'boon' } };
   /** Per-biome once-only rooms and rewards. */
   used = new Set<string>();
+  spoils: Spoils = { materials: {}, gear: [] };
 
   constructor(save: SaveData, seed = (Math.random() * 2 ** 31) | 0) {
     this.seed = seed;
@@ -101,6 +111,7 @@ export class Run {
       used: [...this.used],
       hp,
       souls,
+      spoils: { materials: { ...this.spoils.materials }, gear: this.spoils.gear.map((g) => ({ ...g })) },
     };
   }
 
@@ -125,6 +136,7 @@ export class Run {
     run.time = snap.time;
     run.current = snap.current;
     run.used = new Set(snap.used);
+    if (snap.spoils) run.spoils = { materials: { ...snap.spoils.materials }, gear: [...(snap.spoils.gear ?? [])] };
     return run;
   }
 

@@ -800,6 +800,13 @@ kbd {
   bottom: calc(22px + var(--sb));
 }
 
+.tb.guard {
+  --size: 54px;
+  --c: #ffe0a0;
+  right: calc(244px + var(--sr));
+  bottom: calc(92px + var(--sb));
+}
+
 .tb.art1 {
   right: calc(186px + var(--sr));
   bottom: calc(96px + var(--sb));
@@ -853,7 +860,7 @@ kbd {
   font-size: 16px;
   letter-spacing: 0.06em;
   right: calc(250px + var(--sr));
-  bottom: calc(150px + var(--sb));
+  bottom: calc(160px + var(--sb));
   --c: #ffd890;
 }
 
@@ -2090,4 +2097,25 @@ h3.section small {
   letter-spacing: inherit;
   color: inherit;
   margin-top: 0;
+}
+
+/* ---------------------------------------------------------------- spoils */
+.spoils-gear {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  margin: 4px 0 6px;
+  font-family: var(--serif);
+}
+
+/* ---------------------------------------------------------------- classes */
+.hero-kit {
+  margin: 4px 0 2px;
+  font-family: var(--serif);
+  font-size: 13px;
+  color: var(--muted);
+}
+.hero-kit span {
+  font-weight: 600;
 }

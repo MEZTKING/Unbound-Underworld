@@ -1,4 +1,4 @@
-import { angleTo, clamp, damp, dist, TAU } from '../../engine/math';
+import { angleDiff, angleTo, clamp, damp, dist, TAU } from '../../engine/math';
 import { Actor } from '../actor';
 import { CHILL_MAX, damageEnemy, updateStatuses } from '../combat';
 import { GODS } from '../boons';
@@ -76,6 +76,15 @@ export abstract class Enemy extends Actor {
   summoner: Enemy | null = null;
   /** Wall/obstacle normal from the last movement step. */
   lastHit: { x: number; y: number } | null = null;
+  /** How fast this foe can turn, in radians per second: circle a slow one to get behind it. */
+  turnRate = 5;
+  /** Seconds left on the attack token this foe holds (see `canAttack`). */
+  tokenT = 0;
+  tokenKind: 'melee' | 'ranged' = 'melee';
+  /** A short pause after spawning before it reacts. */
+  reactT = 0.15 + Math.random() * 0.45;
+  /** The side of the player this foe likes to come from, so groups surround you. */
+  readonly slot = Math.random() * TAU;
 
   constructor(x: number, y: number, spec: EnemySpec, hpScale = 1) {
     super();
@@ -128,7 +137,12 @@ export abstract class Enemy extends Actor {
     }
     this.stateT += dt * this.speedMult * this.haste;
     this.cd -= dt * this.speedMult * this.haste;
-    if (this.status.stun !== undefined) {
+    this.tokenT = Math.max(0, this.tokenT - dt);
+    if (this.reactT > 0 && !this.isBoss) {
+      this.reactT -= dt;
+      this.stop(dt);
+      this.turnTo(this.angleToPlayer(w), dt);
+    } else if (this.status.stun !== undefined) {
       this.vx = damp(this.vx, 0, 12, dt);
       this.vy = damp(this.vy, 0, 12, dt);
     } else {
@@ -184,6 +198,42 @@ export abstract class Enemy extends Actor {
     return angleTo(this, w.player);
   }
 
+  /** Turns toward an angle, no faster than `turnRate`. */
+  turnTo(a: number, dt: number): void {
+    const step = this.turnRate * dt;
+    this.facing += clamp(angleDiff(this.facing, a), -step, step);
+  }
+
+  /**
+   * The angle a committed attack goes at. Foes don't lock on: they swing
+   * where they face, pulled toward you by at most `snap` radians, with up to
+   * `spread` radians of error (less at higher Torment).
+   */
+  aimAtPlayer(w: World, spread = 0, snap = 0.5): number {
+    const d = angleDiff(this.facing, this.angleToPlayer(w));
+    const a = this.facing + clamp(d, -snap, snap) + (Math.random() * 2 - 1) * spread * w.foeAimError;
+    this.facing = a;
+    return a;
+  }
+
+  /**
+   * Asks the room for an attack token. Only a few foes attack at once; the
+   * rest wait their turn. Guardians and their summons always may.
+   */
+  canAttack(w: World, kind: 'melee' | 'ranged'): boolean {
+    if (this.isBoss || this.passive || this.tokenT > 0) return true;
+    if (this.tokensFull(w, kind)) return false;
+    this.tokenT = kind === 'melee' ? 1.4 : 1.1;
+    this.tokenKind = kind;
+    return true;
+  }
+
+  tokensFull(w: World, kind: 'melee' | 'ranged'): boolean {
+    let n = 0;
+    for (const e of w.enemies) if (e !== this && !e.dead && e.tokenT > 0 && e.tokenKind === kind) n++;
+    return n >= 2 + w.tokenBonus;
+  }
+
   /** Steers toward a point using line of sight or the room's flow field. */
   moveToward(w: World, tx: number, ty: number, speed: number, dt: number, accel = 10): void {
     let dx = tx - this.x;
@@ -203,11 +253,37 @@ export abstract class Enemy extends Actor {
     }
     this.vx = damp(this.vx, (dx / l) * speed, accel, dt);
     this.vy = damp(this.vy, (dy / l) * speed, accel, dt);
-    this.facing = Math.atan2(this.vy, this.vx);
+    this.turnTo(Math.atan2(this.vy, this.vx), dt);
   }
 
+  /**
+   * Closes in on the player. From afar each foe heads for its own side of
+   * you, so groups surround rather than queue; up close, a foe without an
+   * attack token circles at a distance and waits its turn.
+   */
   chase(w: World, speed: number, dt: number): void {
-    this.moveToward(w, w.player.x, w.player.y, speed, dt);
+    const p = w.player;
+    const d = dist(this, p);
+    if (!this.isBoss && this.tokenT <= 0 && d < 230 && this.tokensFull(w, 'melee')) {
+      this.circleAround(w, 175, speed * 0.7, dt);
+      return;
+    }
+    if (!this.isBoss && d > 150 && w.lineOfSight(this.x, this.y, p.x, p.y, this.r)) {
+      const off = Math.min(110, d * 0.4);
+      this.moveToward(w, p.x + Math.cos(this.slot) * off, p.y + Math.sin(this.slot) * off, speed, dt);
+      return;
+    }
+    this.moveToward(w, p.x, p.y, speed, dt);
+  }
+
+  /** Strafes around the player at about `want` distance, facing them. */
+  circleAround(w: World, want: number, speed: number, dt: number): void {
+    const p = w.player;
+    const a = angleTo(p, this) + (this.id % 2 ? 0.5 : -0.5);
+    const tx = clamp(p.x + Math.cos(a) * want, 60, w.room.w - 60);
+    const ty = clamp(p.y + Math.sin(a) * want, 60, w.room.h - 60);
+    this.moveToward(w, tx, ty, speed, dt);
+    this.turnTo(this.angleToPlayer(w), dt);
   }
 
   /** Keeps roughly `want` distance from the player, strafing. */
@@ -220,7 +296,7 @@ export abstract class Enemy extends Actor {
     const ty = p.y + Math.sin(a + strafe * 0.6) * want;
     if (Math.abs(d - want) < 40 && Math.abs(strafe) < 0.2) this.stop(dt);
     else this.moveToward(w, clamp(tx, 60, w.room.w - 60), clamp(ty, 60, w.room.h - 60), speed, dt);
-    this.facing = angleTo(this, p);
+    this.turnTo(angleTo(this, p), dt);
   }
 
   stop(dt: number): void {

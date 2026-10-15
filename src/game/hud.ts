@@ -7,7 +7,7 @@ import { prefs } from './prefs';
 import { levelFromXp, tierFor, WRATH_MAX } from './progression';
 import type { Run } from './run';
 import type { SaveData } from './meta';
-import type { World } from './world';
+import { LOOT_FEED_TIME, type World } from './world';
 
 const FONT = '"Cinzel", Georgia, serif';
 
@@ -23,7 +23,7 @@ interface Tip {
 let tips: Tip[] = [];
 
 /** The key shown for an action ("R", "4"…); the game points this at the live bindings. */
-let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'F', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
+let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'F', guard: 'V', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
 export function useKeyLabels(fn: (action: string) => string): void {
   keyOf = fn;
 }
@@ -488,6 +488,55 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
   const bn = w.banner;
   if (bn) drawBanner(ctx, bn, vw / 2, vh * bannerY, vw);
 
+  // ---------------------------------------------------------------- combo meter
+  const pl = w.player;
+  if (pl.combo >= 5) {
+    const k = Math.max(0, 1 - pl.comboT / 2.5);
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.65 * k;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    const cx = vw - 24;
+    const cy = touch ? vh * 0.3 : 196;
+    const pop = Math.max(0, 0.15 - pl.comboT) * 4;
+    ctx.font = `700 ${Math.round(30 * (1 + pop))}px ${FONT}`;
+    ctx.fillStyle = pl.combo >= 50 ? '#ff9aff' : pl.combo >= 25 ? '#ffb04a' : '#ffd890';
+    ctx.fillText(`${pl.combo}`, cx, cy);
+    ctx.font = `600 12px ${FONT}`;
+    ctx.fillStyle = '#e8dcc8';
+    ctx.fillText(`HIT COMBO${pl.combo >= 10 ? ` · +${Math.min(10, Math.floor(pl.combo / 10))}% damage` : ''}`, cx, cy + 16);
+    // Drains as the timeout nears.
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(cx - 110, cy + 22, 110, 3);
+    ctx.fillStyle = '#ffd890';
+    ctx.fillRect(cx - 110 * k, cy + 22, 110 * k, 3);
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- loot feed
+  if (w.lootFeed.length) {
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `600 13px ${FONT}`;
+    const fx0 = 24;
+    let fy = touch ? 168 : 84;
+    for (const f of w.lootFeed) {
+      const a = Math.min(1, f.t * 6, (LOOT_FEED_TIME - f.t) * 1.5);
+      if (a <= 0) continue;
+      const slide = Math.max(0, 1 - f.t * 6) * 16;
+      ctx.globalAlpha = a * 0.6;
+      const tw = ctx.measureText(f.text).width;
+      ctx.fillStyle = 'rgba(10,6,14,0.8)';
+      ctx.fillRect(fx0 - 8 - slide, fy - 10, tw + 16, 20);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, fx0 - slide, fy + 1);
+      fy += 24;
+    }
+    ctx.restore();
+  }
+
   // ---------------------------------------------------------------- control hint
   if (prefs.hints && !touch && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
     const s = w.stats;
@@ -497,6 +546,7 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
     // Only what you've unlocked so far.
     const extras = [
       s.artifactSlots > 0 ? `${[1, 2, 3].slice(0, s.artifactSlots).map((i) => keyOf(`artifact${i}`)).join(' ')} Artifacts` : '',
+      s.canGuard ? `${keyOf('guard')} Guard / Parry` : '',
       s.canPotion ? `${keyOf('potion')} Potion` : '',
       s.canWrath ? `${keyOf('wrath')} Wrath` : '',
       `${keyOf('interact')} Interact · Esc Pause`,

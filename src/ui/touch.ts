@@ -8,6 +8,7 @@ export interface TouchHud {
   /** Level-gated buttons are hidden until unlocked. */
   cast: boolean;
   jump: boolean;
+  guard: boolean;
   potion: boolean;
   /** Wrath gauge 0..1, or null while Wrath is locked. */
   wrath: number | null;
@@ -27,6 +28,7 @@ const BUTTONS: { a: Action; cls: string; label: string }[] = [
   { a: 'cast', cls: 'cast', label: '◆' },
   { a: 'dash', cls: 'dash', label: '»' },
   { a: 'jump', cls: 'jump', label: '⤒' },
+  { a: 'guard', cls: 'guard', label: '⛨' },
   { a: 'potion', cls: 'potion small', label: '⚗' },
   { a: 'wrath', cls: 'wrath small', label: '☄' },
   { a: 'artifact1', cls: 'art art1 small', label: '' },
@@ -227,6 +229,7 @@ export class TouchControls {
     cast.classList.toggle('gone', !hud.cast);
     cast.classList.toggle('dim', hud.castAmmo <= 0);
     this.els.get('jump')!.classList.toggle('gone', !hud.jump);
+    this.els.get('guard')!.classList.toggle('gone', !hud.guard);
     const wrath = this.els.get('wrath')!;
     wrath.classList.toggle('gone', hud.wrath === null);
     wrath.style.setProperty('--cd', `${1 - (hud.wrath ?? 0)}`);

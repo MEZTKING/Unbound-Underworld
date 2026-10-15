@@ -5,7 +5,7 @@ import { useArtifact } from './artifacts';
 import { GODS } from './boons';
 import { CHARACTER_BY_ID, type CharacterDef, type CharacterId, type Palette } from './characters';
 import type { HeroLook } from './meta';
-import { castLanded, damageEnemy, dashTriggered, deflectProjectiles } from './combat';
+import { castLanded, damageEnemy, dashTriggered, deflect, deflectProjectiles } from './combat';
 import type { Enemy } from './enemies/enemy';
 import { Pickup, Projectile } from './entities';
 import { prefs } from './prefs';
@@ -26,6 +26,22 @@ const CAST_MOVE = 0.7;
 const SKILL_MOVE = 0.45;
 const HOLD_MOVE = 0.6;
 const BUFFER = 0.2;
+/** Guard: meter, refill per second (after a short pause), front arc (half-angle). */
+export const GUARD_MAX = 100;
+const GUARD_REGEN = 35;
+const GUARD_ARC = 1.22;
+const GUARD_BREAK = 0.8;
+/** Parry timing: the window opened by pressing Guard, and the lock after a miss. */
+const PARRY_WINDOW = 0.15;
+const PARRY_LOCK = 0.35;
+const RIPOSTE_TIME = 1;
+/** Evasive sidestep (ranged classes): length, and the Perfect Dodge window. */
+const SIDESTEP_TIME = 0.11;
+const PERFECT_DODGE = 0.15;
+/** Holding Attack this long after a chain hit starts the powered attack. */
+const POWER_HOLD = 0.22;
+/** Seconds without landing a hit before the combo meter drops. */
+const COMBO_TIMEOUT = 2.5;
 
 type PlayerState = 'free' | 'dash' | 'action' | 'slam' | 'falling' | 'dead';
 
@@ -36,6 +52,8 @@ interface ActionRun {
   aim: number;
   holdT: number;
   released: boolean;
+  /** The attack right after a parry: all its hits are critical. */
+  riposte?: boolean;
 }
 
 let heroLooks: Partial<Record<CharacterId, HeroLook>> = {};
@@ -97,6 +115,31 @@ export class Player extends Actor {
   private noAmmoMsgT = -10;
   /** Distance run since the last footstep puff. */
   private stride = 0;
+  // ---- guard
+  /** Guard meter (0..GUARD_MAX): blocking drains it; empty = Guard Break. */
+  guardMeter = GUARD_MAX;
+  /** Holding Guard and blocking. */
+  blocking = false;
+  /** Seconds left in the parry window opened by pressing Guard. */
+  parryT = 0;
+  /** A parry that catches nothing locks parries (not blocks) for a moment. */
+  private parryLock = 0;
+  /** After a parry: the next attack is a sure critical. */
+  riposteT = 0;
+  /** Staggered after the guard breaks. */
+  guardBreakT = 0;
+  /** The opening moments of a sidestep, when a hit becomes a Perfect Dodge. */
+  evadeT = 0;
+  private evadeCd = 0;
+  private sinceBlock = 9;
+  /** How long Attack has been held since it was last pressed (−1 = released or used). */
+  private attackHold = -1;
+  /** When the last chain hit ended, for combo specials. */
+  private lastChainT = -10;
+  // ---- combo meter
+  /** Hits landed in a row without getting hurt. */
+  combo = 0;
+  comboT = 0;
 
   /** The hero's colours and headwear, with the player's customisation applied. */
   get palette(): Palette {
@@ -167,6 +210,13 @@ export class Player extends Actor {
     this.ironHideT = Math.max(0, this.ironHideT - dt);
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.webT = Math.max(0, this.webT - dt);
+    this.riposteT = Math.max(0, this.riposteT - dt);
+    this.guardBreakT = Math.max(0, this.guardBreakT - dt);
+    this.parryLock = Math.max(0, this.parryLock - dt);
+    this.evadeT = Math.max(0, this.evadeT - dt);
+    this.evadeCd = Math.max(0, this.evadeCd - dt);
+    this.comboT += dt;
+    if (this.combo > 0 && this.comboT > COMBO_TIMEOUT) this.combo = 0;
     this.sinceDash += dt;
     for (let i = 0; i < 3; i++) this.artifactCd[i] = Math.max(0, this.artifactCd[i] - dt);
     if (this.recoverT > 0) {
@@ -214,7 +264,11 @@ export class Player extends Actor {
     const mv = w.camera.screenDirToWorld(inp.moveVector());
     this.moveDir = mv;
     this.updateAim(w);
-    if (inp.pressed('attack')) this.buf.attack = BUFFER;
+    if (inp.pressed('attack')) {
+      this.buf.attack = BUFFER;
+      this.attackHold = 0;
+    } else if (this.attackHold >= 0 && inp.down('attack')) this.attackHold += dt;
+    else this.attackHold = -1;
     if (inp.pressed('special')) this.buf.special = BUFFER;
     // Mechanics you haven't unlocked yet simply don't respond.
     if (inp.pressed('cast') && s.canCast) this.buf.cast = BUFFER;
@@ -223,6 +277,8 @@ export class Player extends Actor {
     if (inp.pressed('potion') && s.canPotion) this.drinkPotion(w);
     for (let i = 0; i < 3; i++) if (inp.pressed(`artifact${i + 1}` as 'artifact1') && i < s.artifactSlots) useArtifact(w, i);
     if (inp.pressed('wrath') && s.canWrath) this.unleashWrath(w);
+    if (s.canGuard) this.updateGuard(w, dt);
+    else this.blocking = false;
 
     this.weapon.update(this, w, dt);
 
@@ -290,6 +346,7 @@ export class Player extends Actor {
             a.t = def.windup + def.active;
             a.fired = true;
           }
+          if (!a.released) def.update?.(this, w, dt, a.holdT);
           // Drawing a bow or charging a spin: you can still walk.
           const holdMove = Math.max(def.hold.moveMult, HOLD_MOVE);
           vx = mv.x * speed * holdMove;
@@ -304,6 +361,18 @@ export class Player extends Actor {
         }
         def.update?.(this, w, dt, a.t);
         const total = def.windup + def.active + def.recover;
+        // Attack held after a chain hit: the weapon's powered attack.
+        if (def.chain !== undefined && a.fired && this.attackHold >= POWER_HOLD && this.weapon.powered) {
+          const pw = this.weapon.powered(this, w, def.chain);
+          if (pw) {
+            this.attackHold = -1;
+            this.weapon.cancel(this, w);
+            this.endAction();
+            this.startAction(w, pw);
+            break;
+          }
+        }
+        if (def.chain !== undefined) this.lastChainT = this.t;
         // Movement stays free while fighting: basic attack chains keep most of
         // your speed and never push you forward; only kit moves (dash-strikes,
         // specials like Meteor Fist) lunge.
@@ -327,6 +396,18 @@ export class Player extends Actor {
         break;
       }
       case 'free': {
+        if (this.guardBreakT > 0) break;
+        if (this.blocking) {
+          // Guarding: a slow shuffle; a tower shield bashes on Attack.
+          if (this.buf.attack > 0 && this.hero.guard === 'shield') {
+            this.buf.attack = 0;
+            this.startAction(w, this.shieldBash());
+          } else {
+            vx = mv.x * speed * 0.4;
+            vy = mv.y * speed * 0.4;
+          }
+          break;
+        }
         if (this.buf.attack > 0 && this.airborne) {
           this.buf.attack = 0;
           this.state = 'slam';
@@ -471,6 +552,11 @@ export class Player extends Actor {
     } else if (this.buf.special > 0) {
       this.buf.special = 0;
       def = this.weapon.special(this, w);
+      // Special straight out of a chain: faster and harder (a combo special).
+      if (def && this.t - this.lastChainT < 0.6) {
+        def = { ...def, windup: def.windup * 0.7, comboSpecial: true };
+        w.particles.text(this.x, this.y, 84, 'COMBO', '#ffd890', 14);
+      }
     } else if (this.buf.attack > 0) {
       this.buf.attack = 0;
       def = this.weapon.attack(this, w, this.sinceDash < 0.2);
@@ -479,12 +565,206 @@ export class Player extends Actor {
     }
     if (!def) return;
     if (def.slot === 'attack' && w.stats.forgeTier >= 3) def = this.awaken(def);
+    this.startAction(w, def);
+  }
+
+  private startAction(w: World, def: ActionDef): void {
     this.state = 'action';
-    this.action = { def, t: 0, fired: false, aim: this.aim, holdT: 0, released: false };
+    // The first attack after a parry is a riposte: every hit it lands is a critical.
+    const riposte = this.riposteT > 0 && (def.slot === 'attack' || def.slot === 'special');
+    if (riposte) {
+      this.riposteT = 0;
+      w.particles.text(this.x, this.y, 80, 'RIPOSTE', '#fff0b0', 18);
+    }
+    const run: ActionRun = { def, t: 0, fired: false, aim: this.aim, holdT: 0, released: false, riposte };
+    this.action = run;
     if (def.windup <= 0 && !def.hold) {
-      this.action.fired = true;
+      run.fired = true;
       def.fire?.(this, w, this.aim);
     }
+  }
+
+  // ---------------------------------------------------------------- guard
+
+  private updateGuard(w: World, dt: number): void {
+    const inp = w.input;
+    const style = this.hero.guard;
+    if (inp.pressed('guard') && this.guardBreakT <= 0) {
+      if (style === 'evade') this.sidestep(w);
+      else {
+        if (this.actionCancelable()) {
+          this.weapon.cancel(this, w);
+          this.endAction();
+        }
+        if (this.parryLock <= 0) this.parryT = this.parryWindow(w);
+      }
+    }
+    if (this.parryT > 0) {
+      this.parryT -= dt;
+      if (this.parryT <= 0) this.parryLock = PARRY_LOCK;
+    }
+    const free = this.state === 'free' || this.actionCancelable();
+    this.blocking = style !== 'evade' && inp.down('guard') && this.guardBreakT <= 0 && this.guardMeter > 0 && !this.airborne && free;
+    if (this.blocking && this.state === 'action') {
+      this.weapon.cancel(this, w);
+      this.endAction();
+    }
+    this.sinceBlock = this.blocking ? 0 : this.sinceBlock + dt;
+    if (this.sinceBlock > 0.8 && this.guardMeter < GUARD_MAX) this.guardMeter = Math.min(GUARD_MAX, this.guardMeter + GUARD_REGEN * dt);
+  }
+
+  /** The parry window: widest for blades and brawlers, a little wider on touch and with Assist. */
+  private parryWindow(w: World): number {
+    const style = this.hero.guard;
+    const base = style === 'catch' ? 0.2 : style === 'parry' ? 0.18 : PARRY_WINDOW;
+    return base + (w.input.lastTouchUse > w.input.lastMouseUse ? 0.03 : 0) + (prefs.assist ? 0.07 : 0);
+  }
+
+  /** Ranged classes guard with a quick sidestep. */
+  private sidestep(w: World): void {
+    if (this.evadeCd > 0 || this.airborne || this.state === 'dash' || this.state === 'slam') return;
+    if (this.state === 'action') {
+      this.weapon.cancel(this, w);
+      this.action = null;
+    }
+    const mv = this.moveDir;
+    this.dashDir = len(mv) > 0.1 ? { x: mv.x / len(mv), y: mv.y / len(mv) } : fromAngle(this.facing + Math.PI / 2);
+    this.state = 'dash';
+    this.dashT = SIDESTEP_TIME;
+    this.evadeT = PERFECT_DODGE;
+    this.evadeCd = 0.45;
+    this.iframes = Math.max(this.iframes, 0.25);
+    audio.play('dash');
+  }
+
+  /**
+   * Guards, parries or dodges an incoming hit from `src`. Returns the share of
+   * the damage that still lands (0 = none). Ground shockwaves can't be guarded.
+   */
+  defend(w: World, src: { x: number; y: number }, dmg: number, o: { proj?: Projectile; ground?: boolean } = {}): number {
+    if (this.state === 'dead') return 1;
+    if (this.evadeT > 0) {
+      this.evadeT = 0;
+      this.perfectDodge(w);
+      return 0;
+    }
+    if (this.invuln || o.ground) return 1;
+    if (this.parryT > 0) {
+      this.parry(w, src, o.proj);
+      return 0;
+    }
+    const from = o.proj ?? src;
+    const front = Math.abs(angleDiff(this.facing, Math.atan2(from.y - this.y, from.x - this.x))) < GUARD_ARC;
+    if (!this.blocking || !front) return 1;
+    const style = this.hero.guard;
+    this.guardMeter -= dmg * (style === 'shield' ? 1.2 : style === 'mist' ? 1 : 2);
+    if (style === 'mist') w.gainSouls(Math.max(1, Math.round(dmg * 0.6)));
+    const a = Math.atan2(from.y - this.y, from.x - this.x);
+    w.particles.directional(this.x + Math.cos(a) * 20, this.y + Math.sin(a) * 20 - 24, a, 0.9, '#ffe0a0', 10, 300);
+    audio.play('deflect');
+    this.knock(-Math.cos(a), -Math.sin(a), 120);
+    if (this.guardMeter <= 0) {
+      this.guardMeter = 0;
+      this.guardBreakT = GUARD_BREAK;
+      this.blocking = false;
+      w.particles.text(this.x, this.y, 80, 'GUARD BREAK', '#ff8a6a', 18);
+      audio.play('armorBreak');
+      return 0.5;
+    }
+    w.particles.text(this.x, this.y, 70, 'BLOCK', '#ffe0a0', 14);
+    return style === 'shield' ? 0 : 0.2;
+  }
+
+  private parry(w: World, src: { x: number; y: number }, proj?: Projectile): void {
+    this.parryT = 0;
+    this.parryLock = 0;
+    this.riposteT = RIPOSTE_TIME;
+    this.iframes = Math.max(this.iframes, 0.25);
+    this.guardMeter = Math.min(GUARD_MAX, this.guardMeter + 20);
+    if (proj) deflect(w, proj, 'player');
+    else if ('cancelTelegraphs' in src && !(src as Enemy).dead) {
+      // Foes stagger; guardians only flinch.
+      const e = src as Enemy;
+      e.status.stun = Math.max(e.status.stun ?? 0, e.isBoss ? 0.4 : 1);
+      e.cancelTelegraphs(w);
+      e.knock(e.x - this.x, e.y - this.y, e.isBoss ? 120 : 320);
+    }
+    w.slowMotion(0.25, 0.15);
+    w.camera.shake(0.2);
+    w.flashLight(this.x, this.y, 260, '#fff0b0', 0.2);
+    w.particles.ring(this.x, this.y, '#fff0b0', 70, 0.3, 6);
+    w.particles.text(this.x, this.y, 90, 'PARRY!', '#fff0b0', 22);
+    if (w.stats.canWrath) this.gainWrath(8);
+    audio.play('deflect');
+    audio.play('select');
+  }
+
+  private perfectDodge(w: World): void {
+    this.iframes = Math.max(this.iframes, 0.4);
+    this.riposteT = RIPOSTE_TIME;
+    w.slowMotion(0.35, 0.6);
+    w.particles.ring(this.x, this.y, '#bfe6ff', 60, 0.35, 5);
+    w.particles.text(this.x, this.y, 90, 'PERFECT DODGE', '#bfe6ff', 20);
+    if (w.stats.canWrath) this.gainWrath(6);
+    audio.play('select');
+  }
+
+  /** The tower shield's bash: a short shove that staggers. */
+  private shieldBash(): ActionDef {
+    return {
+      name: 'shieldBash',
+      slot: 'attack',
+      windup: 0.06,
+      active: 0.08,
+      recover: 0.28,
+      moveMult: 0.3,
+      lunge: 30,
+      lockAim: true,
+      fire: (p, w, aim) => {
+        const x = p.x + Math.cos(aim) * 40;
+        const y = p.y + Math.sin(aim) * 40;
+        for (const e of w.enemiesInRadius(x, y, 60)) {
+          damageEnemy(w, e, 15, { source: 'attack', from: p, knock: 520 });
+          if (!e.isBoss) e.status.stun = Math.max(e.status.stun ?? 0, 0.6);
+        }
+        w.particles.burst(x, y - 20, '#ffd890', 10, 260);
+        audio.play('heavySwing');
+      },
+    };
+  }
+
+  /** The guard meter as an arc at the hero's feet, the shield arc while blocking. `flat` = the 2D view's squashed ground. */
+  drawGuard(ctx: CanvasRenderingContext2D, flat: boolean): void {
+    const show = this.blocking || this.guardMeter < GUARD_MAX || this.guardBreakT > 0 || this.riposteT > 0;
+    if (!show || this.state === 'dead') return;
+    const sy = flat ? 0.45 : 1;
+    ctx.save();
+    ctx.scale(1, sy);
+    const k = this.guardMeter / GUARD_MAX;
+    ctx.lineWidth = 3 / Math.max(0.6, sy);
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = this.guardBreakT > 0 ? '#ff6a5a' : k < 0.3 ? '#ffa04a' : '#ffd890';
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+    ctx.stroke();
+    if (this.blocking) {
+      ctx.strokeStyle = 'rgba(255,240,190,0.9)';
+      ctx.lineWidth = 5 / Math.max(0.6, sy);
+      ctx.beginPath();
+      ctx.arc(0, 0, 38, this.facing - GUARD_ARC, this.facing + GUARD_ARC);
+      ctx.stroke();
+    }
+    if (this.riposteT > 0) {
+      ctx.strokeStyle = `rgba(255,240,176,${0.5 + Math.sin(this.t * 30) * 0.4})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 44, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /** Awakened weapons (forge Tier III+) unleash an arcane wave every 4th Attack. */
@@ -596,7 +876,21 @@ export class Player extends Actor {
     }
   }
 
+  /** A hit landed: the combo meter climbs (twice as fast for brawlers), with a cheer at 10, 25, 50 and 100. */
+  comboHit(w: World): void {
+    const before = this.combo;
+    this.combo += this.hero.id === 'gorran' ? 2 : 1;
+    this.comboT = 0;
+    for (const m of [10, 25, 50, 100]) {
+      if (before < m && this.combo >= m) {
+        w.particles.text(this.x, this.y, 100, `${m} HITS!`, m >= 50 ? '#ff9aff' : '#ffd890', 18 + Math.min(8, m / 10));
+        if (w.stats.canWrath) this.gainWrath(4);
+      }
+    }
+  }
+
   onHurt(dmg: number): void {
+    this.combo = 0;
     this.flash = 0.15;
     this.hurtT = 0.4;
     this.iframes = 0.75;
@@ -621,6 +915,7 @@ export class Player extends Actor {
     ctx.beginPath();
     ctx.ellipse(0, 0, 17 * sh, 7 * sh, 0, 0, TAU);
     ctx.fill();
+    this.drawGuard(ctx, true);
     if (falling) {
       const k = this.fallT / 0.55;
       ctx.scale(k, k);

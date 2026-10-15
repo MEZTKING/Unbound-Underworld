@@ -18,6 +18,7 @@ export abstract class Boss extends Enemy {
     super(x, y, { hp, speed, r, height, damage, knockResist: 1, gold: [60, 80] }, scale);
     this.spawnT = 1.2;
     this.cd = 1.5;
+    this.turnRate = 3;
   }
 
   /** Picks the next attack, avoiding immediate repeats. */
@@ -88,7 +89,7 @@ export abstract class Boss extends Enemy {
     const tx = clamp(p.x + Math.cos(a) * want, 80, w.room.w - 80);
     const ty = clamp(p.y + Math.sin(a) * want, 120, w.room.h - 80);
     this.moveToward(w, tx, ty, speed, dt, 5);
-    this.facing = this.angleToPlayer(w);
+    this.turnTo(this.angleToPlayer(w), dt);
   }
 }
 
@@ -107,7 +108,6 @@ export class Campe extends Boss {
   }
 
   protected think(w: World, dt: number): void {
-    const p = w.player;
     switch (this.state) {
       case 'idle':
         this.circle(w, 230, dt);
@@ -129,8 +129,7 @@ export class Campe extends Boss {
       case 'lash': {
         this.stop(dt);
         if (this.stateT < 0.02) {
-          this.aim = angleTo(this, p);
-          this.facing = this.aim;
+          this.aim = this.aimAtPlayer(w, 0, 0.9);
           const len = 330;
           const shape = { type: 'capsule' as const, x1: this.x, y1: this.y, x2: this.x + Math.cos(this.aim) * len, y2: this.y + Math.sin(this.aim) * len, r: 26 };
           this.telegraph(w, shape, 0.5, () => {
@@ -151,8 +150,7 @@ export class Campe extends Boss {
       }
       case 'dash': {
         if (this.stateT < 0.02) {
-          this.aim = angleTo(this, p);
-          this.facing = this.aim;
+          this.aim = this.aimAtPlayer(w, 0, 0.9);
           this.dashDir = fromAngle(this.aim);
           const len = 700;
           this.telegraph(w, { type: 'capsule', x1: this.x, y1: this.y, x2: this.x + this.dashDir.x * len, y2: this.y + this.dashDir.y * len, r: this.r + 10 }, 0.7, () => {});
@@ -530,8 +528,7 @@ export class Talos extends Boss {
       case 'slam': {
         this.stop(dt);
         if (this.stateT < 0.02) {
-          this.aim = angleTo(this, p);
-          this.facing = this.aim;
+          this.aim = this.aimAtPlayer(w, 0, 0.9);
           const cx = this.x + Math.cos(this.aim) * 90;
           const cy = this.y + Math.sin(this.aim) * 90;
           this.telegraph(w, { type: 'circle', x: cx, y: cy, r: 150 }, 1 / this.haste, () => {

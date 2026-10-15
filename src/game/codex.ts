@@ -4,7 +4,7 @@ import { CHARACTERS, characterUnlocked } from './characters';
 import { createBoss, createEnemy } from './enemies';
 import { HydraHead } from './enemies/bosses';
 import type { Enemy } from './enemies/enemy';
-import { WEAPON_IDS, type SaveData } from './meta';
+import type { SaveData } from './meta';
 import { levelFromXp } from './progression';
 import { BIOMES } from './rooms';
 import type { BossKind, EnemyKind } from './types';
@@ -96,7 +96,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'level10', name: 'Rising Shade', glyph: '▲', desc: 'Reach level 10.', done: (s) => levelFromXp(s.xp).level >= 10 },
   { id: 'level30', name: 'Ascendant', glyph: '♛', desc: 'Reach level 30.', done: (s) => levelFromXp(s.xp).level >= 30 },
   { id: 'patron', name: "Ferryman's Patron", glyph: '⚖', desc: "Buy 10 wares from Charon.", done: (s) => s.stats.shopBuys >= 10 },
-  { id: 'arsenal', name: 'Full Arsenal', glyph: '⚒', desc: 'Own every weapon.', done: (s) => WEAPON_IDS.every((w) => s.weapons.includes(w)) },
+  { id: 'arsenal', name: 'Mythic Smith', glyph: '⚒', desc: 'Forge any weapon to Tier V (Mythic).', done: (s) => Object.values(s.forge).some((t) => (t ?? 0) >= 5) },
   {
     id: 'company',
     name: 'Full Company',

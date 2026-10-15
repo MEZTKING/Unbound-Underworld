@@ -4,9 +4,10 @@ import { applyChill, applyDoom, damageEnemy, playerBlast } from './combat';
 import type { Enemy } from './enemies/enemy';
 import type { SaveData } from './meta';
 import type { PlayerStats } from './stats';
+import type { WeaponId } from './types';
 import type { World } from './world';
 
-export type CharacterId = 'kael' | 'lyra' | 'doran' | 'ione' | 'erebos' | 'selene';
+export type CharacterId = 'kael' | 'lyra' | 'doran' | 'gorran' | 'ione' | 'erebos' | 'rook' | 'selene';
 
 export interface Palette {
   cloak: string;
@@ -19,16 +20,29 @@ export interface Palette {
   glow: string;
 }
 
+/**
+ * How a class guards. `parry`: blades, the widest parry window. `shield`: a
+ * tower shield that blocks everything from the front (Attack while guarding
+ * bashes). `evade`: ranged classes sidestep instead (a sidestep right before
+ * a hit is a Perfect Dodge). `catch`: brawlers catch and counter. `mist`:
+ * blocked damage turns to souls.
+ */
+export type GuardStyle = 'parry' | 'shield' | 'evade' | 'catch' | 'mist';
+
 export interface CharacterDef {
   id: CharacterId;
   name: string;
   title: string;
+  /** The class this hero plays, and the signature weapon that comes with it. */
+  role: string;
+  weapon: WeaponId;
   color: string;
   blurb: string;
   perks: string[];
+  guard: GuardStyle;
   palette: Palette;
-  /** How the hero is unlocked; `null` for the starting heroes. */
-  unlock: { kind: 'level' | 'bosses' | 'escapes'; n: number; text: string } | null;
+  /** How the hero is unlocked (`null` for the starting heroes); `or` is a second way in. */
+  unlock: { kind: 'level' | 'bosses' | 'escapes'; n: number; text: string; or?: { kind: 'bosses' | 'escapes'; n: number } } | null;
   apply: (s: PlayerStats) => void;
   wrath: { name: string; desc: string; use: (w: World) => void };
 }
@@ -56,9 +70,12 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'kael',
     name: 'Kael',
     title: 'Prince of Embers',
+    role: 'Warrior',
+    weapon: 'sword',
     color: '#ff6a5a',
     blurb: 'The runaway heir of the Underworld. Steady in every fight.',
     perks: ['Balanced: no strengths, no weaknesses', '+10% Wrath gain'],
+    guard: 'parry',
     palette: { cloak: '#2b1830', trim: '#c2263a', tunic: '#5b1a26', skin: '#e8c7a8', hair: '#1a0d14', crown: 'flame', glow: '#ff7a3a' },
     unlock: null,
     apply: (s) => (s.wrathGain += 0.1),
@@ -87,9 +104,12 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'lyra',
     name: 'Lyra',
     title: 'Moon Huntress',
+    role: 'Ranger',
+    weapon: 'bow',
     color: '#9dff9a',
     blurb: 'A huntress who slipped her tether to the stars. Fast and precise, but frail.',
     perks: ['+12% move speed', '+8% critical chance', '−10 max Health'],
+    guard: 'evade',
     palette: { cloak: '#1d2a1e', trim: '#9dff9a', tunic: '#2e4a30', skin: '#f0d0b8', hair: '#d8d8f0', crown: 'hood', glow: '#c8f0ff' },
     unlock: null,
     apply: (s) => {
@@ -120,9 +140,12 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'doran',
     name: 'Doran',
     title: 'The Bronze Wall',
+    role: 'Vanguard',
+    weapon: 'spear',
     color: '#ffb14a',
     blurb: 'A fallen shield-bearer who still holds the line. Slow, sturdy and hard to kill.',
     perks: ['+30 max Health', 'Take 12% less damage', '−8% move speed'],
+    guard: 'shield',
     palette: { cloak: '#2a2016', trim: '#ffb14a', tunic: '#6a4a24', skin: '#d8b090', hair: '#3a2410', crown: 'helm', glow: '#ffd08a' },
     unlock: null,
     apply: (s) => {
@@ -152,12 +175,51 @@ export const CHARACTERS: CharacterDef[] = [
     },
   },
   {
+    id: 'gorran',
+    name: 'Gorran',
+    title: 'The Unchained Fist',
+    role: 'Brawler',
+    weapon: 'fists',
+    color: '#c8ff5a',
+    blurb: 'A pit fighter who broke his own chains. He fights up close and never stops swinging.',
+    perks: ['Combo meter builds twice as fast', '+20 max Health'],
+    guard: 'catch',
+    palette: { cloak: '#2a1a10', trim: '#c8ff5a', tunic: '#4a3a20', skin: '#c89070', hair: '#1a1008', crown: 'circlet', glow: '#c8ff5a' },
+    unlock: { kind: 'level', n: 5, text: 'Reach level 5' },
+    apply: (s) => (s.maxHp += 20),
+    wrath: {
+      name: 'Hundred Fists',
+      desc: 'A storm of punches in front of you, ending in a crushing blast.',
+      use: (w) => {
+        const p = w.player;
+        wrathFlash(w, '#c8ff5a', 'HUNDRED FISTS');
+        for (let i = 0; i < 20; i++) {
+          w.later(i * 0.05, () => {
+            const a = p.aim + (Math.random() - 0.5) * 1.1;
+            const d = fx.range(40, 150);
+            const x = p.x + Math.cos(a) * d;
+            const y = p.y + Math.sin(a) * d;
+            for (const e of w.enemiesInRadius(x, y, 50)) damageEnemy(w, e, 15, { source: 'effect', from: p, knock: 80 });
+            w.particles.burst(x, y - 20, '#c8ff5a', 5, 180);
+          });
+        }
+        w.later(1.05, () => {
+          playerBlast(w, p.x + Math.cos(p.aim) * 60, p.y + Math.sin(p.aim) * 60, 200, 80, { color: '#c8ff5a', knock: 600 });
+          w.camera.shake(0.5);
+        });
+      },
+    },
+  },
+  {
     id: 'ione',
     name: 'Ione',
     title: 'Tidecaller',
+    role: 'Monk',
+    weapon: 'nunchaku',
     color: '#5ac8ff',
     blurb: 'A nymph of the black river who bends its currents to her will.',
     perks: ['+1 Cast shard (once Cast is unlocked)', '+20% Special damage', '+15% knockback'],
+    guard: 'catch',
     palette: { cloak: '#10283a', trim: '#5ac8ff', tunic: '#1c4a66', skin: '#e0d0e8', hair: '#2a6a8a', crown: 'circlet', glow: '#8ae0ff' },
     unlock: { kind: 'level', n: 8, text: 'Reach level 8' },
     apply: (s) => {
@@ -180,11 +242,14 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'erebos',
     name: 'Erebos',
     title: 'The Hollow King',
+    role: 'Reaper',
+    weapon: 'scythe',
     color: '#c86bff',
     blurb: 'A forgotten king who feeds on the souls of the slain.',
     perks: ['+10% damage', 'Restore 2 Health per foe slain', '+50% souls gathered', '−15 max Health'],
+    guard: 'mist',
     palette: { cloak: '#140c1e', trim: '#c86bff', tunic: '#2a1440', skin: '#c8c0d8', hair: '#0a0610', crown: 'horns', glow: '#d090ff' },
-    unlock: { kind: 'bosses', n: 2, text: 'Slay 2 guardians' },
+    unlock: { kind: 'level', n: 10, text: 'Reach level 10 or slay 2 guardians', or: { kind: 'bosses', n: 2 } },
     apply: (s) => {
       s.globalDmg += 0.1;
       s.lifeOnKill += 2;
@@ -209,14 +274,57 @@ export const CHARACTERS: CharacterDef[] = [
     },
   },
   {
+    id: 'rook',
+    name: 'Rook',
+    title: 'The Powder Ghost',
+    role: 'Gunner',
+    weapon: 'blunderbuss',
+    color: '#ffb060',
+    blurb: 'A smuggler of black powder who blew a hole in the Underworld and walked in. Loud, and close.',
+    perks: ['Hits on foes close to you deal +30% damage', '+15% knockback'],
+    guard: 'evade',
+    palette: { cloak: '#241a14', trim: '#ffb060', tunic: '#4a3020', skin: '#e0b898', hair: '#3a2014', crown: 'hood', glow: '#ffb060' },
+    unlock: { kind: 'level', n: 12, text: 'Reach level 12' },
+    apply: (s) => (s.knockMult *= 1.15),
+    wrath: {
+      name: 'Cannonade',
+      desc: 'Cannon shots rain down on the foes around you.',
+      use: (w) => {
+        const p = w.player;
+        wrathFlash(w, '#ffb060', 'CANNONADE');
+        const foes = targets(w, 700);
+        for (let i = 0; i < 7; i++) {
+          const e = foes.length ? foes[i % foes.length] : null;
+          const a = Math.random() * TAU;
+          const x = e ? e.x : p.x + Math.cos(a) * fx.range(100, 320);
+          const y = e ? e.y : p.y + Math.sin(a) * fx.range(80, 260);
+          w.telegraphs.push({
+            shape: { type: 'circle', x, y, r: 110 },
+            t: 0,
+            dur: 0.25 + i * 0.14,
+            color: 'rgba(255,176,96,1)',
+            owner: null,
+            onDone: () => {
+              playerBlast(w, x, y, 110, 90, { color: '#ffb060', knock: 480 });
+              w.camera.shake(0.3);
+            },
+          });
+        }
+      },
+    },
+  },
+  {
     id: 'selene',
     name: 'Selene',
     title: 'Starbound',
+    role: 'Duelist',
+    weapon: 'katana',
     color: '#fff0a0',
     blurb: 'A star that fell into the dark and refuses to go out.',
     perks: ['+1 Dash charge', '+15% Attack damage', 'Dash recharges 20% faster'],
+    guard: 'parry',
     palette: { cloak: '#1a1830', trim: '#fff0a0', tunic: '#3a3460', skin: '#f4e0d0', hair: '#fff4d0', crown: 'halo', glow: '#fff0a0' },
-    unlock: { kind: 'escapes', n: 1, text: 'Escape the Underworld once' },
+    unlock: { kind: 'level', n: 15, text: 'Reach level 15 or escape once', or: { kind: 'escapes', n: 1 } },
     apply: (s) => {
       s.dashCharges += 1;
       s.dmgBonus.attack += 0.15;
@@ -263,7 +371,11 @@ export function isCharacterId(id: unknown): id is CharacterId {
 export function characterUnlocked(c: CharacterDef, save: SaveData, level: number): boolean {
   const u = c.unlock;
   if (!u) return true;
-  if (u.kind === 'level') return level >= u.n;
-  if (u.kind === 'bosses') return save.stats.bossesSlain >= u.n;
-  return save.stats.escapes >= u.n;
+  const met = (kind: 'level' | 'bosses' | 'escapes', n: number) => (kind === 'level' ? level >= n : kind === 'bosses' ? save.stats.bossesSlain >= n : save.stats.escapes >= n);
+  return met(u.kind, u.n) || (!!u.or && met(u.or.kind, u.or.n));
+}
+
+/** The hero who wields a weapon. */
+export function heroForWeapon(w: WeaponId): CharacterDef {
+  return CHARACTERS.find((c) => c.weapon === w) ?? CHARACTERS[0];
 }

@@ -51,6 +51,11 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   if (o.doom) mult += s.doomBonus;
   mult += committedBonus(s, e);
   if (e.isBoss || e.isElite) mult += s.bigGameDmg;
+  // Combo meter: +1% per 10 hits in a row (up to +10%); a combo special hits 25% harder.
+  if (ABILITY.has(o.source)) mult += Math.min(0.1, Math.floor(p.combo / 10) * 0.01);
+  if (o.source === 'special' && p.action?.def.comboSpecial) mult += 0.25;
+  // Rook, the Gunner: hits on foes close to you hit harder.
+  if (p.hero?.id === 'rook' && ABILITY.has(o.source) && Math.hypot(e.x - p.x, e.y - p.y) < 160) mult += 0.3;
   let dmg = base * mult;
 
   const guard = e.guard(o.from);
@@ -73,7 +78,9 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
     const eff = s.hitEffects[o.source];
     if (eff?.kind === 'crit') critChance += eff.chance;
   }
-  const crit = critChance > 0 && Math.random() < critChance;
+  // A riposte (the attack right after a parry) always crits.
+  const riposte = !!p.action?.riposte && (o.source === 'attack' || o.source === 'special');
+  const crit = riposte || (critChance > 0 && Math.random() < critChance);
   if (crit) dmg *= s.critMult;
   dmg = Math.max(1, Math.round(dmg));
 
@@ -110,6 +117,7 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   if (crit) w.particles.ring(e.x, e.y, '#ffd54a', 60, 0.3, 3);
   if (o.knock) e.knock(e.x - from.x, e.y - from.y, o.knock * s.knockMult);
   if (s.canWrath) p.gainWrath(dmg * WRATH_PER_DEALT * s.wrathGain);
+  if (ABILITY.has(o.source)) p.comboHit(w);
   if (o.hitstop) w.hitstop(o.hitstop * (crit ? 1.5 : 1));
   if (o.lifesteal && !e.isDummy) w.healPlayer(o.lifesteal, false);
 

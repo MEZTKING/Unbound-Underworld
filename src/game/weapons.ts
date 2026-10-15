@@ -6,6 +6,7 @@ import type { Enemy } from './enemies/enemy';
 import { Projectile } from './entities';
 import type { Player } from './player';
 import { Gauntlets, Scythe } from './arsenal';
+import { Katana, RiptideChains, Thunderbuss } from './kits';
 import type { DamageSource, WeaponId } from './types';
 import type { World } from './world';
 
@@ -21,6 +22,10 @@ export interface ActionDef {
   lunge?: number;
   /** Recovery may be cancelled straight into the next attack. */
   combo?: boolean;
+  /** Step in the weapon's attack chain (0 = first hit). Holding Attack after it starts the powered attack. */
+  chain?: number;
+  /** A special used straight out of a chain: hits 25% harder. */
+  comboSpecial?: boolean;
   lockAim?: boolean;
   fire?: (p: Player, w: World, aim: number) => void;
   update?: (p: Player, w: World, dt: number, t: number) => void;
@@ -40,6 +45,8 @@ export interface Weapon {
   attack(p: Player, w: World, dashStrike: boolean): ActionDef | null;
   /** Attack button held while idle (auto-attack / charge). */
   held(p: Player, w: World): ActionDef | null;
+  /** The powered attack: Attack held after a chain hit. `level` (1–3) grows with the chain step. */
+  powered?(p: Player, w: World, level: number): ActionDef | null;
   special(p: Player, w: World): ActionDef | null;
   /** Landing effect of the jump attack. */
   slam(p: Player, w: World): void;
@@ -53,33 +60,51 @@ export interface Weapon {
 export const WEAPON_INFO: Record<WeaponId, { name: string; blurb: string; color: string; cost: number }> = {
   sword: {
     name: 'Nightblade',
-    blurb: 'A balanced blade. Three-hit combo; Special: Nova Smash knocks back everything nearby.',
+    blurb: 'Slash, backslash, heavy cleave. Powered: Crescent Cleave throws a blade wave. Special: Nova Smash knocks back everything nearby.',
     color: '#ff5a6a',
     cost: 0,
   },
   spear: {
     name: 'Thornspear',
-    blurb: 'Long reach thrusts. Hold Attack to charge a spin. Special: throw the spear, press again to recall it.',
+    blurb: 'Long-reach thrusts. Powered: Skewer Lance runs a whole line through; keep holding to spin. Special: throw the spear, press again to recall it.',
     color: '#ffb14a',
     cost: 40,
   },
   bow: {
     name: 'Moonbow',
-    blurb: 'Hold Attack to draw; release as it flashes for a Power Shot. Special: a wide volley.',
+    blurb: 'Tap for quick shots (every third is a triple). Hold to draw a Power Shot; draw right after quick shots for Rain of Arrows. Special: a wide volley.',
     color: '#8ad0ff',
     cost: 60,
   },
   fists: {
     name: 'Titan Gauntlets',
-    blurb: 'A blur of punches with a crushing fifth blow. Special: Meteor Fist rockets you forward into a shockwave.',
+    blurb: 'A blur of five punches. Powered: Titan Uppercut stuns and shakes the ground. Special: Meteor Fist rockets you forward into a shockwave.',
     color: '#c8ff5a',
     cost: 90,
   },
   scythe: {
     name: "Reaper's Crescent",
-    blurb: 'Wide, heavy sweeps that end in a full spin. Special: Soul Reap sends a spectral scythe whirling around you.',
+    blurb: 'Wide sweeps that end in a full spin. Powered: Harvest drags foes in for a giant reap. Special: Soul Reap sends a spectral scythe whirling around you.',
     color: '#b48cff',
     cost: 140,
+  },
+  katana: {
+    name: 'Starsplitter',
+    blurb: 'Three lightning-fast draw-cuts. Powered: Moonlit Iaido blinks you through foes. Special: Thousand Cuts.',
+    color: '#cfe0ff',
+    cost: 0,
+  },
+  blunderbuss: {
+    name: 'Thunderbuss',
+    blurb: 'Spread shots, then a piercing slug. Powered: Grapeshot Cannon. Special: a Powder Keg that blows up after a short fuse.',
+    color: '#ffb060',
+    cost: 0,
+  },
+  nunchaku: {
+    name: 'Riptide Chains',
+    blurb: 'Six flowing strikes ending in a whirl. Powered: Whirlpool pulls foes in. Special: Tidal Snap drags a foe to you.',
+    color: '#5ac8ff',
+    cost: 0,
   },
 };
 
@@ -93,12 +118,83 @@ export function createWeapon(id: WeaponId): Weapon {
       return new Gauntlets();
     case 'scythe':
       return new Scythe();
+    case 'katana':
+      return new Katana();
+    case 'blunderbuss':
+      return new Thunderbuss();
+    case 'nunchaku':
+      return new RiptideChains();
     default:
       return new Sword();
   }
 }
 
 // ---------------------------------------------------------------- shared helpers
+
+/** A blade of light that flies forward and passes through foes. */
+export function crescentWave(p: Player, w: World, aim: number, dmg: number, color: string, r = 22, range = 0.5): void {
+  const pr = new Projectile(p.x + Math.cos(aim) * 24, p.y + Math.sin(aim) * 24, Math.cos(aim) * 950, Math.sin(aim) * 950, 'player', dmg, 'attack');
+  pr.style = 'crescent';
+  pr.r = r;
+  pr.ttl = range;
+  pr.pierce = 99;
+  pr.knock = 220;
+  pr.color = color;
+  pr.deflectable = false;
+  pr.hitsWalls = false;
+  pr.z = 24;
+  pr.owner = p;
+  w.projectiles.push(pr);
+}
+
+/** Chain step → powered level (1–3), for chains of any length. */
+export function powerLevel(step: number, chainLength: number): number {
+  return Math.max(1, Math.min(3, Math.ceil(((step + 1) * 3) / chainLength)));
+}
+
+/**
+ * A powered attack: it charges while Attack stays held and lets fly on
+ * release (or when held too long). Releasing on the charge flash is a
+ * Perfect (+25%). `power` passed to `release` folds in the charge, the chain
+ * level and the Perfect bonus (about 0.55 to 2.1).
+ */
+export function poweredAttack(name: string, color: string, level: number, release: (p: Player, w: World, power: number, aim: number) => void, max = 0.42): ActionDef {
+  let flashed = false;
+  return {
+    name,
+    slot: 'attack',
+    windup: 0,
+    active: 0.1,
+    recover: 0.3,
+    moveMult: 0.5,
+    hold: {
+      max,
+      moveMult: 0.5,
+      button: 'attack',
+      overhold: 0.7,
+      release: (p, w, charge, holdT) => {
+        const perfect = holdT >= max && holdT <= max + 0.16;
+        const power = (0.55 + 0.45 * charge) * (1 + (level - 1) * 0.3) * (perfect ? 1.25 : 1);
+        if (perfect) {
+          w.particles.text(p.x, p.y, 92, 'PERFECT', '#fff0b0', 18);
+          audio.play('select');
+        }
+        release(p, w, power, p.aim);
+      },
+    },
+    update: (p, w, _dt, t) => {
+      if (Math.random() < 0.6) {
+        const a = Math.random() * TAU;
+        w.particles.spawn({ kind: 'dot', x: p.x + Math.cos(a) * 40, y: p.y + Math.sin(a) * 40, z: 26, vx: -Math.cos(a) * 160, vy: -Math.sin(a) * 160, color, size: 2.5, life: 0.25, drag: 0 });
+      }
+      if (!flashed && t >= max) {
+        flashed = true;
+        w.particles.ring(p.x, p.y, color, 46, 0.25, 4);
+        audio.play('pickup');
+      }
+    },
+  };
+}
 
 /** Gravity enchant: pulls foes toward a point before an impact lands. */
 export function gravityPull(w: World, x: number, y: number, r: number): void {
@@ -248,6 +344,7 @@ class Sword implements Weapon {
       moveMult: 0.25,
       lunge: c.lunge,
       combo: true,
+      chain: i,
       lockAim: true,
       fire: (pp, ww, aim) => {
         this.lastFire = ww.time;
@@ -264,6 +361,21 @@ class Sword implements Weapon {
 
   held(p: Player, w: World): ActionDef {
     return this.attack(p, w, false);
+  }
+
+  /** Crescent Cleave: a full spinning slash that throws a blade wave ahead. */
+  powered(_p: Player, _w: World, step: number): ActionDef {
+    return poweredAttack('crescentCleave', '#ff8a9a', powerLevel(step, SWORD_COMBO.length), (pp, ww, power, aim) => {
+      this.combo = -1;
+      this.swingT = 0.2;
+      this.swingAim = aim;
+      const r = 135;
+      ww.addHitbox({ team: 'player', shape: { type: 'circle', x: pp.x, y: pp.y, r }, damage: 45 * power, source: 'attack', knock: 520, ttl: 0.1, hit: new Set(), owner: pp, follow: true, hitstop: 0.07 });
+      ww.addSwipe(pp.x, pp.y, r, aim, Math.PI, 0.3, '#ffd0d6', 24, true);
+      crescentWave(pp, ww, aim, 35 * power, '#ff8a9a', 26, 0.55);
+      ww.camera.shake(0.25);
+      audio.play('heavySwing');
+    });
   }
 
   private dashStrike(w: World): ActionDef {
@@ -429,6 +541,7 @@ class Spear implements Weapon {
       moveMult: 0.3,
       lunge: c.lunge,
       combo: true,
+      chain: i,
       lockAim: true,
       fire: (pp, ww, aim) => {
         this.lastFire = ww.time;
@@ -440,6 +553,21 @@ class Spear implements Weapon {
         audio.play(i === 2 ? 'heavySwing' : 'swing');
       },
     };
+  }
+
+  /** Skewer Lance: a lance of light that runs through a whole line of foes. */
+  powered(_p: Player, w: World, step: number): ActionDef {
+    const armorMult = w.stats.hammers.has('spear_breach') ? 5 : 1;
+    return poweredAttack('skewerLance', '#ffc070', powerLevel(step, SPEAR_COMBO.length), (pp, ww, power, aim) => {
+      this.combo = -1;
+      this.thrustT = 0.2;
+      this.thrustAim = aim;
+      const len = 320 * this.reach(ww);
+      thrust(pp, ww, aim, { dmg: 50 * power, len, width: 34, knock: 420, ttl: 0.12, source: 'attack', armorMult, hitstop: 0.06 });
+      ww.addSwipe(pp.x, pp.y, len, aim, 0.1, 0.2, '#fff0c0', 20, false, 1);
+      ww.camera.kick(fromAngle(aim), 8);
+      audio.play('heavySwing');
+    });
   }
 
   held(_p: Player, w: World): ActionDef {
@@ -640,6 +768,9 @@ class Bow implements Weapon {
   drawT = 0;
   drawing = false;
   private maxT = 0.55;
+  /** Quick shots in the current chain (tap, tap, then a triple shot). */
+  private quick = 0;
+  private lastQuick = -10;
 
   reset(): void {
     this.drawing = false;
@@ -649,6 +780,8 @@ class Bow implements Weapon {
   private chargeAction(w: World): ActionDef {
     const max = w.stats.hammers.has('bow_draw') ? 0.55 * 0.65 : 0.55;
     this.maxT = max;
+    // Drawing fully right after quick shots calls down Rain of Arrows instead of a Power Shot.
+    const chainAtStart = w.time - this.lastQuick < 0.8 ? this.quick : 0;
     return {
       name: 'draw',
       slot: 'attack',
@@ -664,6 +797,15 @@ class Bow implements Weapon {
         release: (pp, ww, charge, holdT) => {
           this.drawing = false;
           this.drawT = 0;
+          if (holdT < 0.2) {
+            this.quickShot(pp, ww);
+            return;
+          }
+          this.quick = 0;
+          if (chainAtStart > 0 && holdT >= max) {
+            this.rain(pp, ww, Math.min(3, chainAtStart), holdT <= max + 0.2);
+            return;
+          }
           const power = holdT >= max && holdT <= max + 0.2;
           let dmg = 20 + 40 * charge;
           if (power) dmg *= ww.stats.hammers.has('bow_power') ? 2.5 : 1.5;
@@ -695,6 +837,43 @@ class Bow implements Weapon {
         this.drawT += dt;
       },
     };
+  }
+
+  /** A tap: a quick shot. Every third one in a row is a triple shot. */
+  private quickShot(p: Player, w: World): void {
+    this.quick = w.time - this.lastQuick < 0.8 ? this.quick + 1 : 1;
+    this.lastQuick = w.time;
+    const triple = this.quick >= 3;
+    const aim = p.aim;
+    for (const off of triple ? [-0.12, 0, 0.12] : [0]) {
+      playerArrow(p, w, p.x + Math.cos(aim + off) * 20, p.y + Math.sin(aim + off) * 20, aim + off, { speed: 1500, dmg: triple ? 18 : 16, range: 800, source: 'attack', pierce: 0, color: '#cfe8ff', knock: 80 });
+    }
+    if (triple) this.quick = 0;
+    audio.play('bow');
+  }
+
+  /** Rain of Arrows: arrows fall on the area you aim at. More, the longer the chain before it. */
+  private rain(p: Player, w: World, level: number, perfect: boolean): void {
+    const aim = p.aim;
+    const tx = clamp(p.x + Math.cos(aim) * 320, 40, w.room.w - 40);
+    const ty = clamp(p.y + Math.sin(aim) * 320, 40, w.room.h - 40);
+    const n = 6 + level * 3;
+    const dmg = 20 * (perfect ? 1.25 : 1);
+    w.particles.ring(tx, ty, '#a8dcff', 110, 0.5, 4);
+    if (perfect) w.particles.text(p.x, p.y, 92, 'PERFECT', '#fff0b0', 18);
+    for (let i = 0; i < n; i++) {
+      w.later(0.12 + i * 0.06, () => {
+        const a = Math.random() * TAU;
+        const d = Math.sqrt(Math.random()) * 110;
+        const x = tx + Math.cos(a) * d;
+        const y = ty + Math.sin(a) * d;
+        w.addHitbox({ team: 'player', shape: { type: 'circle', x, y, r: 30 }, damage: dmg, source: 'attack', knock: 90, ttl: 0.06, hit: new Set(), owner: p });
+        w.particles.spawn({ kind: 'spark', x, y, z: 160, vz: -900, color: '#cfe8ff', size: 3, life: 0.18, drag: 0 });
+        w.particles.burst(x, y, '#a8dcff', 4, 120);
+      });
+    }
+    audio.play('bow');
+    audio.play('swing');
   }
 
   attack(_p: Player, w: World, dashStrike: boolean): ActionDef {
