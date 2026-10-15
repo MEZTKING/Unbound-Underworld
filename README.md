@@ -49,6 +49,11 @@ Open your link in Safari and tap *Share → Add to Home Screen* (in Chrome on An
 
 On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (hold to repeat or charge, drag to aim), **✦** Special, **◆** Cast, **»** Dash and **⤒** Jump. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
 
+## Game documentation
+
+- **[docs/DESIGN.md](docs/DESIGN.md):** how the game works. Covers the run structure, progression and unlock order, combat, build systems, heroes, enemy and boss behaviour, where everything lives in the code, and how to add new content.
+- **[docs/GAME_DATA.md](docs/GAME_DATA.md):** every number in the game, generated from the code. This includes the level table, talents, heroes, weapons and forge tiers, every boon, enchantment and artifact, regions, enemies, guardians and Torment. Run `npm run docs` after changing game data; CI checks that it's up to date.
+
 ## Play from source
 
 ```bash
@@ -120,6 +125,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 
 ```bash
 npm test           # Vitest unit tests (combat pipeline, boons, rooms, run flow, saves)
+npm run docs       # regenerate docs/GAME_DATA.md from the game data
 npm run typecheck
 npm run build
 ```
@@ -204,6 +210,8 @@ src/
     render.ts    room art, lighting, effects     hud.ts  HUD
   ui/            DOM menus (boon cards, altar, armory, pause…) and touch controls
 tests/           Vitest suites
+scripts/         gen-docs.ts (writes docs/GAME_DATA.md)
+docs/            DESIGN.md (how the game works), GAME_DATA.md (generated reference), screenshots
 ```
 
 The art is all drawn in code on the canvas, and every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. The fonts (Cinzel and EB Garamond, under the SIL Open Font License) are bundled, so the game also runs offline. Progress is saved to `localStorage`.
