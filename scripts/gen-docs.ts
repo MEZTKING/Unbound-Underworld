@@ -7,8 +7,8 @@ import { CHARACTERS, heroForWeapon } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
 import { CHAINS, ECHO, ENCHANTS, MAX_ENCHANT_TIER, RADIANCE, RAMPAGING, STUNNING } from '../src/game/enchants';
 import { heatScale, UPGRADES, WEAPON_IDS } from '../src/game/meta';
-import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, eliteChance, FOE_DROP, GEAR_LUCK, POM_DOUBLE, POT, SIPHON, type DoorReward } from '../src/game/odds';
-import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, PERKS, RARITY_ORDER, rarityOdds, regionMaterial, SLOT_NAME, upgradeCost } from '../src/game/gear';
+import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
+import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, maxDropStars, minRoll, PERKS, RARITY_ORDER, regionMaterial, SLOT_NAME, starOdds, upgradeCost } from '../src/game/gear';
 import { FORGE, levelFromXp, MAX_LEVEL, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
 import { BIOMES, ENEMY_COST } from '../src/game/rooms';
@@ -193,19 +193,31 @@ table(
 // ---------------------------------------------------------------- loot & gear
 line('## Loot and gear');
 line();
-line(`Unlocks at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}. Foes drop materials; gear drops from foes (${pc(FOE_DROP.gear)}), enchanted foes (${pc(FOE_DROP.eliteGear)}), chests (${pc(CHEST.gear)}) and guardians (always, Rare or better). Every drop chance is listed under *Probabilities*. Up to ${INVENTORY_SIZE} pieces are kept; a full inventory salvages new finds.`);
+line(`The Gear & Inventory screen opens at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}; loot drops from the first escape. Foes drop materials; gear drops from foes (${pc(FOE_DROP.gear)}), enchanted foes (${pc(FOE_DROP.eliteGear)}), chests (${pc(CHEST.gear)}) and guardians (always). Every drop chance is listed under *Probabilities*. Up to ${INVENTORY_SIZE} pieces are kept; a full inventory salvages new finds.`);
+line();
+line('**Plain and starred pieces.** Common and Uncommon pieces are *plain*: no stars, and they can\'t be starred up (salvage them for materials). Rare and better pieces drop with stars: one star usually, each extra star half as likely, up to a cap set by your level. Legendary pieces come only from guardians.');
 line();
 table(
   ['Material', 'Source'],
   MATERIAL_IDS.map((k) => [`${MATERIALS[k].glyph} ${MATERIALS[k].name}`, MATERIALS[k].desc]),
 );
-const odds0 = rarityOdds(0);
-const oddsBoss = rarityOdds(GEAR_LUCK.guardian);
+const SOURCE_NAME: Record<DropSource, string> = { foe: 'Foes', elite: 'Enchanted foes', chest: 'Chests', guardian: 'Guardians' };
+const SOURCES = Object.keys(SOURCE_NAME) as DropSource[];
+const whereFrom = (k: (typeof RARITY_ORDER)[number]) =>
+  k === 'ghost' ? `Any foe (${pc(GHOST_CHANCE)} a kill)` : PLAIN_TIER[k] ? 'Any drop that rolls no star' : SOURCES.filter((src) => STARRED_TIER[src][k]).map((src) => SOURCE_NAME[src]).join(', ');
 table(
-  ['Tier', 'Bonuses', 'Bonus strength ×', 'Chance (foe)', 'Chance (guardian luck)', 'Perk'],
-  RARITY_ORDER.map((k) => [GEAR_RARITY[k].name, GEAR_RARITY[k].affixes, GEAR_RARITY[k].power, pc(odds0[k]), pc(oddsBoss[k]), k === 'unique' ? 'One Unique perk' : k === 'ghost' ? 'One Ghost perk' : '—']),
+  ['Tier', 'Bonuses', 'Bonus strength ×', 'Bonus roll', 'Stars', 'Drops from', 'Perk'],
+  RARITY_ORDER.map((k) => [
+    GEAR_RARITY[k].name,
+    GEAR_RARITY[k].affixes,
+    GEAR_RARITY[k].power,
+    `${minRoll(k).toFixed(2)}–1.25`,
+    PLAIN_TIER[k] ? 'None (plain)' : `1–${MAX_GEAR_LEVEL}`,
+    whereFrom(k),
+    k === 'unique' ? 'One Unique perk' : k === 'ghost' ? 'One Ghost perk' : '—',
+  ]),
 );
-line('Guardians always drop Rare or better (lower tiers roll up to Rare).');
+line(`A bonus is its base value × roll × tier strength × star bonus. Ghost bonuses never roll low: the weakest Ghost bonus (${(minRoll('ghost') * GEAR_RARITY.ghost.power).toFixed(2)}× base) beats the best Legendary one (${(1.25 * GEAR_RARITY.legendary.power).toFixed(2)}×).`);
 line();
 table(
   ['Perk', 'Tier', 'Effect'],
@@ -215,20 +227,23 @@ table(
   ['Bonus', 'Common, level 1 (typical)', 'Slots'],
   (Object.keys(AFFIXES) as (keyof typeof AFFIXES)[]).map((k) => [AFFIXES[k].name(AFFIXES[k].base), AFFIXES[k].flat ? AFFIXES[k].base : `${Math.round(AFFIXES[k].base * 100)}%`, (AFFIXES[k].slots ?? GEAR_SLOTS).map((s) => SLOT_NAME[s]).join(', ')]),
 );
-line(`Pieces are starred up from 1 to ${MAX_GEAR_LEVEL} stars. The first five stars are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.`);
+line(`Rare and better pieces are starred up from 1 to ${MAX_GEAR_LEVEL} stars. Stars 2–5 are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.`);
 line();
 const sample = (rarity: keyof typeof GEAR_RARITY, level: number) => costText(upgradeCost({ uid: '', slot: 'helmet', rarity, name: '', level, affixes: [] }));
 table(
-  ['Stars', 'Bonus ×', 'Next star (Common)', 'Next star (Epic)', 'Next star (Ghost)'],
+  ['Stars', 'Bonus ×', 'Next star (Rare)', 'Next star (Epic)', 'Next star (Ghost)'],
   Array.from({ length: MAX_GEAR_LEVEL }, (_, i) => i + 1).map((l) => [
     l <= 5 ? `${'★'.repeat(l)} gold` : `${'★'.repeat(l - 5)} purple + ${'★'.repeat(10 - l)} gold`,
     levelMult(l).toFixed(2),
-    l < MAX_GEAR_LEVEL ? sample('common', l) : '—',
+    l < MAX_GEAR_LEVEL ? sample('rare', l) : '—',
     l < MAX_GEAR_LEVEL ? sample('epic', l) : '—',
     l < MAX_GEAR_LEVEL ? sample('ghost', l) : '—',
   ]),
 );
-table(['Recipe', 'Rarity', 'Cost'], CRAFTS.map((c) => [c.name, `${GEAR_RARITY[c.min].name} or better`, costText(c.cost)]));
+table(
+  ['Recipe', 'Makes', 'Cost'],
+  CRAFTS.map((c) => [c.name, (Object.keys(c.tiers) as (keyof typeof GEAR_RARITY)[]).map((k) => `${GEAR_RARITY[k].name} ${pc(c.tiers[k] ?? 0)}`).join(', '), costText(c.cost)]),
+);
 line();
 
 // ---------------------------------------------------------------- world
@@ -345,7 +360,8 @@ table(
     [`${MATERIALS.bone.glyph} ${MATERIALS.bone.name}`, `${pc(D.bone)} (×2 at ${pc(D.extraBone)})`, `${pc(D.bone * D.eliteMult)} (×2 at ${pc(D.extraBone)})`, `${pc(Math.min(1, D.bone * D.guardianMult))} (×10)`],
     [`Region material (${regionMats})`, pc(D.regional), pc(D.regional * D.eliteMult), `${pc(Math.min(1, D.regional * D.guardianMult))} (×6)`],
     [`${MATERIALS.scale.glyph} ${MATERIALS.scale.name}`, '—', pc(D.eliteScale), '100% (×3–5)'],
-    ['Gear', pc(D.gear), pc(D.eliteGear), '100% (Rare or better)'],
+    ['Gear', pc(D.gear), pc(D.eliteGear), '100% (starred)'],
+    ['Ghost gear', pc(GHOST_CHANCE), pc(GHOST_CHANCE), pc(GHOST_CHANCE)],
   ],
 );
 line('Breaking a pot: ' + `${pc(POT.gold)} obols (1–5), else ${pc(POT.souls)} two souls: ${pc((1 - POT.gold) * POT.souls)} overall, nothing ${pc((1 - POT.gold) * (1 - POT.souls))}.`);
@@ -357,7 +373,7 @@ table(
   ['Roll', 'Chance'],
   [
     ['A combat chamber holds a chest', `${pc(CHEST.spawn)} (+10% per Treasure Sense tier)`],
-    ['The chest is a Mimic (combat chambers)', pc(CHEST.mimic)],
+    ['The chest is a Mimic (combat chambers); slaying it always drops a Unique piece', pc(CHEST.mimic)],
     ['Always inside', '15–35 obols, 6 souls, 3 Bone Dust'],
     ['Also a piece of gear', pc(CHEST.gear)],
     ['An artifact pops out', `${pc(CHEST.artifact)} (artifacts unlocked, one left to find)`],
@@ -365,21 +381,43 @@ table(
   ],
 );
 
-line('### Gear tiers by source');
+line('### Gear drops');
 line();
-line('Luck slides the tier odds toward the better tiers. Guardians then lift anything below Rare up to Rare.');
+const KILLS = 80;
+const ELITES = 10;
+const starredShare = (src: DropSource, lvl: number) => 1 - starOdds(src, lvl)[0];
+const perRun = (lvl: number) => (KILLS - ELITES) * FOE_DROP.gear * starredShare('foe', lvl) + ELITES * FOE_DROP.eliteGear * starredShare('elite', lvl) + KILLS * GHOST_CHANCE;
+line(`A run of about ${KILLS} kills (${ELITES} of them enchanted) yields about ${perRun(1).toFixed(1)} starred pieces at level 1 and ${perRun(30).toFixed(1)} at level 30, before guardians and chests; the rest of the gear is plain. Every guardian drops one starred piece.`);
 line();
-const luckRows: [string, number][] = [
-  ...BIOMES.map((b, i) => [`Foe, ${b.name}`, i * GEAR_LUCK.perRegion] as [string, number]),
-  ['Chest', GEAR_LUCK.chest],
-  ['Guardian', GEAR_LUCK.guardian],
-];
 table(
-  ['Source', 'Luck', ...RARITY_ORDER.map((k) => GEAR_RARITY[k].name)],
-  luckRows.map(([name, luck]) => {
-    const o = rarityOdds(luck);
-    return [name, luck.toFixed(1), ...RARITY_ORDER.map((k) => pc(o[k]))];
+  ['Source', 'Drops a piece', 'Plain (Common 70% / Uncommon 30%)', 'Starred', 'Starred tier'],
+  SOURCES.map((src) => {
+    const chance = src === 'foe' ? FOE_DROP.gear : src === 'elite' ? FOE_DROP.eliteGear : src === 'chest' ? CHEST.gear : 1;
+    const tiers = STARRED_TIER[src];
+    return [
+      SOURCE_NAME[src],
+      pc(chance),
+      pc(starOdds(src, 30)[0]),
+      pc(starredShare(src, 30)),
+      (Object.keys(tiers) as (keyof typeof GEAR_RARITY)[]).map((k) => `${GEAR_RARITY[k].name} ${pc(tiers[k] ?? 0)}`).join(', '),
+    ];
   }),
+);
+line(`Plus, on any kill (guardians too): a Ghost piece, ${pc(GHOST_CHANCE)}. *Plain* and *Starred* are at level 30; at low levels the star cap trims the many-star rolls (see below).`);
+line();
+line(`**Stars on a drop.** The first star has the source's chance (foes ${pc(STAR_CHANCE.foe)}, enchanted foes ${pc(STAR_CHANCE.elite)}, chests ${pc(STAR_CHANCE.chest)}); each further star is half as likely. A drop carries at most 1 star, +1 every 3 player levels (${maxDropStars(1)} at level 1, ${maxDropStars(15)} at level 15, ${maxDropStars(30)} at level 30). Guardian and Ghost pieces always have at least one star, spread the same way.`);
+line();
+const starCols = [1, 2, 3, 4, 5];
+table(
+  ['Source (level 30)', ...starCols.map((k) => `${k}★`), '6★ or more'],
+  SOURCES.map((src) => {
+    const o = starOdds(src, 30);
+    return [SOURCE_NAME[src], ...starCols.map((k) => pc(o[k] ?? 0)), pc(o.slice(6).reduce((a, v) => a + v, 0))];
+  }),
+);
+table(
+  ['Player level', 'Most stars on a drop'],
+  [1, 3, 6, 9, 12, 15, 18, 21, 24, 27].map((l) => [`${l}+`, maxDropStars(l)]),
 );
 
 line('### Enchantment procs');

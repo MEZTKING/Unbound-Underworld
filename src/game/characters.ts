@@ -185,7 +185,7 @@ export const CHARACTERS: CharacterDef[] = [
     perks: ['Combo meter builds twice as fast', '+20 max Health'],
     guard: 'catch',
     palette: { cloak: '#2a1a10', trim: '#c8ff5a', tunic: '#4a3a20', skin: '#c89070', hair: '#1a1008', crown: 'circlet', glow: '#c8ff5a' },
-    unlock: { kind: 'level', n: 5, text: 'Reach level 5' },
+    unlock: { kind: 'level', n: 7, text: 'Reach level 7 or slay a guardian', or: { kind: 'bosses', n: 1 } },
     apply: (s) => (s.maxHp += 20),
     wrath: {
       name: 'Hundred Fists',
@@ -221,7 +221,7 @@ export const CHARACTERS: CharacterDef[] = [
     perks: ['+1 Cast shard (once Cast is unlocked)', '+20% Special damage', '+15% knockback'],
     guard: 'catch',
     palette: { cloak: '#10283a', trim: '#5ac8ff', tunic: '#1c4a66', skin: '#e0d0e8', hair: '#2a6a8a', crown: 'circlet', glow: '#8ae0ff' },
-    unlock: { kind: 'level', n: 8, text: 'Reach level 8' },
+    unlock: { kind: 'level', n: 10, text: 'Reach level 10 or slay 3 guardians', or: { kind: 'bosses', n: 3 } },
     apply: (s) => {
       if (s.canCast) s.castAmmo += 1;
       s.dmgBonus.special += 0.2;
@@ -249,7 +249,7 @@ export const CHARACTERS: CharacterDef[] = [
     perks: ['+10% damage', 'Restore 2 Health per foe slain', '+50% souls gathered', '−15 max Health'],
     guard: 'mist',
     palette: { cloak: '#140c1e', trim: '#c86bff', tunic: '#2a1440', skin: '#c8c0d8', hair: '#0a0610', crown: 'horns', glow: '#d090ff' },
-    unlock: { kind: 'level', n: 10, text: 'Reach level 10 or slay 2 guardians', or: { kind: 'bosses', n: 2 } },
+    unlock: { kind: 'level', n: 14, text: 'Reach level 14 or slay 6 guardians', or: { kind: 'bosses', n: 6 } },
     apply: (s) => {
       s.globalDmg += 0.1;
       s.lifeOnKill += 2;
@@ -284,7 +284,7 @@ export const CHARACTERS: CharacterDef[] = [
     perks: ['Hits on foes close to you deal +30% damage', '+15% knockback'],
     guard: 'evade',
     palette: { cloak: '#241a14', trim: '#ffb060', tunic: '#4a3020', skin: '#e0b898', hair: '#3a2014', crown: 'hood', glow: '#ffb060' },
-    unlock: { kind: 'level', n: 12, text: 'Reach level 12' },
+    unlock: { kind: 'level', n: 18, text: 'Reach level 18 or escape once', or: { kind: 'escapes', n: 1 } },
     apply: (s) => (s.knockMult *= 1.15),
     wrath: {
       name: 'Cannonade',
@@ -324,7 +324,7 @@ export const CHARACTERS: CharacterDef[] = [
     perks: ['+1 Dash charge', '+15% Attack damage', 'Dash recharges 20% faster'],
     guard: 'parry',
     palette: { cloak: '#1a1830', trim: '#fff0a0', tunic: '#3a3460', skin: '#f4e0d0', hair: '#fff4d0', crown: 'halo', glow: '#fff0a0' },
-    unlock: { kind: 'level', n: 15, text: 'Reach level 15 or escape once', or: { kind: 'escapes', n: 1 } },
+    unlock: { kind: 'level', n: 22, text: 'Reach level 22 or escape 3 times', or: { kind: 'escapes', n: 3 } },
     apply: (s) => {
       s.dashCharges += 1;
       s.dmgBonus.attack += 0.15;

@@ -26,6 +26,45 @@ const FIGURE_SCALE = 1.15;
 const LIGHTS = { high: 8, balanced: 1 };
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
+const PLANE = new THREE.PlaneGeometry(1, 1);
+
+/** Soft gradients for unlit glows (drawn once, shared). */
+let radialTex: THREE.Texture | null = null;
+let riseTex: THREE.Texture | null = null;
+function gradientTexture(kind: 'radial' | 'rise'): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = kind === 'radial' ? g.createRadialGradient(32, 32, 0, 32, 32, 32) : g.createLinearGradient(0, 64, 0, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(kind === 'radial' ? 0.45 : 0.3, 'rgba(255,255,255,0.4)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const radialGlow = () => (radialTex ??= gradientTexture('radial'));
+const riseGlow = () => (riseTex ??= gradientTexture('rise'));
+
+/**
+ * A door in the north wall. Its glow is unlit geometry (a portal in the
+ * doorway and a spill of light on the floor) that fades in and out, plus a
+ * point light from slots kept for doors, so nothing pops or flickers.
+ */
+interface DoorView {
+  x: number;
+  g: THREE.Group;
+  bars: THREE.Group;
+  portal: THREE.MeshBasicMaterial;
+  spill: THREE.MeshBasicMaterial;
+  edge: THREE.MeshBasicMaterial;
+  trim: THREE.Color;
+  color: THREE.Color;
+  /** 0..1: how lit the door is (eases toward open-with-a-reward). */
+  k: number;
+}
 const DISC = new THREE.CircleGeometry(1, 18).rotateX(-Math.PI / 2);
 
 function hash(x: number, y: number, seed: number): number {
@@ -611,7 +650,9 @@ export class VoxelRenderer {
   private interactables = new Map<Interactable, THREE.Group>();
   private breakables = new Map<Breakable, THREE.Group>();
   private traps = new Map<Trap, { g: THREE.Group; spikes: THREE.Mesh[]; plate: THREE.MeshLambertMaterial }>();
-  private doors: { x: number; g: THREE.Group; glow: THREE.Mesh; bars: THREE.Group }[] = [];
+  private doors: DoorView[] = [];
+  /** Fade weight per static light, so lights ease in and out instead of popping. */
+  private staticW: number[] = [];
   private lava: THREE.MeshBasicMaterial | null = null;
   private flames: THREE.Object3D[] = [];
   private staticLights: { x: number; y: number; z: number; color: string; r: number; k: number }[] = [];
@@ -691,6 +732,7 @@ export class VoxelRenderer {
     this.flames = [];
     this.lava = null;
     this.staticLights = [];
+    this.staticW = [];
   }
 
   private buildRoom(w: World): void {
@@ -870,55 +912,7 @@ export class VoxelRenderer {
     }
 
     // Doors in the north wall.
-    for (const d of w.doors) {
-      const g = new THREE.Group();
-      g.position.set(d.x, 0, -B);
-      const frame = new THREE.MeshLambertMaterial({ color: capStone(1.2) });
-      const trimM = new THREE.MeshBasicMaterial({ color: bio.trim });
-      const half = DOOR_W / 2;
-      // Posts and lintel stand 6 units proud of the wall, so no face of theirs
-      // lies flat on a wall face (shared faces flicker).
-      const postW = B + 14;
-      const depth = 2 * B + 6;
-      for (const s of [-1, 1]) {
-        const post = new THREE.Mesh(BOX, frame);
-        post.scale.set(postW, 150, depth);
-        post.position.set(s * (half + postW / 2), 75, 3);
-        post.castShadow = high;
-        g.add(post);
-        const tr = new THREE.Mesh(BOX, trimM);
-        tr.scale.set(3, 120, 2);
-        tr.position.set(s * (half - 1.5), 61, B + 7.5);
-        g.add(tr);
-      }
-      const lintel = new THREE.Mesh(BOX, frame);
-      lintel.scale.set(DOOR_W + 2 * postW, 26, depth);
-      lintel.position.set(0, 150, 3);
-      g.add(lintel);
-      const dark = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#050307' }));
-      dark.scale.set(DOOR_W - 2, 140, 4);
-      dark.position.set(0, 68, -B + 2);
-      g.add(dark);
-      const glow = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
-      glow.scale.set(DOOR_W - 8, 130, 2 * B - 6);
-      glow.position.set(0, 64, 0);
-      g.add(glow);
-      const bars = new THREE.Group();
-      const barM = new THREE.MeshLambertMaterial({ color: '#5a4a50' });
-      for (let i = -2; i <= 2; i++) {
-        const bar = new THREE.Mesh(BOX, barM);
-        bar.scale.set(5, 130, 5);
-        bar.position.set(i * 22, 65, B - 6);
-        bars.add(bar);
-      }
-      const cross = new THREE.Mesh(BOX, barM);
-      cross.scale.set(DOOR_W, 6, 5);
-      cross.position.set(0, 90, B - 6);
-      bars.add(cross);
-      g.add(bars);
-      this.props.add(g);
-      this.doors.push({ x: d.x, g, glow, bars });
-    }
+    for (const d of w.doors) this.doors.push(this.buildDoor(d.x, bio.trim, capStone(1.2), high));
 
     // Sun and its shadow camera cover the whole room.
     const cx = l.w / 2;
@@ -1313,13 +1307,21 @@ export class VoxelRenderer {
     }
     if (weapon.id === 'spear' && wpn) wpn.visible = !('thrown' in weapon && weapon.thrown);
     switch (p.state) {
-      case 'dash':
-        rig.body.rotation.x = 0.45;
-        rig.legs.forEach((l, i) => (l.rotation.x = i ? 0.8 : -0.4));
-        rig.knees.forEach((k, i) => (k.rotation.x = i ? 0.9 : 0.3));
-        rig.arms.forEach((a) => (a.rotation.x = 0.9));
-        if (rig.bits.cape) rig.bits.cape.rotation.x = 1.1;
+      case 'dash': {
+        // Lean the way the dash goes, measured from where the hero faces:
+        // forward into a forward dash, back on a backstep, sideways on a sidestep.
+        const d = angleDiff(p.facing, Math.atan2(p.dashDir.y, p.dashDir.x));
+        const fwd = Math.cos(d);
+        const side = Math.sin(d);
+        const back = fwd < -0.2;
+        rig.body.rotation.x = fwd > 0 ? 0.45 * fwd : 0.35 * fwd;
+        rig.body.rotation.z = 0.3 * side;
+        rig.legs.forEach((l, i) => (l.rotation.x = back ? (i ? -0.7 : 0.3) : (i ? 0.8 : -0.4) * Math.max(0.3, fwd)));
+        rig.knees.forEach((k, i) => (k.rotation.x = back ? (i ? 0.4 : 0.8) : i ? 0.9 : 0.3));
+        rig.arms.forEach((a) => (a.rotation.x = back ? -0.7 : 0.9 * Math.max(0.3, fwd)));
+        if (rig.bits.cape) rig.bits.cape.rotation.x = back ? 0.15 : 0.4 + 0.7 * Math.max(0, fwd);
         break;
+      }
       case 'slam':
         rig.arms.forEach((a) => (a.rotation.x = -2.8));
         break;
@@ -1353,6 +1355,83 @@ export class VoxelRenderer {
   }
 
   // ---------------------------------------------------------------- frame
+
+  /**
+   * One door, built so no two surfaces share a plane (shared faces flicker):
+   * stone posts and a lintel standing proud of the wall, a dark void behind,
+   * then (back to front) the glowing portal, the edge trims sunk into the
+   * posts, the bars, and a spill of light on the floor in front.
+   */
+  private buildDoor(x: number, trimColor: string, stoneColor: THREE.ColorRepresentation, high: boolean): DoorView {
+    const g = new THREE.Group();
+    g.position.set(x, 0, -B);
+    const half = DOOR_W / 2;
+    const postW = B + 14;
+    // From the back of the wall (z = -B) to 8 units proud of its face (z = B + 8).
+    const depth = 2 * B + 8;
+    const zMid = depth / 2 - B;
+    const frame = new THREE.MeshLambertMaterial({ color: stoneColor });
+    for (const sx of [-1, 1]) {
+      const post = new THREE.Mesh(BOX, frame);
+      post.scale.set(postW, 152, depth);
+      post.position.set(sx * (half + postW / 2), 76, zMid);
+      post.castShadow = high;
+      g.add(post);
+    }
+    const lintel = new THREE.Mesh(BOX, frame);
+    lintel.scale.set(DOOR_W + 2 * postW, 28, depth);
+    lintel.position.set(0, 152 + 14 - 2, zMid);
+    lintel.castShadow = high;
+    g.add(lintel);
+    // The dark beyond: sunk well behind everything else in the opening.
+    const voidM = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#040206' }));
+    voidM.scale.set(DOOR_W + 4, 156, 10);
+    voidM.position.set(0, 76, -B + 4);
+    g.add(voidM);
+    // The portal: a vertical glow across the opening, brightest at the floor.
+    const portalM = new THREE.MeshBasicMaterial({ map: riseGlow(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const portal = new THREE.Mesh(PLANE, portalM);
+    portal.scale.set(DOOR_W - 6, 148, 1);
+    portal.position.set(0, 74, 14);
+    portal.renderOrder = 3;
+    g.add(portal);
+    // Glowing edges, half sunk into the posts so only their inner faces show.
+    const edgeM = new THREE.MeshBasicMaterial({ color: trimColor });
+    for (const sx of [-1, 1]) {
+      const edge = new THREE.Mesh(BOX, edgeM);
+      edge.scale.set(5, 146, depth - 6);
+      edge.position.set(sx * (half + 0.5), 75, zMid - 1);
+      g.add(edge);
+    }
+    const top = new THREE.Mesh(BOX, edgeM);
+    top.scale.set(DOOR_W + 1, 5, depth - 6);
+    top.position.set(0, 150.5, zMid - 1);
+    g.add(top);
+    // Bars, in front of the portal and clear of every other surface.
+    const bars = new THREE.Group();
+    const barM = new THREE.MeshLambertMaterial({ color: '#5a4a50' });
+    for (let i = -2; i <= 2; i++) {
+      const bar = new THREE.Mesh(BOX, barM);
+      bar.scale.set(5, 140, 5);
+      bar.position.set(i * 22, 70, B - 4);
+      bars.add(bar);
+    }
+    const cross = new THREE.Mesh(BOX, barM);
+    cross.scale.set(DOOR_W - 2, 6, 5);
+    cross.position.set(0, 96, B - 4);
+    bars.add(cross);
+    g.add(bars);
+    // Light spilling onto the floor in front of the door.
+    const spillM = new THREE.MeshBasicMaterial({ map: radialGlow(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const spill = new THREE.Mesh(PLANE, spillM);
+    spill.rotation.x = -Math.PI / 2;
+    spill.scale.set(DOOR_W * 2.4, 220, 1);
+    spill.position.set(0, 1.5, B + 70);
+    spill.renderOrder = 3;
+    g.add(spill);
+    this.props.add(g);
+    return { x, g, bars, portal: portalM, spill: spillM, edge: edgeM, trim: new THREE.Color(trimColor), color: new THREE.Color(), k: 0 };
+  }
 
   render(w: World, cam: Camera): void {
     const now = performance.now() / 1000;
@@ -1399,16 +1478,19 @@ export class VoxelRenderer {
       f.scale.set(1, 0.85 + Math.sin(t * 13 + f.parent!.position.x) * 0.15, 1);
       f.rotation.y = t * 1.5;
     }
+    // Doors: the glow eases in when a door opens on a reward, out when it closes.
     for (const d of this.doors) {
       const door = w.doors.find((x) => x.x === d.x);
       const open = !!door?.open;
       d.bars.visible = !open;
-      d.glow.visible = open && !!door?.reward;
-      if (door?.reward) {
-        const m = d.glow.material as THREE.MeshBasicMaterial;
-        m.color.set(rewardColor(door.reward));
-        m.opacity = 0.32 + Math.sin(t * 3 + d.x) * 0.08;
-      }
+      const lit = open && !!door?.reward;
+      d.k += ((lit ? 1 : 0) - d.k) * Math.min(1, dt * 5);
+      if (door?.reward) d.color.set(rewardColor(door.reward));
+      const pulse = 0.9 + Math.sin(t * 2 + d.x * 0.01) * 0.1;
+      d.portal.color.copy(d.color).multiplyScalar(0.5 * d.k * pulse);
+      d.spill.color.copy(d.color).multiplyScalar(0.4 * d.k * pulse);
+      d.edge.color.copy(d.trim).lerp(d.color, d.k);
+      d.portal.visible = d.spill.visible = d.k > 0.01;
     }
     for (const it of w.interactables) {
       let g = this.interactables.get(it);
@@ -1496,16 +1578,30 @@ export class VoxelRenderer {
     };
     put(p.x, p.y, 70 + p.z, '#ffc8a0', high ? 480 : 520, high ? 1.6 : 1.9);
     if (high) {
-      const near = this.staticLights
-        .map((s) => ({ s, d: Math.hypot(s.x - tx, s.y - tz) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 4);
-      // A gentle, slow flicker: fast changes in light read as glitches.
-      for (const { s } of near) put(s.x, s.y, s.z, s.color, s.r, s.k * (0.95 + Math.sin(t * 3 + s.x) * 0.05));
+      // Doors keep their own slots right after the hero, so flashes and
+      // braziers never take their light away.
+      for (const d of this.doors) if (d.k > 0.01) put(d.x, 30, 70, `#${d.color.getHexString()}`, 300, 1.3 * d.k);
+      // Braziers and lava: the nearest few, eased in and out so walking
+      // around never makes a light pop on or off.
+      const free = Math.max(0, L.length - n - 1);
+      const want = new Set(
+        this.staticLights
+          .map((s, i) => ({ i, d: Math.hypot(s.x - tx, s.y - tz) }))
+          .sort((a, b) => a.d - b.d)
+          .slice(0, free)
+          .map((x) => x.i),
+      );
+      const W = this.staticW;
+      this.staticLights.forEach((_, i) => (W[i] = Math.max(0, Math.min(1, (W[i] ?? 0) + (want.has(i) ? dt : -dt) * 2.5))));
+      const shown = this.staticLights
+        .map((s, i) => ({ s, w: W[i] }))
+        .filter((x) => x.w > 0)
+        .sort((a, b) => b.w - a.w)
+        .slice(0, free);
+      for (const { s, w: k } of shown) put(s.x, s.y, s.z, s.color, s.r, s.k * k * (0.95 + Math.sin(t * 3 + s.x) * 0.05));
       for (const e of w.enemies) if (e.isBoss && !e.dead) put(e.x, e.y, e.height * 0.6, '#ff5a5a', 320, 1.2);
       const fl = [...w.flashes].sort((a, b) => b.r - a.r);
       for (const f of fl) put(f.x, f.y, 40, f.color, f.r * 1.2, 2.5 * (1 - f.t / f.dur));
-      for (const d of w.doors) if (d.open && d.reward) put(d.x, 20, 60, rewardColor(d.reward), 260, 1.2);
     }
     while (n < L.length) L[n++].intensity = 0;
     this.sun.intensity = high ? 1.8 : 1.6;
@@ -1513,5 +1609,111 @@ export class VoxelRenderer {
     this.fill.intensity = 0.9;
 
     this.renderer.render(this.scene, this.camera);
+  }
+}
+
+/**
+ * The hero on the appearance screen, built from the same voxel model the 3D
+ * view draws and seen from the game camera's angle. It turns slowly (drag to
+ * turn it yourself) and stops when its canvas leaves the page.
+ */
+export class HeroPreview {
+  private renderer: THREE.WebGLRenderer;
+  private scene = new THREE.Scene();
+  private camera: THREE.OrthographicCamera;
+  private rig: Rig | null = null;
+  private look = '';
+  private facing = Math.PI / 4;
+  private drag: number | null = null;
+  private last = performance.now();
+  private raf = 0;
+
+  constructor(
+    private canvas: HTMLCanvasElement,
+    private player: Player,
+    yaw: number,
+    pitch: number,
+  ) {
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    const w = canvas.clientWidth || canvas.width;
+    const h = canvas.clientHeight || canvas.height;
+    this.renderer.setSize(w, h, false);
+    // Frame the whole figure: about 80 units tall, centred on its middle.
+    const halfH = 46;
+    const halfW = (halfH * w) / h;
+    this.camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 3000);
+    const flat = Math.cos(pitch) * 800;
+    this.camera.position.set(Math.sin(yaw) * flat, 34 + Math.sin(pitch) * 800, Math.cos(yaw) * flat);
+    this.camera.lookAt(0, 34, 0);
+    // The game's lights: sky and ground, a warm sun, a cool fill from the camera side.
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1.6));
+    const sun = new THREE.DirectionalLight(0xffe8d0, 1.6);
+    sun.position.set(-0.6, 1, 0.4);
+    const fill = new THREE.DirectionalLight(0xc8c0ff, 0.9);
+    fill.position.set(Math.sin(yaw) * 1.4, 1, Math.cos(yaw) * 1.4);
+    this.scene.add(sun, fill);
+    canvas.addEventListener('pointerdown', (e) => {
+      this.drag = e.clientX;
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (this.drag === null) return;
+      this.facing -= (e.clientX - this.drag) * 0.02;
+      this.drag = e.clientX;
+    });
+    canvas.addEventListener('pointerup', () => (this.drag = null));
+    this.loop();
+  }
+
+  private build(): void {
+    const look = JSON.stringify(this.player.palette) + this.player.weapon.id;
+    if (this.rig && look === this.look) return;
+    if (this.rig) {
+      this.scene.remove(this.rig.root);
+      disposeTree(this.rig.root);
+    }
+    const b = new RigBuilder(false);
+    const rig = buildHeroRig(this.player, b, new THREE.MeshBasicMaterial({ visible: false }));
+    equipWeapon(rig, this.player.weapon.id, b);
+    rig.body.scale.setScalar((56 / rig.unit) * FIGURE_SCALE);
+    if (rig.bits.weapon) rig.bits.weapon.rotation.set(0.35, 0, 0);
+    this.scene.add(rig.root);
+    this.rig = rig;
+    this.look = look;
+  }
+
+  private loop = (): void => {
+    if (!this.canvas.isConnected) {
+      this.dispose();
+      return;
+    }
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - this.last) / 1000);
+    this.last = now;
+    this.build();
+    const rig = this.rig!;
+    if (this.drag === null) this.facing += dt * 0.5;
+    rig.root.rotation.set(0, Math.PI / 2 - this.facing, 0);
+    // Breathing, as in the game's idle pose.
+    rig.idle += dt;
+    const k = Math.sin(rig.idle * 2.2);
+    if (rig.bits.torso) rig.bits.torso.scale.set(1 + k * 0.012, 1 + k * 0.018, 1 + k * 0.012);
+    rig.arms.forEach((a, i) => (a.rotation.z = (i ? 1 : -1) * (0.06 + k * 0.03)));
+    if (rig.bits.cape) rig.bits.cape.rotation.x = 0.04 + Math.sin(rig.idle * 1.3) * 0.03;
+    if (rig.bits.flame) {
+      rig.bits.flame.scale.y = 0.8 + Math.sin(rig.idle * 14) * 0.25;
+      rig.bits.flame.rotation.y = rig.idle * 2;
+    }
+    if (rig.bits.halo) rig.bits.halo.rotation.y = rig.idle;
+    this.renderer.render(this.scene, this.camera);
+    this.raf = requestAnimationFrame(this.loop);
+  };
+
+  dispose(): void {
+    cancelAnimationFrame(this.raf);
+    if (this.rig) disposeTree(this.rig.root);
+    this.renderer.dispose();
   }
 }

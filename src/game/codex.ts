@@ -46,7 +46,7 @@ export const BESTIARY: FoeEntry[] = [
   foe('hissling', 'Lights a fuse up close and explodes, hurting other foes too.', 'Back off. A stun puts the fuse out.'),
   foe('weaver', 'Spits webs that slow you.', 'Avoid the marked landing spots.'),
   foe('bonecaller', 'Summons Numblings, which die with it.', 'Kill the Bonecaller first.'),
-  foe('mimic', 'A chest that bites back with hopping slams.', 'Dash or jump out of its landing zone.'),
+  foe('mimic', 'A chest that bites back with hopping slams. Rare, and it guards a Unique piece of gear.', 'Dash or jump out of its landing zone.'),
   foe('dummy', 'The training dummy in the Hall of Shades. Heals when left alone.', 'Practise your combos.'),
   guardian('fury', 'Warden of Chains. Whip lashes, a dashing charge and bullet rings.', 'Step off the dash lane; slip through gaps in the rings.'),
   guardian('hydra', 'Rooted in place. Bites, spits fire and grows extra heads.', 'Clear the heads if overwhelmed, then focus the body.'),

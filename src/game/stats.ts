@@ -7,6 +7,7 @@ export interface PlayerStats {
   moveSpeed: number;
   attackSpeed: number;
   dashCharges: number;
+  /** Seconds to get a dash charge back: the dash cooldown. Only boons, talents, gear and perks shorten it. */
   dashRecharge: number;
   castAmmo: number;
   /** Seconds per automatic shard regeneration; 0 disables it. */
@@ -71,7 +72,7 @@ export function baseStats(): PlayerStats {
     moveSpeed: 1,
     attackSpeed: 1,
     dashCharges: 1,
-    dashRecharge: 0.3,
+    dashRecharge: 0.9,
     castAmmo: 1,
     castRegen: 0,
     damageTaken: 1,

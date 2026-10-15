@@ -661,6 +661,16 @@ export const BOONS: BoonDef[] = [
     apply: (s, v) => (s.attackSpeed += v / 100),
   },
   {
+    id: 'hermes_windstep',
+    god: 'hermes',
+    name: 'Windstep',
+    slot: 'passive',
+    base: 25,
+    perLevel: 0.3,
+    desc: (v) => `Your Dash recharges ${pct(Math.min(60, v))} faster.`,
+    apply: (s, v) => (s.dashRecharge *= 1 - Math.min(0.6, v / 100)),
+  },
+  {
     id: 'hermes_recovery',
     god: 'hermes',
     name: 'Rebound',
@@ -877,20 +887,22 @@ export type RarityOdds = Record<'common' | 'rare' | 'epic' | 'heroic', number>;
  * escape is at most Rare.
  */
 export const BOON_RARITY_BY_REGION: RarityOdds[] = [
-  { common: 0.85, rare: 0.14, epic: 0.01, heroic: 0 },
-  { common: 0.7, rare: 0.24, epic: 0.05, heroic: 0.01 },
-  { common: 0.55, rare: 0.3, epic: 0.12, heroic: 0.03 },
-  { common: 0.42, rare: 0.33, epic: 0.19, heroic: 0.06 },
+  { common: 0.925, rare: 0.07, epic: 0.005, heroic: 0 },
+  { common: 0.85, rare: 0.12, epic: 0.025, heroic: 0.005 },
+  { common: 0.775, rare: 0.15, epic: 0.06, heroic: 0.015 },
+  { common: 0.71, rare: 0.165, epic: 0.095, heroic: 0.03 },
 ];
-const FIRST_BOON_ODDS: RarityOdds = { common: 0.9, rare: 0.1, epic: 0, heroic: 0 };
+const FIRST_BOON_ODDS: RarityOdds = { common: 0.95, rare: 0.05, epic: 0, heroic: 0 };
+/** Per rank of Favor of the Gods. */
+export const FAVOR_ODDS = { rare: 0.02, epic: 0.01, heroic: 0.0025 };
 
-/** Rarity odds for a boon in region `region` (0–3). Each rank of Favor of the Gods moves 6.5% from Common to the rarer tiers. */
+/** Rarity odds for a boon in region `region` (0–3). Each rank of Favor of the Gods moves 3.25% from Common to the rarer tiers. */
 export function boonRarityOdds(region: number, first = false, favor = 0): RarityOdds {
   const base = first ? FIRST_BOON_ODDS : BOON_RARITY_BY_REGION[Math.max(0, Math.min(BOON_RARITY_BY_REGION.length - 1, region))];
   const f = first ? 0 : favor;
-  const rare = base.rare + f * 0.04;
-  const epic = base.epic + f * 0.02;
-  const heroic = base.heroic + (region > 0 ? f * 0.005 : 0);
+  const rare = base.rare + f * FAVOR_ODDS.rare;
+  const epic = base.epic + f * FAVOR_ODDS.epic;
+  const heroic = base.heroic + (region > 0 ? f * FAVOR_ODDS.heroic : 0);
   return { common: Math.max(0, 1 - rare - epic - heroic), rare, epic, heroic };
 }
 
