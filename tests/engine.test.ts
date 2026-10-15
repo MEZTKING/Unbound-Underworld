@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { circleArc, resolveCircleRect, segmentCircle, segmentRect } from '../src/engine/collision';
+import { Camera } from '../src/engine/camera';
 import { angleDiff, Rng } from '../src/engine/math';
 
 describe('Rng', () => {
@@ -47,5 +48,33 @@ describe('collision', () => {
 
   it('angleDiff wraps around', () => {
     expect(angleDiff(Math.PI - 0.1, -Math.PI + 0.1)).toBeCloseTo(0.2);
+  });
+});
+
+describe('Camera', () => {
+  it('maps world and screen points both ways in the flat and turned views', () => {
+    for (const [yaw, pitch] of [
+      [0, null],
+      [Math.PI / 4, 0.7],
+    ] as const) {
+      const c = new Camera();
+      c.setAngle(yaw, pitch);
+      c.resize(1280, 720);
+      c.snap({ x: 600, y: 400 });
+      const back = c.screenToWorld(c.worldToScreen({ x: 650, y: 480 }));
+      expect(back.x).toBeCloseTo(650);
+      expect(back.y).toBeCloseTo(480);
+      // Height lifts a point straight up on screen, by cos(pitch).
+      const up = c.lift;
+      const a = c.worldToScreen({ x: 650, y: 480 });
+      const b = c.worldToScreen({ x: 650 + up.x * 100, y: 480 + up.y * 100 });
+      expect(b.x - a.x).toBeCloseTo(0);
+      expect(a.y - b.y).toBeCloseTo(100 * c.zoom * c.zScale);
+      // Screen-up on the stick walks the way that looks up on screen.
+      const d = c.screenDirToWorld({ x: 0, y: -1 });
+      const s = c.worldToScreen({ x: 600 + d.x * 10, y: 400 + d.y * 10 });
+      expect(s.x - 640).toBeCloseTo(0);
+      expect(s.y).toBeLessThan(360);
+    }
   });
 });

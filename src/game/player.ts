@@ -189,7 +189,8 @@ export class Player extends Actor {
     }
 
     // ---- input
-    const mv = inp.moveVector();
+    // Input directions are on screen; the 3D view turns the room, so turn them too.
+    const mv = w.camera.screenDirToWorld(inp.moveVector());
     this.moveDir = mv;
     this.updateAim(w);
     if (inp.pressed('attack')) this.buf.attack = BUFFER;
@@ -376,10 +377,12 @@ export class Player extends Actor {
     const inp = w.input;
     const src = inp.aimSource();
     if (src === 'mouse') {
+      // Aim from the chest (24 up), where the cursor is naturally compared.
       const m = w.camera.screenToWorld(inp.mouse);
-      this.aim = Math.atan2(m.y - (this.y - 24), m.x - this.x);
+      const up = w.camera.lift;
+      this.aim = Math.atan2(m.y - (this.y + up.y * 24), m.x - (this.x + up.x * 24));
     } else if (src === 'stick') {
-      const v = inp.stickAim();
+      const v = w.camera.screenDirToWorld(inp.stickAim());
       this.aim = Math.atan2(v.y, v.x);
     } else if (src === 'auto') {
       // Touch play: lock onto the nearest foe, otherwise face where you move.
@@ -406,7 +409,7 @@ export class Player extends Actor {
       else if (this.t - this.noAmmoMsgT > 0.8) {
         this.noAmmoMsgT = this.t;
         audio.play('deny');
-        w.particles.text(this.x, this.y - 70, 'No shards', '#ff8080', 14);
+        w.particles.text(this.x, this.y, 70, 'No shards', '#ff8080', 14);
       }
     } else if (this.buf.special > 0) {
       this.buf.special = 0;
@@ -525,7 +528,7 @@ export class Player extends Actor {
     }
     if (this.hp >= this.maxHp) {
       audio.play('deny');
-      w.particles.text(this.x, this.y - 70, 'Full health', '#a0ffa0', 14);
+      w.particles.text(this.x, this.y, 70, 'Full health', '#a0ffa0', 14);
       return;
     }
     this.potionCd = s.potionCooldown;

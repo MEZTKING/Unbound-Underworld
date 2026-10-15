@@ -169,7 +169,7 @@ export function help(g: Game, intro = false): void {
 
 export function settings(g: Game): void {
   const s = g.save.settings;
-  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration';
+  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration' | 'view3d';
   type Slider = 'volume' | 'music' | 'shake' | 'flashes' | 'touchSize' | 'touchOpacity';
   const toggleLabel: Record<Toggle, string> = {
     muted: 'Sound',
@@ -182,6 +182,7 @@ export function settings(g: Game): void {
     showFps: 'Show FPS',
     leftHanded: 'Left-handed layout',
     vibration: 'Vibration',
+    view3d: '3D voxel view (off: classic 2D)',
   };
   const isOn = (k: Toggle) => (k === 'muted' ? !s.muted : s[k]);
   const toggle = (k: Toggle) => `<button class="btn toggle${isOn(k) ? ' on' : ''}" data-nav data-t="${k}"><span>${toggleLabel[k]}</span><b>${isOn(k) ? 'On' : 'Off'}</b></button>`;
@@ -203,6 +204,7 @@ export function settings(g: Game): void {
       ${toggle('hints')}
       ${toggle('doorInfo')}
       <h3 class="section">Display</h3>
+      ${toggle('view3d')}
       ${slider('shake', 'Screen shake', 0, 1.5, 0.1)}
       ${slider('flashes', 'Flash intensity', 0, 1, 0.1)}
       ${toggle('hitstop')}

@@ -257,7 +257,7 @@ export function useArtifact(w: World, slot: number): void {
   }
   if (def.souls && p.souls < def.souls) {
     audio.play('deny');
-    w.particles.text(p.x, p.y - 80, 'Not enough souls', '#7fe8ff', 14);
+    w.particles.text(p.x, p.y, 80, 'Not enough souls', '#7fe8ff', 14);
     return;
   }
   if (!def.use(w)) {
@@ -305,10 +305,11 @@ export function drawBeam(ctx: CanvasRenderingContext2D, w: World): void {
   const p = w.player;
   if (p.beamT <= 0) return;
   const len = 560;
-  const x1 = p.x + Math.cos(p.aim) * 20;
-  const y1 = p.y + Math.sin(p.aim) * 20 - 26 - p.z;
-  const x2 = p.x + Math.cos(p.aim) * len;
-  const y2 = p.y + Math.sin(p.aim) * len - 26;
+  const up = w.camera.lift;
+  const x1 = p.x + Math.cos(p.aim) * 20 + up.x * (26 + p.z);
+  const y1 = p.y + Math.sin(p.aim) * 20 + up.y * (26 + p.z);
+  const x2 = p.x + Math.cos(p.aim) * len + up.x * 26;
+  const y2 = p.y + Math.sin(p.aim) * len + up.y * 26;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';

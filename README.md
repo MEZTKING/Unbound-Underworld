@@ -123,7 +123,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 *Settings* (on the title screen or in the pause menu) has:
 - **Audio:** sound and music volume, mute.
 - **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints, and door descriptions for every door (or only the one you walk up to).
-- **Display:** screen shake, flash intensity, hit-stop, an FPS counter and fullscreen.
+- **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 
 ## Development
@@ -186,6 +186,8 @@ These URL parameters are handy for testing:
 | `?weapon=sword\|spear\|bow\|fists\|scythe` | Try a weapon for this session |
 | `?level=12` | Play at that level for this session (unlocks everything up to it) |
 | `?seed=123` | Use a fixed run seed |
+| `?view=2d` | Use the classic 2D view for this session |
+| `?quality=high\|balanced` | Force the 3D view's quality (shadows on or off) |
 
 ### Project layout
 
@@ -214,14 +216,16 @@ src/
     rooms.ts     biomes, procedural layouts, encounters
     run.ts       per-run state and door rewards
     meta.ts      save data and permanent upgrades
-    render.ts    room art, lighting, effects     hud.ts  HUD
+    render.ts    2D room art, lighting, effects, and the overlay drawn over the 3D view     hud.ts  HUD
+  render3d/
+    voxel.ts     the 3D voxel view (three.js): block rooms, props, doors and animated figures
   ui/            DOM menus (boon cards, altar, armory, pause…) and touch controls
 tests/           Vitest suites
 scripts/         gen-docs.ts (writes docs/GAME_DATA.md)
 docs/            DESIGN.md (how the game works), GAME_DATA.md (generated reference), screenshots
 ```
 
-The art is all drawn in code on the canvas, and every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. The fonts (Cinzel and EB Garamond, under the SIL Open Font License) are bundled, so the game also runs offline. Progress is saved to `localStorage`.
+The art is all made in code: the 3D view builds every room, prop and character from blocks with three.js, and the 2D view draws them on a canvas. Every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. The fonts (Cinzel and EB Garamond, under the SIL Open Font License) are bundled, so the game also runs offline. Progress is saved to `localStorage`.
 
 ## Credits
 

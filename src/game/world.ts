@@ -239,7 +239,16 @@ export class World {
     this.swipes.push({ x, y, r, angle, half, t: 0, dur, color, width, full, dir, owner: this.player });
   }
 
-  addBolt(x1: number, y1: number, x2: number, y2: number, color: string): void {
+  /** Lightning from (x1, y1) at height z1 to (x2, y2) at height z2. */
+  addBolt(x1: number, y1: number, x2: number, y2: number, color: string, z1 = 0, z2 = 0): void {
+    const gx = x2;
+    const gy = y2;
+    // Bolts are drawn flat, so put the heights in now (straight up on screen).
+    const up = this.camera.lift;
+    x1 += up.x * z1;
+    y1 += up.y * z1;
+    x2 += up.x * z2;
+    y2 += up.y * z2;
     const pts: Vec[] = [{ x: x1, y: y1 }];
     const n = Math.max(3, Math.floor(Math.hypot(x2 - x1, y2 - y1) / 22));
     const nx = -(y2 - y1);
@@ -252,7 +261,7 @@ export class World {
     }
     pts.push({ x: x2, y: y2 });
     this.bolts.push({ pts, t: 0, dur: 0.22, color });
-    this.flashLight(x2, y2, 160, color, 0.15);
+    this.flashLight(gx, gy, 160, color, 0.15);
   }
 
   flashLight(x: number, y: number, r: number, color: string, dur: number): void {
@@ -584,7 +593,7 @@ export class World {
       p.holyShield = false;
       p.iframes = 0.6;
       this.particles.ring(p.x, p.y, GODS.athena.color, 70, 0.4, 5);
-      this.particles.text(p.x, p.y - 80, 'BLOCKED', GODS.athena.color, 18);
+      this.particles.text(p.x, p.y, 80, 'BLOCKED', GODS.athena.color, 18);
       audio.play('deflect');
       return;
     }
@@ -609,7 +618,7 @@ export class World {
         p.knock(p.x - src.x, p.y - src.y, 280);
       }
     }
-    if (amount > 0 && prefs.damageNumbers) this.particles.text(p.x, p.y - 70, `-${amount}`, '#ff4a4a', 20);
+    if (amount > 0 && prefs.damageNumbers) this.particles.text(p.x, p.y, 70, `-${amount}`, '#ff4a4a', 20);
     this.particles.burst(p.x, p.y - 25, '#ff3040', 12, 260);
     if (s.retaliate > 0 && src instanceof Enemy && !src.dead) lightningBolt(this, src, s.retaliate);
     if (p.hp <= 0) {
@@ -617,7 +626,7 @@ export class World {
         p.hp = Math.round(p.maxHp * 0.5);
         p.iframes = 2;
         this.slowMotion(0.3, 0.8);
-        this.particles.text(p.x, p.y - 90, 'REPRIEVE!', '#ffcf5a', 24);
+        this.particles.text(p.x, p.y, 90, 'REPRIEVE!', '#ffcf5a', 24);
         this.particles.ring(p.x, p.y, '#ffcf5a', 260, 0.6, 10);
         for (const e of this.enemiesInRadius(p.x, p.y, 260)) e.knock(e.x - p.x, e.y - p.y, 900);
         for (const pr of this.projectiles) if (pr.team === 'enemy' && Math.hypot(pr.x - p.x, pr.y - p.y) < 300) pr.dead = true;
@@ -641,7 +650,7 @@ export class World {
     p.hp = Math.min(p.maxHp, p.hp + a);
     const gained = Math.round(p.hp - before);
     if (showText && gained > 0) {
-      this.particles.text(p.x, p.y - 80, `+${gained}`, '#7dff8a', 20);
+      this.particles.text(p.x, p.y, 80, `+${gained}`, '#7dff8a', 20);
       audio.play('heal');
     }
   }
@@ -1057,7 +1066,7 @@ export class World {
       if (g === 'pit' && !e.isBoss) {
         e.fellT += dt;
         if (e.fellT > 0.05) {
-          this.particles.text(e.x, e.y - 30, 'FELL', '#b0a0ff', 16);
+          this.particles.text(e.x, e.y, 30, 'FELL', '#b0a0ff', 16);
           this.killEnemy(e);
         }
       } else if (g === 'lava') {
@@ -1138,7 +1147,7 @@ export class World {
             pk.collected = true;
             this.host.addAsh(pk.value);
             audio.play('pickup');
-            this.particles.text(pk.x, pk.y - 40, `+${pk.value} Ash`, '#c8a8ff', 18);
+            this.particles.text(pk.x, pk.y, 40, `+${pk.value} Ash`, '#c8a8ff', 18);
             break;
           case 'reward':
             if (pk.reward) {

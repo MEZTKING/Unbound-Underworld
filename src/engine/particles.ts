@@ -26,6 +26,11 @@ export interface Particle {
 
 export class Particles {
   list: Particle[] = [];
+  /** Camera.lift: where height goes on the ground plane ((0, -1) in the flat view). */
+  liftX = 0;
+  liftY = -1;
+  /** Zoom × pixel ratio when the view is turned or squashed, so text is drawn upright; 0 otherwise. */
+  uprightScale = 0;
   private cap = 1400;
 
   spawn(p: Partial<Particle> & { x: number; y: number }): Particle {
@@ -101,12 +106,13 @@ export class Particles {
     this.spawn({ kind: 'ring', x, y, size: 4, size2: radius, life, color, drag: 0, angle: width });
   }
 
-  text(x: number, y: number, text: string, color: string, size = 18): void {
+  /** Floating text `h` units above the ground point (x, y). */
+  text(x: number, y: number, h: number, text: string, color: string, size = 18): void {
     this.spawn({
       kind: 'text',
       x: x + fx.range(-10, 10),
       y,
-      z: 40,
+      z: 40 + h,
       vx: fx.range(-30, 30),
       vy: 0,
       vz: 160,
@@ -145,8 +151,12 @@ export class Particles {
   }
 
   draw(ctx: CanvasRenderingContext2D, layer: 'ground' | 'air'): void {
+    const lx = this.liftX;
+    const ly = this.liftY;
     for (const p of this.list) {
       const ground = p.kind === 'ring' || p.kind === 'smoke';
+      const X = p.x + p.z * lx;
+      const Y = p.y + p.z * ly;
       if ((layer === 'ground') !== ground) continue;
       const t = p.life / p.max;
       ctx.globalCompositeOperation = p.additive ? 'lighter' : 'source-over';
@@ -156,7 +166,7 @@ export class Particles {
           ctx.globalAlpha = Math.min(1, t * 2);
           ctx.fillStyle = p.color;
           ctx.beginPath();
-          ctx.arc(p.x, p.y - p.z, p.size * (p.kind === 'ember' ? t : 1), 0, TAU);
+          ctx.arc(X, Y, p.size * (p.kind === 'ember' ? t : 1), 0, TAU);
           ctx.fill();
           break;
         }
@@ -166,8 +176,8 @@ export class Particles {
           ctx.lineWidth = p.size;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(p.x, p.y - p.z);
-          ctx.lineTo(p.x - p.vx * 0.04, p.y - p.z - (p.vy - p.vz) * 0.04);
+          ctx.moveTo(X, Y);
+          ctx.lineTo(X - (p.vx + p.vz * lx) * 0.04, Y - (p.vy + p.vz * ly) * 0.04);
           ctx.stroke();
           break;
         }
@@ -185,7 +195,7 @@ export class Particles {
           ctx.globalAlpha = t * 0.35;
           ctx.fillStyle = p.color;
           ctx.beginPath();
-          ctx.arc(p.x, p.y - p.z, p.size * (1.6 - t * 0.6), 0, TAU);
+          ctx.arc(X, Y, p.size * (1.6 - t * 0.6), 0, TAU);
           ctx.fill();
           break;
         }
@@ -195,8 +205,8 @@ export class Particles {
           ctx.lineWidth = p.size * t;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(p.x - Math.cos(p.angle) * p.size2, p.y - Math.sin(p.angle) * p.size2 - p.z);
-          ctx.lineTo(p.x + Math.cos(p.angle) * p.size2, p.y + Math.sin(p.angle) * p.size2 - p.z);
+          ctx.moveTo(X - Math.cos(p.angle) * p.size2, Y - Math.sin(p.angle) * p.size2);
+          ctx.lineTo(X + Math.cos(p.angle) * p.size2, Y + Math.sin(p.angle) * p.size2);
           ctx.stroke();
           break;
         }
@@ -204,7 +214,7 @@ export class Particles {
           ctx.globalAlpha = Math.min(1, t * 2);
           ctx.fillStyle = p.color;
           ctx.save();
-          ctx.translate(p.x, p.y - p.z);
+          ctx.translate(X, Y);
           ctx.rotate(p.angle);
           ctx.fillRect(-p.size, -p.size * 0.4, p.size * 2, p.size * 0.8);
           ctx.restore();
@@ -217,9 +227,17 @@ export class Particles {
           ctx.textAlign = 'center';
           ctx.lineWidth = 4;
           ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-          ctx.strokeText(p.text ?? '', p.x, p.y - p.z);
+          ctx.save();
+          if (this.uprightScale) {
+            // Unturned and unsquashed, at the point's place on screen.
+            const m = ctx.getTransform();
+            const k = this.uprightScale;
+            ctx.setTransform(k, 0, 0, k, m.a * X + m.c * Y + m.e, m.b * X + m.d * Y + m.f);
+          } else ctx.translate(X, Y);
+          ctx.strokeText(p.text ?? '', 0, 0);
           ctx.fillStyle = p.color;
-          ctx.fillText(p.text ?? '', p.x, p.y - p.z);
+          ctx.fillText(p.text ?? '', 0, 0);
+          ctx.restore();
           break;
         }
       }

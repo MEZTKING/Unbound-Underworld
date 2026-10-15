@@ -25,6 +25,8 @@ export default defineConfig({
   // Relative base so the production build runs from any static host or sub-path.
   base: './',
   plugins: [serviceWorker()],
+  // three.js (~500 kB) is its own chunk, loaded only when the 3D view is on.
+  build: { chunkSizeWarningLimit: 700 },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },

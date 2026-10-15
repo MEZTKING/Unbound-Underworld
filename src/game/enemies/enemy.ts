@@ -285,6 +285,9 @@ export abstract class Enemy extends Actor {
     ctx.restore();
   }
 
+  /** Attack effects drawn on top of the world (in both renderers). Body-relative, origin at the feet. */
+  drawFx(_ctx: CanvasRenderingContext2D, _w: World): void {}
+
   drawStatus(ctx: CanvasRenderingContext2D): void {
     const top = this.y - this.height - 14;
     let ix = this.x - 18;

@@ -57,7 +57,7 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   dmg *= guard;
   if (guard < 1) {
     if (guard < 0.5) {
-      w.particles.text(e.x, e.y - e.height - 20, 'BLOCK', '#d8c070', 14);
+      w.particles.text(e.x, e.y, e.height + 20, 'BLOCK', '#d8c070', 14);
       w.particles.burst(e.x, e.y - e.height * 0.5, '#ffe0a0', 6, 200);
     }
   }
@@ -89,7 +89,7 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
       e.onArmorBreak(w);
       audio.play('armorBreak');
       w.particles.burst(e.x, e.y - e.height / 2, '#c9d4e8', 24, 320);
-      w.particles.text(e.x, e.y - e.height - 20, 'BREAK', '#c9d4e8', 22);
+      w.particles.text(e.x, e.y, e.height + 20, 'BREAK', '#c9d4e8', 22);
     } else {
       e.armor -= toArmor;
     }
@@ -102,7 +102,7 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   e.onDamaged(w, dmg, o.source);
 
   const color = o.color ?? (crit ? '#ffd54a' : e.armor > 0 ? '#aab8d0' : '#ffffff');
-  if (prefs.damageNumbers) w.particles.text(e.x, e.y - e.height - 8, crit ? `${shown}!` : `${shown}`, color, crit ? 26 : o.source === 'effect' ? 15 : 19);
+  if (prefs.damageNumbers) w.particles.text(e.x, e.y, e.height + 8, crit ? `${shown}!` : `${shown}`, color, crit ? 26 : o.source === 'effect' ? 15 : 19);
   if (!o.silent) audio.play(crit ? 'crit' : dmg >= 40 ? 'heavyHit' : 'hit');
   const from = o.from ?? p;
   const ang = angleTo(from, e);
@@ -168,7 +168,7 @@ export function applyDoom(e: Enemy, dmg: number): void {
 
 export function applyWeak(w: World, e: Enemy): void {
   if (e.dead) return;
-  if (!e.status.weak) w.particles.text(e.x, e.y - e.height - 30, 'WEAK', GODS.aphrodite.color, 14);
+  if (!e.status.weak) w.particles.text(e.x, e.y, e.height + 30, 'WEAK', GODS.aphrodite.color, 14);
   e.status.weak = { t: WEAK_TIME };
 }
 
@@ -267,7 +267,7 @@ export function updateStatuses(w: World, e: Enemy, dt: number): number {
 
 export function lightningBolt(w: World, e: Enemy, dmg: number): void {
   if (e.dead) return;
-  w.addBolt(e.x + fx.range(-30, 30), e.y - 320, e.x, e.y - e.height * 0.4, GODS.zeus.color);
+  w.addBolt(e.x + fx.range(-30, 30), e.y, e.x, e.y, GODS.zeus.color, 320, e.height * 0.4);
   w.particles.burst(e.x, e.y, GODS.zeus.color, 10, 240);
   audio.play('lightning');
   damageEnemy(w, e, dmg, { source: 'effect', lightning: true, noEffects: true, color: GODS.zeus.color, silent: true });
@@ -276,12 +276,12 @@ export function lightningBolt(w: World, e: Enemy, dmg: number): void {
 export function chainLightning(w: World, first: Enemy, dmg: number, bounces: number): void {
   const hit = new Set<number>();
   let cur: Enemy | null = first;
-  let prev: { x: number; y: number } = { x: w.player.x, y: w.player.y - 30 };
+  let prev = { x: w.player.x, y: w.player.y, z: 30 };
   for (let i = 0; i <= bounces && cur; i++) {
     hit.add(cur.id);
-    w.addBolt(prev.x, prev.y, cur.x, cur.y - cur.height * 0.4, GODS.zeus.color);
+    w.addBolt(prev.x, prev.y, cur.x, cur.y, GODS.zeus.color, prev.z, cur.height * 0.4);
     damageEnemy(w, cur, dmg, { source: 'effect', lightning: true, noEffects: true, color: GODS.zeus.color, silent: i > 0 });
-    prev = { x: cur.x, y: cur.y - cur.height * 0.4 };
+    prev = { x: cur.x, y: cur.y, z: cur.height * 0.4 };
     cur = w.nearestEnemy(cur.x, cur.y, 300, (o) => !hit.has(o.id));
   }
   audio.play('lightning');

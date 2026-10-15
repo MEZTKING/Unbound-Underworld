@@ -665,9 +665,16 @@ export class Talos extends Boss {
     if (stunned && Math.random() < 0.5) {
       w.particles.spawn({ kind: 'smoke', x: this.x + fx.range(-40, 40), y: this.y, z: 100, vz: 80, size: 12, color: '#d8d0d0', life: 1, additive: false, drag: 1 });
     }
+    this.drawFx(ctx);
+  }
+
+  drawFx(ctx: CanvasRenderingContext2D, w?: World): void {
     if (this.laserOn) {
+      // From the eye, 121 up (wherever the view puts height).
+      const up = w?.camera.lift ?? { x: 0, y: -1 };
+      const dir = Math.cos(this.facing) >= 0 ? 1 : -1;
       ctx.save();
-      ctx.translate(dir * 4, -121);
+      ctx.translate((w ? 0 : dir * 4) + up.x * 121, up.y * 121);
       ctx.rotate(this.facing);
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = 'rgba(255,80,40,0.5)';
