@@ -25,6 +25,9 @@ export class Camera {
   private sin = 0;
   /** Extra zoom (the voxel view sits a little closer). */
   viewScale = 1;
+  /** Party play: zooms out (below 1) to keep spread-out heroes in view. */
+  private fitK = 1;
+  private baseZoom = 1;
   ox = 0;
   oy = 0;
   private t = 0;
@@ -45,7 +48,17 @@ export class Camera {
     this.zoom = Math.min(w / 1280, h / 760);
     // Small (phone) screens zoom in a little so characters stay readable.
     if (Math.min(w, h) < 560) this.zoom = Math.max(this.zoom, Math.min(w / 1000, h / 600));
-    this.zoom = Math.max(0.35, this.zoom) * this.viewScale;
+    this.baseZoom = Math.max(0.35, this.zoom) * this.viewScale;
+    this.zoom = this.baseZoom * this.fitK;
+  }
+
+  /** Party play: the zoom-out that keeps every hero in view (1 = none). */
+  get fit(): number {
+    return this.fitK;
+  }
+  set fit(k: number) {
+    this.fitK = k;
+    this.zoom = this.baseZoom * k;
   }
 
   /** Visible world width/height. */

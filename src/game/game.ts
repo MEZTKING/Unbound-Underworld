@@ -1,9 +1,9 @@
 import { audio, type Mood } from '../engine/audio';
 import { Camera } from '../engine/camera';
-import { Input, keyLabel, type Action } from '../engine/input';
+import { Input, keyLabel, PadControl, type Action, type Control } from '../engine/input';
 import { clamp, damp, fx, Rng } from '../engine/math';
 import { Particles } from '../engine/particles';
-import { UI } from '../ui/overlay';
+import { UI, type ChoiceOpts } from '../ui/overlay';
 import * as screens from '../ui/screens';
 import { TouchControls } from '../ui/touch';
 import { ARTIFACT_BY_ID, ARTIFACTS } from './artifacts';
@@ -44,6 +44,7 @@ import type { GodId, RewardSpec } from './types';
 import { createWeapon, WEAPON_INFO } from './weapons';
 import { World, type Door, type Interactable, type WorldHost } from './world';
 import { CHEST, FOE_DROP, GHOST_CHANCE, POM_DOUBLE } from './odds';
+import { MAX_PARTY, MEMBER_COLORS, partyHp, type Member, type MemberKind } from './party';
 
 const STEP = 1 / 60;
 
@@ -51,6 +52,16 @@ type Mode = 'title' | 'hub' | 'run' | 'over';
 const SAVE_MARK = 1.8;
 /** Obols for skipping a card choice. */
 const SKIP_OBOLS = 25;
+
+/** What a remote player earned, sent to their device to keep in their save. */
+export interface Grant {
+  xp?: number;
+  ash?: number;
+  loot?: Loot;
+  kill?: string;
+  boss?: boolean;
+  escape?: boolean;
+}
 
 export interface RunSummary {
   victory: boolean;
@@ -95,14 +106,15 @@ export class Game implements WorldHost {
   readonly touch: TouchControls;
   save: SaveData;
   run: Run | null = null;
-  player: Player;
+  /** The heroes in this game: you, a second gamepad player, players online. */
+  members: Member[] = [];
+  /** The member the code running now acts for (see `withMember`). */
+  private active!: Member;
   world: World | null = null;
-  stats: PlayerStats;
   mode: Mode = 'title';
   godMode = false;
   /** Developer options were used this session: achievements are off until restart. */
   cheated = false;
-  private hubArtifacts: (string | null)[] = [null, null, null];
   private pendingDoors: RoomPlan[] = [];
   private fade = 1;
   private fadeTarget = 0;
@@ -145,8 +157,8 @@ export class Game implements WorldHost {
       this.save.character = 'kael';
       this.save.weapon = CHARACTER_BY_ID.kael.weapon;
     }
-    this.player = new Player(this.save.weapon, this.save.character);
-    this.stats = computeStats([], [], metaBonuses(this.save));
+    this.members = [this.makeMember(0, 'local', this.save, this.save.character, 'You')];
+    this.active = this.members[0];
     const unlock = () => audio.unlock();
     // iOS only lets audio start inside touchend/click, so listen for those too.
     for (const ev of ['keydown', 'mousedown', 'touchstart', 'touchend', 'click']) window.addEventListener(ev, unlock);
@@ -156,8 +168,162 @@ export class Game implements WorldHost {
     this.resize();
   }
 
+  // ---------------------------------------------------------------- party
+
+  /** The active member's hero (see `withMember`). Offline with one player: you. */
+  get player(): Player {
+    return this.active.player;
+  }
+
+  /** The active member's stats. */
+  get stats(): PlayerStats {
+    return this.active.stats;
+  }
+
   get artifacts(): (string | null)[] {
-    return this.run ? this.run.artifacts : this.hubArtifacts;
+    return this.run ? this.run.artifacts : this.active.hubArtifacts;
+  }
+
+  /** This device's first player. */
+  get me(): Member {
+    return this.members[0];
+  }
+
+  /** Builds a party member and their hero. */
+  private makeMember(id: number, kind: MemberKind, profile: SaveData, character: CharacterId, name: string, pad?: number): Member {
+    const def = CHARACTER_BY_ID[character] ?? CHARACTER_BY_ID.kael;
+    const m: Member = {
+      id,
+      kind,
+      name,
+      profile,
+      character: def.id,
+      player: new Player(kind === 'local' ? profile.weapon : def.weapon, def.id),
+      stats: computeStats([], [], metaBonuses(profile)),
+      pad,
+      hubArtifacts: [null, null, null],
+    };
+    this.outfit(m);
+    return m;
+  }
+
+  /** Gives a member's hero their controls and name tag. */
+  private outfit(m: Member): void {
+    const p = m.player;
+    p.control = m.kind === 'pad' && m.pad !== undefined ? new PadControl(this.input, m.pad) : m.kind === 'remote' ? (this.remoteControl?.(m) ?? null) : null;
+    p.tag = this.members.length > 1 || m.kind !== 'local' ? m.name : '';
+    p.tagColor = MEMBER_COLORS[m.id % MEMBER_COLORS.length];
+  }
+
+  /** Online games plug in each remote player's controls (see the net session). */
+  remoteControl: ((m: Member) => Control) | null = null;
+
+  /** Runs `fn` as member `m`: `player`, `stats`, the run's build and rewards are theirs. */
+  withMember<T>(m: Member, fn: () => T): T {
+    const prev = this.active;
+    this.active = m;
+    this.run?.setActive(m.id);
+    try {
+      // The world's "current hero" follows, so `w.player` and `w.stats` agree.
+      const w = this.world;
+      return w && w.players.includes(m.player) ? w.as(m.player, fn) : fn();
+    } finally {
+      this.active = prev;
+      this.run?.setActive(prev.id);
+    }
+  }
+
+  /** Wraps a callback (a card pick, say) so it runs as the member active now, whenever it fires. */
+  private bound<A extends unknown[]>(fn: (...a: A) => void): (...a: A) => void {
+    const m = this.active;
+    return (...a: A) => this.withMember(m, () => fn(...a));
+  }
+
+  /** WorldHost: the world switches heroes as it updates each one. */
+  setActive(p: Player): void {
+    const m = this.members.find((x) => x.player === p);
+    if (!m) return;
+    this.active = m;
+    this.run?.setActive(m.id);
+  }
+
+  memberOf(p: Player): Member | undefined {
+    return this.members.find((m) => m.player === p);
+  }
+
+  /** WorldHost: the heroes this device's camera keeps in view. */
+  viewPlayers(): Player[] {
+    const own = this.members.filter((m) => m.kind !== 'remote').map((m) => m.player);
+    const standing = own.filter((p) => p.state !== 'dead');
+    return standing.length ? standing : own;
+  }
+
+  /** WorldHost: hub stations open menus on this device, so only its own players use them. */
+  canInteract(p: Player, it: Interactable): boolean {
+    const m = this.memberOf(p);
+    return !(it.kind === 'station' && m?.kind === 'remote');
+  }
+
+  /** A member's level: theirs online, this save's otherwise. */
+  levelOf(m: Member): number {
+    if (m.profile === this.save) return this.level;
+    return levelFromXp(m.profile.xp).level;
+  }
+
+  /** A fresh hero for every member (entering the hub or starting an escape). */
+  private respawnMembers(): void {
+    for (const m of this.members) {
+      const def = CHARACTER_BY_ID[m.character] ?? CHARACTER_BY_ID.kael;
+      const weapon = m.kind === 'local' ? m.profile.weapon : def.weapon;
+      m.player = new Player(weapon, def.id);
+      this.outfit(m);
+    }
+    this.active = this.members[0];
+  }
+
+  /** Adds a member to the party (a second gamepad, or a player online). Returns null when full. */
+  addMember(kind: MemberKind, profile: SaveData, character: CharacterId, name: string, extra: { pad?: number; peer?: number } = {}): Member | null {
+    if (this.members.length >= MAX_PARTY) return null;
+    let id = 1;
+    while (this.members.some((m) => m.id === id)) id++;
+    const m = this.makeMember(id, kind, profile, character, name, extra.pad);
+    m.peer = extra.peer;
+    this.members.push(m);
+    for (const x of this.members) this.outfit(x);
+    if (this.run) {
+      this.run.addMember(m.id, profile);
+      this.run.builds.get(m.id)!.weapon = m.player.weapon.id;
+      this.run.partySize = this.members.length;
+    }
+    this.withMember(m, () => this.recomputeStats(true));
+    m.player.castAmmo = m.stats.castAmmo;
+    m.player.dashCharges = m.stats.dashCharges;
+    m.player.souls = m.stats.soulMax;
+    const w = this.world;
+    if (w) {
+      const lead = this.me.player;
+      m.player.x = lead.x + 40;
+      m.player.y = lead.y + 30;
+      w.players.push(m.player);
+      w.particles.ring(m.player.x, m.player.y, MEMBER_COLORS[m.id % MEMBER_COLORS.length], 80, 0.5, 6);
+    }
+    return m;
+  }
+
+  /** Takes a member out of the party (player 2 leaves, or someone online disconnects). */
+  removeMember(m: Member): void {
+    if (m === this.me) return;
+    this.members = this.members.filter((x) => x !== m);
+    if (this.active === m) this.active = this.me;
+    if (m.pad !== undefined) this.input.claimed.delete(m.pad);
+    const w = this.world;
+    if (w) {
+      w.players = w.players.filter((p) => p !== m.player);
+      for (const e of w.enemies) if (e.target === m.player) e.target = null;
+    }
+    this.run?.builds.delete(m.id);
+    if (this.run) this.run.partySize = this.members.length;
+    for (const x of this.members) this.outfit(x);
   }
 
   boot(): void {
@@ -381,13 +547,27 @@ export class Game implements WorldHost {
     this.save.xp += n;
     const after = this.level;
     if (after <= before) return;
-    this.recomputeStats();
-    const p = this.player;
-    p.castAmmo = this.stats.castAmmo;
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.25);
+    for (const m of this.members) {
+      if (m.profile !== this.save) continue;
+      this.withMember(m, () => {
+        this.recomputeStats();
+        const p = m.player;
+        p.castAmmo = m.stats.castAmmo;
+        if (p.state !== 'dead') p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.25);
+      });
+    }
     this.persist();
     this.announceLevels();
   }
+
+  /** Experience for the whole party: this save once, and each player online their share. */
+  private gainXpAll(n: number): void {
+    this.gainXp(n);
+    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { xp: n });
+  }
+
+  /** Online games send a remote player what they earned (experience, Ash, loot, records). */
+  grant: ((m: Member, g: Grant) => void) | null = null;
 
   /** Shows the banner for levels reached but not yet announced. */
   announceLevels(): void {
@@ -401,8 +581,9 @@ export class Game implements WorldHost {
     const tier = tierFor(level);
     audio.play('boon');
     if (w) {
-      w.particles.ring(this.player.x, this.player.y, tier.color, 160, 0.6, 8);
-      w.particles.text(this.player.x, this.player.y, 100, `LEVEL ${level}`, tier.color, 26);
+      const me = this.me.player;
+      w.particles.ring(me.x, me.y, tier.color, 160, 0.6, 8);
+      w.particles.text(me.x, me.y, 100, `LEVEL ${level}`, tier.color, 26);
     }
     if (unlocks.length) {
       const u = unlocks[unlocks.length - 1];
@@ -581,24 +762,34 @@ export class Game implements WorldHost {
 
   // ---------------------------------------------------------------- stats
 
+  /** Rebuilds the active member's stats from their save, build, hero, weapon and gear. */
   recomputeStats(fullHeal = false): void {
+    const m = this.active;
+    const save = m.profile;
+    const level = this.levelOf(m);
     let s: PlayerStats;
-    if (this.run) s = this.run.computeStats(this.save);
+    if (this.run) s = this.run.computeStats(save);
     else {
-      s = computeStats([], [], metaBonuses(this.save));
-      applyMetaExtras(this.save, s);
+      s = computeStats([], [], metaBonuses(save));
+      applyMetaExtras(save, s);
     }
     // Order matters: features decide what exists, then talents, hero and forge build on top.
-    applyFeatures(this.level, s, this.save.stats.escapes > 0);
-    applyTalents(this.save.talents, s);
-    this.player.hero.apply(s);
-    applyForge(this.save.forge[this.player.weapon.id] ?? 1, s);
-    if (this.has('gear')) applyGear(equippedItems(this.save.gear), s);
-    if (prefs.assist) s.damageTaken *= 0.5;
+    applyFeatures(level, s, save.stats.escapes > 0);
+    applyTalents(save.talents, s);
+    m.player.hero.apply(s);
+    applyForge(save.forge[m.player.weapon.id] ?? 1, s);
+    if (hasFeature(level, 'gear', save.stats.escapes > 0)) applyGear(equippedItems(save.gear), s);
+    // Assist mode is this device's setting: it covers this device's players.
+    if (prefs.assist && m.kind !== 'remote') s.damageTaken *= 0.5;
     s.maxHp = Math.max(20, s.maxHp);
-    this.stats = s;
+    m.stats = s;
     if (this.run) this.run.level = this.level;
-    this.player.applyStats(this.stats, fullHeal);
+    m.player.applyStats(s, fullHeal);
+  }
+
+  /** Recomputes every member's stats. */
+  recomputeAll(fullHeal = false): void {
+    for (const m of this.members) this.withMember(m, () => this.recomputeStats(fullHeal));
   }
 
   // ---------------------------------------------------------------- hub
@@ -607,14 +798,18 @@ export class Game implements WorldHost {
     this.mode = 'hub';
     this.run = null;
     this.particles.clear();
-    this.player = new Player(this.save.weapon, this.save.character);
-    this.hubArtifacts = [this.has('artifacts') ? this.save.startArtifact : null, null, null];
-    this.recomputeStats(true);
-    this.player.castAmmo = this.stats.castAmmo;
-    this.player.dashCharges = this.stats.dashCharges;
-    this.player.souls = this.stats.soulMax;
+    this.respawnMembers();
+    for (const m of this.members) {
+      m.hubArtifacts = [hasFeature(this.levelOf(m), 'artifacts', m.profile.stats.escapes > 0) ? m.profile.startArtifact : null, null, null];
+      this.withMember(m, () => {
+        this.recomputeStats(true);
+        m.player.castAmmo = m.stats.castAmmo;
+        m.player.dashCharges = m.stats.dashCharges;
+        m.player.souls = m.stats.soulMax;
+      });
+    }
     const layout = hubLayout();
-    const w = new World(this, layout, BIOMES[3], this.camera, this.particles, this.player);
+    const w = new World(this, layout, BIOMES[3], this.camera, this.particles, this.members.map((m) => m.player));
     w.cleared = true;
     w.doors = [{ x: layout.w / 2, reward: null, open: true }];
     const st = (id: string, x: number, y: number, label: string, prompt: string, color: string): Interactable => ({ id, x, y, r: 90, label, prompt, kind: 'station', color });
@@ -645,14 +840,24 @@ export class Game implements WorldHost {
     if (biomeParam > 0) this.run.biomeIndex = clamp(Math.floor(biomeParam), 0, BIOMES.length - 1);
     this.save.stats.runs++;
     this.persist();
-    this.player = new Player(this.save.weapon, this.save.character);
-    this.run.level = this.level;
-    this.run.deathDefiance += this.save.talents.undying ?? 0;
-    if (this.has('gear')) this.run.deathDefiance += gearDefiance(equippedItems(this.save.gear));
-    if (!this.has('artifacts')) this.run.artifacts[0] = null;
-    this.recomputeStats(true);
-    this.player.castAmmo = this.stats.castAmmo;
-    this.player.dashCharges = this.stats.dashCharges;
+    this.respawnMembers();
+    const run = this.run;
+    run.level = this.level;
+    run.partySize = this.members.length;
+    for (const m of this.members) {
+      if (m.id !== 0) run.addMember(m.id, m.profile);
+      run.builds.get(m.id)!.weapon = m.player.weapon.id;
+      this.withMember(m, () => {
+        const level = this.levelOf(m);
+        const esc = m.profile.stats.escapes > 0;
+        run.deathDefiance += m.profile.talents.undying ?? 0;
+        if (hasFeature(level, 'gear', esc)) run.deathDefiance += gearDefiance(equippedItems(m.profile.gear));
+        run.artifacts[0] = hasFeature(level, 'artifacts', esc) ? m.profile.startArtifact || null : null;
+        this.recomputeStats(true);
+        m.player.castAmmo = m.stats.castAmmo;
+        m.player.dashCharges = m.stats.dashCharges;
+      });
+    }
     this.mode = 'run';
     const plan = dev ? { kind: dev.kind, reward: dev.kind === 'combat' ? { kind: 'boon' as const } : null } : this.params.get('room') === 'boss' ? { kind: 'boss' as const, reward: null } : this.run.startPlan();
     this.goToRoom(plan);
@@ -663,24 +868,27 @@ export class Game implements WorldHost {
     run.enter(plan);
     // Autosave at the start of every chamber, so Save & Quit (or closing the
     // app) resumes here.
-    writeRun(run.snapshot(this.player.hp, this.player.souls));
+    // Party escapes aren't saved mid-way (everyone would have to come back).
+    if (this.members.length === 1) writeRun(run.snapshot(this.player.hp, this.player.souls));
+    else writeRun(null);
     this.saveMark = SAVE_MARK;
     this.particles.clear();
     const biome = run.biome;
     const layout = generateLayout(run.rng, biome, plan.kind, this.stats.chestChance);
-    const p = this.player;
-    p.castAmmo = this.stats.castAmmo;
-    const w = new World(this, layout, biome, this.camera, this.particles, p);
+    for (const m of this.members) m.player.castAmmo = m.stats.castAmmo;
+    const w = new World(this, layout, biome, this.camera, this.particles, this.members.map((m) => m.player));
     this.world = w;
     this.pendingDoors = [];
     // Higher Torment: more foes attack at once, and they aim better.
     w.tokenBonus = Math.floor(run.heat / 2);
     w.foeAimError = Math.max(0.35, 1 - run.heat * 0.1);
     const sc = run.scales();
+    // Party play: tougher foes, and more of them.
+    sc.hp *= partyHp(this.members.length);
     switch (plan.kind) {
       case 'combat': {
         const elite = plan.reward?.kind === 'hammer' || plan.reward?.kind === 'artifact';
-        const waves = generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite);
+        const waves = generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite, this.members.length);
         w.startEncounter(waves, sc.hp, sc.dmg);
         if (run.depth === 0) w.showBanner(biome.name, biome.subtitle);
         else w.showBanner(`Chamber ${run.depth + 1}`, elite ? 'Enchanted foes lie in wait' : biome.name);
@@ -772,20 +980,28 @@ export class Game implements WorldHost {
     run.roomsCleared++;
     if (run.current.kind === 'combat') run.depth++;
     audio.play('clear');
-    this.gainXp(run.current.kind === 'boss' ? XP.boss : XP.room);
-    const s = this.stats;
-    const p = this.player;
-    if (s.afterParty > 0 && p.hp < p.maxHp * s.afterParty) {
-      p.hp = p.maxHp * s.afterParty;
-      w.particles.text(p.x, p.y, 80, 'After Party!', GODS.dionysus.color, 18);
+    this.gainXpAll(run.current.kind === 'boss' ? XP.boss : XP.room);
+    for (const m of this.members) {
+      this.withMember(m, () =>
+        w.as(m.player, () => {
+          const s = m.stats;
+          const p = m.player;
+          if (s.afterParty > 0 && p.state !== 'dead' && p.hp < p.maxHp * s.afterParty) {
+            p.hp = p.maxHp * s.afterParty;
+            w.particles.text(p.x, p.y, 80, 'After Party!', GODS.dionysus.color, 18);
+          }
+          if (run.current.kind === 'boss') w.healPlayer(p.maxHp * 0.3, true);
+        }),
+      );
     }
+    const p = this.me.player;
     this.save.stats.bestDepth = Math.max(this.save.stats.bestDepth, run.roomsCleared);
     const cx = clamp(p.x, 200, w.room.w - 200);
     const cy = clamp(p.y - 140, 220, w.room.h - 160);
     if (run.current.kind === 'boss') {
       this.save.stats.bossesSlain++;
+      for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { boss: true });
       this.persist();
-      w.healPlayer(p.maxHp * 0.3, true);
       if (run.isFinalBiome) {
         this.openExitDoors(w);
         return;
@@ -808,11 +1024,46 @@ export class Game implements WorldHost {
   }
 
   onRewardPicked(w: World, reward: RewardSpec): void {
-    const after = reward.bonus ? () => {} : () => this.openExitDoors(w);
-    this.resolveReward(reward, after);
+    // A bonus (from a chest) is for whoever picked it up; a chamber's reward is for everyone.
+    if (reward.bonus) {
+      this.resolveReward(reward, () => {});
+      return;
+    }
+    this.forEachMember(
+      (done) => this.resolveReward(reward, done),
+      () => this.openExitDoors(w),
+    );
   }
 
-  onDoorEntered(w: World, door: Door): void {
+  /**
+   * Runs `fn` once as each member, then `after` when all are done. This
+   * device's players take turns (they share the screen); players online
+   * answer at the same time on their own screens.
+   */
+  private forEachMember(fn: (done: () => void) => void, after: () => void): void {
+    if (this.members.length === 1) {
+      this.withMember(this.me, () => fn(after));
+      return;
+    }
+    let left = this.members.length;
+    const done = () => {
+      if (--left === 0) after();
+    };
+    for (const m of this.members) if (m.kind === 'remote') this.withMember(m, () => fn(done));
+    const local = this.members.filter((m) => m.kind !== 'remote');
+    const next = (i: number): void => {
+      if (i >= local.length) return;
+      this.withMember(local[i], () =>
+        fn(() => {
+          done();
+          next(i + 1);
+        }),
+      );
+    };
+    next(0);
+  }
+
+  onDoorEntered(w: World, door: Door, by?: Player): void {
     if (this.mode === 'hub') {
       this.transition(() => this.startRun());
       return;
@@ -820,7 +1071,20 @@ export class Game implements WorldHost {
     const idx = w.doors.indexOf(door);
     const plan = this.pendingDoors[idx];
     if (!plan) return;
+    if (this.members.length > 1) {
+      // The party follows whoever chose: a short moment to catch up.
+      const who = by ? this.memberOf(by)?.name : null;
+      w.showBanner(`${who ?? 'The party'} chose a door`, 'Everyone goes through in 2 seconds');
+      w.later(2, () => this.transition(() => this.goToRoom(plan)));
+      return;
+    }
     this.transition(() => this.goToRoom(plan));
+  }
+
+  /** WorldHost: a hero went down while partners still stand. */
+  onPlayerDowned(_w: World, p: Player): void {
+    const m = this.memberOf(p);
+    this.ui.toast(`${m?.name ?? 'A hero'} is down! Stand by them to revive them.`, 3000);
   }
 
   onPlayerDied(w: World): void {
@@ -856,7 +1120,8 @@ export class Game implements WorldHost {
     this.addAsh(bonus);
     const couldJump = this.has('jump');
     this.save.stats.escapes++;
-    this.gainXp(XP.escape);
+    this.gainXpAll(XP.escape);
+    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { escape: true, ash: bonus });
     if (!couldJump) {
       this.recomputeStats();
       this.ui.toast('Unlocked: Jump & Slam (slaying the final guardian)', 4000);
@@ -880,10 +1145,11 @@ export class Game implements WorldHost {
     if (this.run) this.run.kills++;
     this.save.stats.kills++;
     this.save.bestiary[e.name] = (this.save.bestiary[e.name] ?? 0) + 1;
+    for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { kill: e.name });
     this.checkAchievements();
     this.dropLoot(w, e);
     if (this.stats.lifeOnKill > 0) w.healPlayer(this.stats.lifeOnKill, false);
-    if (this.run && !e.isBoss) this.gainXp(e.isElite ? XP.eliteKill : XP.kill);
+    if (this.run && !e.isBoss) this.gainXpAll(e.isElite ? XP.eliteKill : XP.kill);
   }
 
   /** Loot (from level 10): materials from most foes, gear now and then. */
@@ -910,6 +1176,13 @@ export class Game implements WorldHost {
 
   onLoot(w: World, loot: Loot): void {
     const p = this.player;
+    if (this.active.kind === 'remote') {
+      // Their loot goes to their save, on their device.
+      this.grant?.(this.active, { loot });
+      const text = loot.gear ? loot.gear.name : `+${loot.count ?? 1} ${MATERIALS[loot.material!].glyph}`;
+      w.particles.text(p.x, p.y, 70, text, loot.gear ? GEAR_RARITY[loot.gear.rarity].color : MATERIALS[loot.material!].color, 15);
+      return;
+    }
     const spoils = this.run?.spoils;
     if (loot.material) {
       const m = MATERIALS[loot.material];
@@ -958,6 +1231,10 @@ export class Game implements WorldHost {
   }
 
   addAsh(n: number): void {
+    if (this.active.kind === 'remote') {
+      this.grant?.(this.active, { ash: n });
+      return;
+    }
     this.save.ash += n;
     this.save.stats.totalAsh += n;
     if (this.run) this.run.ash += n;
@@ -981,7 +1258,8 @@ export class Game implements WorldHost {
         break;
       case 'fountain': {
         it.used = true;
-        w.healPlayer(this.player.maxHp * 0.4, true);
+        // The fountain refreshes the whole party.
+        for (const m of this.members) this.withMember(m, () => w.as(m.player, () => w.healPlayer(m.player.maxHp * 0.4, true)));
         w.particles.burst(it.x, it.y - 30, '#7fd8ff', 30, 300);
         break;
       }
@@ -1133,7 +1411,7 @@ export class Game implements WorldHost {
       after();
       return;
     }
-    this.ui.choice({
+    this.choose({
       title: g.name,
       info: this.buildInfo(),
       subtitle: g.title,
@@ -1157,7 +1435,7 @@ export class Game implements WorldHost {
       return;
     }
     const gain = run.rng.chance(POM_DOUBLE) ? 2 : 1;
-    this.ui.choice({
+    this.choose({
       title: 'Pomegranate',
       info: this.buildInfo(),
       subtitle: `Level up a boon by ${gain}.`,
@@ -1194,7 +1472,7 @@ export class Game implements WorldHost {
       this.resolveReward({ kind: 'gold' }, after);
       return;
     }
-    this.ui.choice({
+    this.choose({
       title: "Hephaestus' Anvil",
       info: this.buildInfo(),
       subtitle: `Reforge the ${WEAPON_INFO[run.weapon].name}.`,
@@ -1216,7 +1494,7 @@ export class Game implements WorldHost {
       this.resolveReward({ kind: 'gold' }, after);
       return;
     }
-    this.ui.choice({
+    this.choose({
       title: 'Enchanting Tome',
       info: this.buildInfo(),
       subtitle: 'Imbue your gear. Find an enchantment again to empower it (up to III).',
@@ -1241,7 +1519,7 @@ export class Game implements WorldHost {
       this.resolveReward({ kind: 'gold' }, after);
       return;
     }
-    this.ui.choice({
+    this.choose({
       title: 'Artifact Cache',
       info: this.buildInfo(),
       subtitle: 'Equip an artifact (keys 1–3 to use).',
@@ -1261,11 +1539,41 @@ export class Game implements WorldHost {
           after();
           return;
         }
+        // Online, a full set of artifacts swaps out the first one.
+        if (this.active.kind === 'remote') {
+          run.artifacts[0] = chosen.id;
+          after();
+          return;
+        }
         screens.replaceArtifact(this, chosen.id, after);
       },
       skip: this.skipChoice(after, 'Leave it'),
     });
   }
+
+  /**
+   * Shows a card choice to the active member: on this screen (with their
+   * name in party play), or on their own device when they play online. Its
+   * answers run as that member, whenever they come.
+   */
+  private choose(opts: ChoiceOpts): void {
+    const m = this.active;
+    const wrapped: ChoiceOpts = {
+      ...opts,
+      onPick: this.bound(opts.onPick),
+      skip: opts.skip ? { label: opts.skip.label, onSkip: this.bound(opts.skip.onSkip) } : undefined,
+      who: this.members.length > 1 ? { name: `${m.name} · ${m.player.hero.name}`, color: MEMBER_COLORS[m.id % MEMBER_COLORS.length] } : undefined,
+    };
+    if (m.kind === 'remote') {
+      if (this.remoteChoice) this.remoteChoice(m, wrapped);
+      else wrapped.skip?.onSkip();
+      return;
+    }
+    this.ui.choice(wrapped);
+  }
+
+  /** Online games send a remote player's card choices to their device. */
+  remoteChoice: ((m: Member, opts: ChoiceOpts) => void) | null = null;
 
   /** Every card choice can be skipped for a few obols, so nothing is forced on you. */
   private skipChoice(after: () => void, label = 'Skip'): { label: string; onSkip: () => void } {
@@ -1339,7 +1647,11 @@ export class Game implements WorldHost {
     this.ui.closeAll();
     const run = Run.restore(this.save, snap);
     this.run = run;
-    this.player = new Player(run.weapon, this.save.character);
+    // A saved escape is a solo one.
+    for (const m of [...this.members]) this.removeMember(m);
+    this.me.player = new Player(run.weapon, this.save.character);
+    this.outfit(this.me);
+    this.active = this.me;
     run.level = this.level;
     this.recomputeStats(true);
     this.player.hp = Math.max(1, Math.min(this.player.maxHp, snap.hp));

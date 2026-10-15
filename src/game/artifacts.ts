@@ -338,6 +338,8 @@ export class Ally extends Actor {
   atkCd = 0;
   t = 0;
   bite = 0;
+  /** The hero who summoned it (it follows and fights for them). */
+  owner: Actor | null = null;
 
   constructor(kind: AllyKind, x: number, y: number, ttl: number) {
     super();

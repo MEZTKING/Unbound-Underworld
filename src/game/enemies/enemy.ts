@@ -88,6 +88,9 @@ export abstract class Enemy extends Actor {
   /** Seconds this foe has been stuck out of reach (see `World.unstick`). */
   stuckT = 0;
   lastPos = { x: 0, y: 0 };
+  /** Party play: the hero this foe is after (see `World.targetFor`). */
+  target: Actor | null = null;
+  retargetT = 0;
 
   constructor(x: number, y: number, spec: EnemySpec, hpScale = 1) {
     super();

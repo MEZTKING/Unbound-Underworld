@@ -62,8 +62,17 @@ export interface WorldHost {
   readonly artifacts: (string | null)[];
   readonly godMode: boolean;
   onRewardPicked(w: World, reward: RewardSpec, x: number, y: number): void;
-  onDoorEntered(w: World, door: Door): void;
+  onDoorEntered(w: World, door: Door, by: Player): void;
+  /** The whole party is down (or the only hero died). */
   onPlayerDied(w: World): void;
+  /** Party play: a hero went down while partners still stand. */
+  onPlayerDowned?(w: World, p: Player): void;
+  /** Party play: makes `p` the hero that `stats`, `artifacts` and rewards refer to. */
+  setActive?(p: Player): void;
+  /** The heroes the camera keeps in view (this device's own). */
+  viewPlayers?(): Player[];
+  /** Party play: whether hero `p` may use this (hub stations are for this device's players). */
+  canInteract?(p: Player, it: Interactable): boolean;
   onInteract(w: World, it: Interactable): void;
   onRoomCleared(w: World): void;
   onEnemyKilled(w: World, e: Enemy): void;
@@ -136,7 +145,10 @@ export class World {
   biome: BiomeInfo;
   camera: Camera;
   particles: Particles;
-  player: Player;
+  /** Every hero in the room: one, or the whole party. */
+  players: Player[];
+  /** The hero the code running now acts for (see `as`). */
+  private cur: Player;
   enemies: Enemy[] = [];
   allies: Ally[] = [];
   projectiles: Projectile[] = [];
@@ -178,40 +190,135 @@ export class World {
   /** Pre-rendered floor and walls. */
   roomCanvas: HTMLCanvasElement | null = null;
   rng: Rng;
-  private timers: { t: number; fn: () => void }[] = [];
+  private timers: { t: number; fn: () => void; as: Player }[] = [];
   private zoneTargets = new Map<Zone, Actor>();
   private grid: { cols: number; rows: number; block: Uint8Array };
-  private flow: Int32Array;
-  private flowCell = -1;
-  private flowT = 0;
+  /** A flow field toward each hero, so every foe can find its way to its own target. */
+  private flows = new Map<Player, { flow: Int32Array; cell: number; t: number }>();
+  /** Party play: the camera's extra zoom-out to keep everyone in view (eased). */
+  private fitZoom = 1;
 
-  constructor(host: WorldHost, room: RoomLayout, biome: BiomeInfo, camera: Camera, particles: Particles, player: Player) {
+  constructor(host: WorldHost, room: RoomLayout, biome: BiomeInfo, camera: Camera, particles: Particles, players: Player | Player[]) {
     this.host = host;
     this.room = room;
     this.biome = biome;
     this.camera = camera;
     this.particles = particles;
-    this.player = player;
+    this.players = Array.isArray(players) ? players : [players];
+    this.cur = this.players[0];
     this.rng = new Rng(room.seed);
-    player.x = room.entrance.x;
-    player.y = room.entrance.y;
-    player.vx = player.vy = player.kx = player.ky = 0;
-    player.safe = { x: player.x, y: player.y };
-    player.z = 0;
-    player.jumpT = -1;
-    player.beamT = 0;
-    if (player.state !== 'dead') player.state = 'free';
-    player.action = null;
-    player.holyShield = true;
-    player.weapon.reset();
+    this.players.forEach((player, i) => {
+      // The party comes in side by side.
+      player.x = room.entrance.x + (i - (this.players.length - 1) / 2) * 44;
+      player.y = room.entrance.y;
+      player.vx = player.vy = player.kx = player.ky = 0;
+      player.safe = { x: player.x, y: player.y };
+      player.z = 0;
+      player.jumpT = -1;
+      player.beamT = 0;
+      if (player.state !== 'dead') player.state = 'free';
+      player.action = null;
+      player.holyShield = true;
+      player.weapon.reset();
+    });
     this.grid = buildGrid(room);
-    this.flow = new Int32Array(this.grid.cols * this.grid.rows);
     for (const p of room.pots) this.breakables.push({ x: p.x, y: p.y, r: 16, dead: false });
     for (const t of room.traps) this.traps.push({ x: t.x, y: t.y, state: 'idle', t: 0, hit: new Set() });
     room.chests.forEach((c, i) =>
       this.interactables.push({ id: `chest:${i}`, x: c.x, y: c.y, r: 60, label: 'Treasure Chest', prompt: 'Open', kind: 'chest' }),
     );
-    camera.snap(player, room);
+    camera.snap(this.players[0], room);
+  }
+
+  /** The hero the code running now acts for: the one updating, or the one a foe is after. */
+  get player(): Player {
+    return this.cur;
+  }
+
+  /**
+   * Runs `fn` as hero `p`: inside, `player`, `stats` and `artifacts` mean that
+   * hero's (and so does the host's reward flow). With one hero this is free.
+   */
+  as<T>(p: Player, fn: () => T): T {
+    const prev = this.cur;
+    if (p === prev) return fn();
+    this.cur = p;
+    this.host.setActive?.(p);
+    try {
+      return fn();
+    } finally {
+      this.cur = prev;
+      this.host.setActive?.(prev);
+    }
+  }
+
+  /**
+   * Like `as`, and anything hero `p` creates on the way (zones, shots, hitboxes,
+   * summons) is marked as theirs, so later damage and kills count for them.
+   */
+  acting(p: Player, fn: () => void): void {
+    const z = this.zones.length;
+    const pr = this.projectiles.length;
+    const hb = this.hitboxes.length;
+    const al = this.allies.length;
+    this.as(p, fn);
+    for (let i = z; i < this.zones.length; i++) this.zones[i].owner ??= p;
+    for (let i = pr; i < this.projectiles.length; i++) if (this.projectiles[i].team === 'player') this.projectiles[i].owner ??= p;
+    for (let i = hb; i < this.hitboxes.length; i++) if (this.hitboxes[i].team === 'player') this.hitboxes[i].owner ??= p;
+    for (let i = al; i < this.allies.length; i++) this.allies[i].owner ??= p;
+  }
+
+  /** Heroes still standing. */
+  get living(): Player[] {
+    return this.players.filter((p) => p.state !== 'dead');
+  }
+
+  /** The hero who owns a hitbox, shot, zone or summon (the first hero when unknown). */
+  ownerOf(a: Actor | null | undefined): Player {
+    if (a instanceof Player) return a;
+    const o = (a as { owner?: Actor | null } | null)?.owner;
+    if (o instanceof Player) return o;
+    return this.players[0];
+  }
+
+  /** The nearest standing hero to a point (any hero when everyone is down). */
+  nearestPlayer(x: number, y: number): Player {
+    let best = this.players[0];
+    let bd = Infinity;
+    for (const p of this.players) {
+      if (p.state === 'dead' && this.players.length > 1) continue;
+      const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The hero foe `e` is after: the nearest one standing, kept for a while so
+   * it doesn't flip-flop (guardians switch less often).
+   */
+  private targetFor(e: Enemy, dt: number): Player {
+    if (this.players.length === 1) return this.players[0];
+    const living = this.living;
+    if (!living.length) return this.players[0];
+    e.retargetT -= dt;
+    const cur = e.target as Player | null;
+    if (cur && cur.state !== 'dead' && this.players.includes(cur) && e.retargetT > 0) return cur;
+    let best = living[0];
+    let bd = Infinity;
+    for (const p of living) {
+      const d = Math.hypot(p.x - e.x, p.y - e.y) * (p === cur ? 0.8 : 1);
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    e.target = best;
+    e.retargetT = e.isBoss ? 4 + Math.random() * 3 : 1.2 + Math.random();
+    return best;
   }
 
   get stats(): PlayerStats {
@@ -227,7 +334,7 @@ export class World {
   // ---------------------------------------------------------------- helpers
 
   later(t: number, fn: () => void): void {
-    this.timers.push({ t, fn });
+    this.timers.push({ t, fn, as: this.cur });
   }
 
   hitstop(t: number): void {
@@ -319,20 +426,26 @@ export class World {
     return false;
   }
 
-  private rebuildFlow(): void {
+  private rebuildFlow(p: Player): void {
     const g = this.grid;
-    const start = this.cellIndex(this.player.x, this.player.y);
-    this.flow.fill(-1);
+    let f = this.flows.get(p);
+    if (!f) {
+      f = { flow: new Int32Array(g.cols * g.rows), cell: -1, t: 0 };
+      this.flows.set(p, f);
+    }
+    const flow = f.flow;
+    const start = this.cellIndex(p.x, p.y);
+    flow.fill(-1);
     const q = new Int32Array(g.cols * g.rows);
     let head = 0;
     let tail = 0;
     q[tail++] = start;
-    this.flow[start] = 0;
+    flow[start] = 0;
     while (head < tail) {
       const c = q[head++];
       const cx = c % g.cols;
       const cy = (c / g.cols) | 0;
-      const d = this.flow[c];
+      const d = flow[c];
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dy) continue;
@@ -340,24 +453,39 @@ export class World {
           const ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= g.cols || ny >= g.rows) continue;
           const n = ny * g.cols + nx;
-          if (this.flow[n] !== -1 || g.block[n] !== 0) continue;
+          if (flow[n] !== -1 || g.block[n] !== 0) continue;
           // No corner cutting.
           if (dx && dy && (g.block[cy * g.cols + nx] !== 0 || g.block[ny * g.cols + cx] !== 0)) continue;
-          this.flow[n] = d + 1;
+          flow[n] = d + 1;
           q[tail++] = n;
         }
       }
     }
-    this.flowCell = start;
+    f.cell = start;
   }
 
-  /** Direction along the flow field toward the player. */
+  /** Keeps each hero's flow field fresh (rebuilt when they change cell, or every 0.4 s). */
+  private updateFlows(dt: number): void {
+    for (const p of this.players) {
+      const f = this.flows.get(p);
+      if (f) f.t -= dt;
+      if (!f || f.cell !== this.cellIndex(p.x, p.y) || f.t <= 0) {
+        this.rebuildFlow(p);
+        this.flows.get(p)!.t = 0.4;
+      }
+    }
+  }
+
+  /** Direction along the flow field toward the current hero (the one a foe is after). */
   flowDir(x: number, y: number): Vec | null {
     const g = this.grid;
+    const field = this.flows.get(this.cur);
+    if (!field) return null;
+    const flow = field.flow;
     const c = this.cellIndex(x, y);
     const cx = c % g.cols;
     const cy = (c / g.cols) | 0;
-    let best = this.flow[c] === -1 ? 1e9 : this.flow[c];
+    let best = flow[c] === -1 ? 1e9 : flow[c];
     let bx = -1;
     let by = -1;
     for (let dy = -1; dy <= 1; dy++) {
@@ -366,7 +494,7 @@ export class World {
         const nx = cx + dx;
         const ny = cy + dy;
         if (nx < 0 || ny < 0 || nx >= g.cols || ny >= g.rows) continue;
-        const v = this.flow[ny * g.cols + nx];
+        const v = flow[ny * g.cols + nx];
         if (v >= 0 && v < best) {
           best = v;
           bx = nx;
@@ -500,13 +628,12 @@ export class World {
     this.unstickT -= dt;
     if (this.unstickT > 0) return;
     this.unstickT = 1;
-    const p = this.player;
     for (const e of this.enemies) {
       if (e.dead || e.spawning || e.isBoss || e.isDummy || e.speed <= 0) continue;
       const off = e.x < 8 || e.y < 8 || e.x > this.room.w - 8 || e.y > this.room.h - 8 || (!e.flying && this.grid.block[this.cellIndex(e.x, e.y)] !== 0);
       const moved = Math.hypot(e.x - e.lastPos.x, e.y - e.lastPos.y);
       e.lastPos = { x: e.x, y: e.y };
-      const reachable = Math.hypot(e.x - p.x, e.y - p.y) < 520 && this.lineOfSight(e.x, e.y, p.x, p.y, e.r);
+      const reachable = this.players.some((p) => Math.hypot(e.x - p.x, e.y - p.y) < 520 && this.lineOfSight(e.x, e.y, p.x, p.y, e.r));
       e.stuckT = off ? STUCK_TIME : moved < 20 && !reachable ? e.stuckT + 1 : 0;
       if (e.stuckT < STUCK_TIME) continue;
       this.particles.burst(e.x, e.y - e.height / 2, '#6a5a70', 12, 200, { kind: 'smoke', size: 10, gravity: 0, life: 0.5, additive: false });
@@ -523,11 +650,10 @@ export class World {
   }
 
   private spawnPoint(): Vec {
-    const p = this.player;
     for (let i = 0; i < 60; i++) {
       const x = this.rng.range(90, this.room.w - 90);
       const y = this.rng.range(200, this.room.h - 90);
-      if (Math.hypot(x - p.x, y - p.y) < 300 - i * 2) continue;
+      if (this.players.some((p) => Math.hypot(x - p.x, y - p.y) < 300 - i * 2)) continue;
       if (this.grid.block[this.cellIndex(x, y)] !== 0) continue;
       if (this.enemies.some((e) => !e.dead && Math.hypot(e.x - x, e.y - y) < 60)) continue;
       return { x, y };
@@ -573,6 +699,8 @@ export class World {
     for (const t of this.telegraphs) t.cancelled = true;
     // Shards return to the player once the fight is over.
     for (const pk of this.pickups) if (pk.kind === 'shard' || pk.kind === 'soul' || pk.kind === 'gold' || pk.kind === 'loot') pk.magnet = true;
+    // Party play: heroes who went down get back up once the fight is won.
+    for (const p of this.players) if (p.state === 'dead' && this.living.length) this.revive(p);
     this.host.onRoomCleared(this);
   }
 
@@ -620,6 +748,7 @@ export class World {
 
   dropShard(x: number, y: number): void {
     const pk = new Pickup('shard', clamp(x, 20, this.room.w - 20), clamp(y, 20, this.room.h - 20), 1);
+    pk.owner = this.cur;
     pk.vz = 120;
     pk.delay = 0.3;
     this.pickups.push(pk);
@@ -714,10 +843,39 @@ export class World {
         p.hp = 0;
         p.state = 'dead';
         p.action = null;
+        p.reviveT = 0;
         audio.play('death');
-        this.slowMotion(0.25, 1.2);
-        this.host.onPlayerDied(this);
+        if (this.living.length > 0) {
+          // Party play: down, not out. A partner can stand by to revive them.
+          this.particles.text(p.x, p.y, 80, 'DOWN!', '#ff6a6a', 22);
+          this.host.onPlayerDowned?.(this, p);
+        } else {
+          this.slowMotion(0.25, 1.2);
+          this.host.onPlayerDied(this);
+        }
       }
+    }
+  }
+
+  /** Brings a downed hero back with 30% health and a moment of safety. */
+  revive(p: Player): void {
+    p.state = 'free';
+    p.hp = Math.max(1, Math.round(p.maxHp * 0.3));
+    p.iframes = 2;
+    p.reviveT = 0;
+    this.particles.ring(p.x, p.y, '#ffd890', 90, 0.5, 6);
+    this.particles.text(p.x, p.y, 90, 'REVIVED', '#ffd890', 20);
+    audio.play('heal');
+  }
+
+  /** Party play: a partner standing by a downed hero for REVIVE_TIME brings them back. */
+  private updateRevives(dt: number): void {
+    if (this.players.length < 2) return;
+    for (const p of this.players) {
+      if (p.state !== 'dead') continue;
+      const helper = this.living.some((h) => Math.hypot(h.x - p.x, h.y - p.y) < REVIVE_RANGE);
+      p.reviveT = helper ? p.reviveT + dt : Math.max(0, p.reviveT - dt * 0.5);
+      if (p.reviveT >= REVIVE_TIME && this.living.length) this.revive(p);
     }
   }
 
@@ -793,7 +951,7 @@ export class World {
     this.eclipseT = Math.max(0, this.eclipseT - rawDt);
     if (this.hitstopT > 0) {
       this.hitstopT -= rawDt;
-      this.camera.follow(this.player, rawDt, this.room);
+      this.followCamera(rawDt);
       return;
     }
     this.time += dt;
@@ -803,21 +961,21 @@ export class World {
       tm.t -= dt;
       if (tm.t <= 0) {
         this.timers.splice(i, 1);
-        tm.fn();
+        this.acting(tm.as, tm.fn);
       }
     }
 
-    this.flowT -= dt;
-    const pc = this.cellIndex(this.player.x, this.player.y);
-    if (pc !== this.flowCell || this.flowT <= 0) {
-      this.rebuildFlow();
-      this.flowT = 0.4;
-    }
+    this.updateFlows(dt);
 
-    this.player.update(this, dt);
-    updateArtifacts(this, dt);
-    for (const e of this.enemies) if (!e.dead) e.update(this, dt);
-    for (const a of this.allies) a.update(this, dt);
+    for (const p of this.players) {
+      this.acting(p, () => {
+        p.update(this, dt);
+        updateArtifacts(this, dt);
+      });
+    }
+    for (const e of this.enemies) if (!e.dead) this.as(this.targetFor(e, dt), () => e.update(this, dt));
+    for (const a of this.allies) this.acting(this.ownerOf(a), () => a.update(this, dt));
+    this.updateRevives(dt);
     this.separate();
     this.updateEncounter(dt);
     this.unstick(dt);
@@ -857,15 +1015,33 @@ export class World {
       });
     }
 
-    const p = this.player;
-    const lead = p.state === 'free' ? { x: p.vx * 0.12, y: p.vy * 0.12 } : { x: 0, y: 0 };
+    this.followCamera(rawDt);
+  }
+
+  /**
+   * The camera follows this device's hero, or frames all of them (local
+   * co-op), zooming out a little when they spread apart.
+   */
+  private followCamera(rawDt: number): void {
+    const view = this.host.viewPlayers?.() ?? [this.players[0]];
+    const ps = view.length ? view : [this.players[0]];
+    let cx = 0;
+    let cy = 0;
+    for (const v of ps) {
+      cx += v.x;
+      cy += v.y;
+    }
+    cx /= ps.length;
+    cy /= ps.length;
+    const p = ps[0];
+    const lead = ps.length === 1 && p.state === 'free' ? { x: p.vx * 0.12, y: p.vy * 0.12 } : { x: 0, y: 0 };
     // Lean toward an active boss so it stays framed.
     const boss = this.boss;
     if (boss && !boss.dead) {
-      const dx = boss.x - p.x;
-      const dy = boss.y - boss.height * 0.5 - p.y;
+      const dx = boss.x - cx;
+      const dy = boss.y - boss.height * 0.5 - cy;
       const d = Math.hypot(dx, dy) || 1;
-      const k = Math.min(d * 0.35, 240) / d;
+      const k = Math.min(d * 0.35, ps.length > 1 ? 120 : 240) / d;
       lead.x += dx * k;
       lead.y += dy * k;
     }
@@ -873,7 +1049,16 @@ export class World {
       lead.x += Math.sin(this.time * 0.11) * 150;
       lead.y += Math.sin(this.time * 0.07 + 1) * 90 - 40;
     }
-    this.camera.follow({ x: p.x, y: p.y - 30 }, rawDt, this.room, lead);
+    // Spread-apart heroes: zoom out (down to 70%) so both stay on screen.
+    let want = 1;
+    if (ps.length > 1) {
+      let span = 0;
+      for (const a of ps) for (const b of ps) span = Math.max(span, Math.hypot(a.x - b.x, a.y - b.y));
+      want = clamp((this.camera.viewH * this.fitZoom * 0.6) / Math.max(1, span), 0.7, 1);
+    }
+    this.fitZoom += (want - this.fitZoom) * Math.min(1, rawDt * 2.5);
+    this.camera.fit = this.fitZoom;
+    this.camera.follow({ x: cx, y: cy - 30 }, rawDt, this.room, lead);
   }
 
   private separate(): void {
@@ -899,25 +1084,25 @@ export class World {
         b.x += (dx / d) * push * wb;
         b.y += (dy / d) * push * wb;
       }
-      const p = this.player;
-      if (p.state === 'dash' || p.airborne || p.state === 'dead') continue;
-      const dx = p.x - a.x;
-      const dy = p.y - a.y;
-      const rr = a.r + p.r;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= rr * rr || d2 < 1e-6) continue;
-      const d = Math.sqrt(d2);
-      const push = rr - d;
-      const pw = a.knockResist >= 1 ? 1 : a.isBoss ? 0.9 : 0.35;
-      p.x += (dx / d) * push * pw;
-      p.y += (dy / d) * push * pw;
-      a.x -= (dx / d) * push * (1 - pw);
-      a.y -= (dy / d) * push * (1 - pw);
+      for (const p of this.players) {
+        if (p.state === 'dash' || p.airborne || p.state === 'dead') continue;
+        const dx = p.x - a.x;
+        const dy = p.y - a.y;
+        const rr = a.r + p.r;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= rr * rr || d2 < 1e-6) continue;
+        const d = Math.sqrt(d2);
+        const push = rr - d;
+        const pw = a.knockResist >= 1 ? 1 : a.isBoss ? 0.9 : 0.35;
+        p.x += (dx / d) * push * pw;
+        p.y += (dy / d) * push * pw;
+        a.x -= (dx / d) * push * (1 - pw);
+        a.y -= (dy / d) * push * (1 - pw);
+      }
     }
   }
 
   private updateHitboxes(dt: number): void {
-    const s = this.stats;
     for (const hb of this.hitboxes) {
       if (hb.grow && hb.shape.type === 'ring') {
         hb.shape.r1 += hb.grow * dt;
@@ -936,7 +1121,28 @@ export class World {
           sh.y = o.y;
         }
       }
-      if (hb.team === 'player') {
+      if (hb.team === 'player') this.acting(this.ownerOf(hb.owner), () => this.playerHitbox(hb));
+      else {
+        for (const p of this.players) {
+          this.as(p, () => {
+            if (hb.hit.has(p.id) || (p.invuln && p.evadeT <= 0)) return;
+            if (hb.tag === 'ground' && p.airborne) return;
+            if (!shapeHits(hb.shape, p)) return;
+            hb.hit.add(p.id);
+            this.hurtPlayer(hb.damage, hb.owner ?? { x: (hb.shape as { x?: number }).x ?? p.x, y: (hb.shape as { y?: number }).y ?? p.y }, false, { ground: hb.tag === 'ground' });
+          });
+        }
+      }
+      hb.ttl -= dt;
+    }
+    this.hitboxes = this.hitboxes.filter((h) => h.ttl > 0);
+  }
+
+  /** A hero's hitbox hits foes and pots, and may knock shots back. */
+  private playerHitbox(hb: Hitbox): void {
+    const s = this.stats;
+    {
+      {
         const from = hb.owner ? { x: hb.owner.x, y: hb.owner.y } : undefined;
         for (const e of this.enemies) {
           if (e.dead || e.spawning || hb.hit.has(e.id)) continue;
@@ -964,17 +1170,8 @@ export class World {
             if (shapeHits(hb.shape, pr)) deflect(this, pr, 'player');
           }
         }
-      } else {
-        const p = this.player;
-        if (hb.hit.has(p.id) || (p.invuln && p.evadeT <= 0)) continue;
-        if (hb.tag === 'ground' && p.airborne) continue;
-        if (!shapeHits(hb.shape, p)) continue;
-        hb.hit.add(p.id);
-        this.hurtPlayer(hb.damage, hb.owner ?? { x: (hb.shape as { x?: number }).x ?? p.x, y: (hb.shape as { y?: number }).y ?? p.y }, false, { ground: hb.tag === 'ground' });
       }
-      hb.ttl -= dt;
     }
-    this.hitboxes = this.hitboxes.filter((h) => h.ttl > 0);
   }
 
   private endProjectile(pr: Projectile): void {
@@ -984,7 +1181,6 @@ export class World {
   }
 
   private updateProjectiles(dt: number): void {
-    const p = this.player;
     for (const pr of this.projectiles) {
       if (pr.dead) continue;
       pr.age += dt;
@@ -999,7 +1195,7 @@ export class World {
         continue;
       }
       if (pr.homing > 0) {
-        const target: Actor | null = pr.team === 'player' ? this.nearestEnemy(pr.x, pr.y, 600) : p;
+        const target: Actor | null = pr.team === 'player' ? this.nearestEnemy(pr.x, pr.y, 600) : this.nearestPlayer(pr.x, pr.y);
         if (target) {
           const cur = Math.atan2(pr.vy, pr.vx);
           const want = angleTo(pr, target);
@@ -1023,30 +1219,37 @@ export class World {
         }
       }
       if (pr.team === 'player') {
-        for (const e of this.enemies) {
-          if (e.dead || e.spawning || pr.hit.has(e.id)) continue;
-          if (!circleCircle(pr, e)) continue;
-          pr.hit.add(e.id);
-          if (pr.onHit) pr.onHit(this, e);
-          else if (pr.damage > 0) {
-            damageEnemy(this, e, pr.damage, { source: pr.source, from: { x: pr.x - pr.vx * 0.05, y: pr.y - pr.vy * 0.05 }, knock: pr.knock, crit: pr.crit, noEffects: pr.source === 'effect' });
+        this.acting(this.ownerOf(pr.owner), () => {
+          for (const e of this.enemies) {
+            if (e.dead || e.spawning || pr.hit.has(e.id)) continue;
+            if (!circleCircle(pr, e)) continue;
+            pr.hit.add(e.id);
+            if (pr.onHit) pr.onHit(this, e);
+            else if (pr.damage > 0) {
+              damageEnemy(this, e, pr.damage, { source: pr.source, from: { x: pr.x - pr.vx * 0.05, y: pr.y - pr.vy * 0.05 }, knock: pr.knock, crit: pr.crit, noEffects: pr.source === 'effect' });
+            }
+            if (pr.charged) lightningBolt(this, e, 40);
+            pr.pierce--;
+            if (pr.pierce < 0) {
+              this.endProjectile(pr);
+              break;
+            }
           }
-          if (pr.charged) lightningBolt(this, e, 40);
-          pr.pierce--;
-          if (pr.pierce < 0) {
-            this.endProjectile(pr);
-            break;
+          if (!pr.dead) {
+            for (const b of this.breakables) if (!b.dead && circleCircle(pr, b)) this.breakPot(b);
           }
+        });
+      } else {
+        const victim = this.players.find((p) => (!p.invuln || p.evadeT > 0) && circleCircle(pr, p));
+        if (victim) {
+          this.as(victim, () => {
+            if (pr.onHit) pr.onHit(this, victim);
+            else this.hurtPlayer(pr.damage, pr.owner ?? pr, false, { proj: pr });
+          });
+          // A parried shot flies back instead of ending.
+          if ((pr.team as string) !== 'player') this.endProjectile(pr);
+          continue;
         }
-        if (!pr.dead) {
-          for (const b of this.breakables) if (!b.dead && circleCircle(pr, b)) this.breakPot(b);
-        }
-      } else if ((!p.invuln || p.evadeT > 0) && circleCircle(pr, p)) {
-        if (pr.onHit) pr.onHit(this, p);
-        else this.hurtPlayer(pr.damage, pr.owner ?? pr, false, { proj: pr });
-        // A parried shot flies back instead of ending.
-        if ((pr.team as string) !== 'player') this.endProjectile(pr);
-        continue;
       }
       if (!pr.dead && pr.ttl <= 0) this.endProjectile(pr);
     }
@@ -1054,7 +1257,6 @@ export class World {
   }
 
   private updateZones(dt: number): void {
-    const p = this.player;
     for (const z of this.zones) {
       z.age += dt;
       z.ttl -= dt;
@@ -1069,15 +1271,25 @@ export class World {
       z.tickT -= dt;
       if (z.tickT <= 0) {
         z.tickT += z.interval;
-        if (z.onTick) z.onTick(this, z);
-        else if (z.team === 'player') {
-          for (const e of this.enemiesInRadius(z.x, z.y, z.r)) {
-            if (z.damage > 0) damageEnemy(this, e, z.damage, { source: z.source, noEffects: true, crit: z.crit, silent: true, from: z });
-            z.onActor?.(this, e);
+        if (z.team === 'player') {
+          this.acting(this.ownerOf(z.owner), () => {
+            if (z.onTick) z.onTick(this, z);
+            else {
+              for (const e of this.enemiesInRadius(z.x, z.y, z.r)) {
+                if (z.damage > 0) damageEnemy(this, e, z.damage, { source: z.source, noEffects: true, crit: z.crit, silent: true, from: z });
+                z.onActor?.(this, e);
+              }
+            }
+          });
+        } else if (z.onTick) this.as(this.nearestPlayer(z.x, z.y), () => z.onTick!(this, z));
+        else {
+          for (const p of this.players) {
+            if (p.airborne || p.state === 'dead' || Math.hypot(p.x - z.x, p.y - z.y) >= z.r + p.r * 0.5) continue;
+            this.as(p, () => {
+              if (z.damage > 0) this.hurtPlayer(z.damage, null, z.kind === 'fire');
+              z.onActor?.(this, p);
+            });
           }
-        } else if (!p.airborne && Math.hypot(p.x - z.x, p.y - z.y) < z.r + p.r * 0.5) {
-          if (z.damage > 0) this.hurtPlayer(z.damage, null, z.kind === 'fire');
-          z.onActor?.(this, p);
         }
       }
     }
@@ -1094,7 +1306,9 @@ export class World {
       if (t.owner && (t.owner.dead || (t.owner as Enemy).status?.stun !== undefined) && !t.cancelled) t.cancelled = true;
       if (t.t >= t.dur && !t.cancelled) {
         t.cancelled = true;
-        t.onDone?.();
+        const owner = t.owner as Enemy | null;
+        const target = owner?.target instanceof Player ? owner.target : this.players[0];
+        if (t.onDone) this.as(target, t.onDone);
         t.t = t.dur + 1;
       }
     }
@@ -1102,13 +1316,12 @@ export class World {
   }
 
   private updateTraps(dt: number): void {
-    const p = this.player;
     const half = TRAP_SIZE / 2;
     for (const tr of this.traps) {
       const inside = (a: Actor) => a.alive && Math.abs(a.x - tr.x) < half + a.r * 0.4 && Math.abs(a.y - tr.y) < half + a.r * 0.4;
       switch (tr.state) {
         case 'idle':
-          if ((inside(p) && !p.airborne) || this.enemies.some((e) => !e.dead && !e.spawning && !e.flying && inside(e))) {
+          if (this.players.some((p) => inside(p) && !p.airborne) || this.enemies.some((e) => !e.dead && !e.spawning && !e.flying && inside(e))) {
             tr.state = 'armed';
             tr.t = 0.5;
             audio.play('telegraph');
@@ -1126,9 +1339,10 @@ export class World {
           break;
         case 'up':
           tr.t -= dt;
-          if (inside(p) && !p.airborne && !tr.hit.has(p.id)) {
+          for (const p of this.players) {
+            if (!inside(p) || p.airborne || tr.hit.has(p.id)) continue;
             tr.hit.add(p.id);
-            this.hurtPlayer(Math.round(10 * this.biomeDmg()), tr);
+            this.as(p, () => this.hurtPlayer(Math.round(10 * this.biomeDmg()), tr));
           }
           for (const e of this.enemies) {
             if (e.dead || e.spawning || e.flying || tr.hit.has(e.id) || !inside(e)) continue;
@@ -1171,8 +1385,6 @@ export class World {
   }
 
   private updatePickups(dt: number): void {
-    const p = this.player;
-    const s = this.stats;
     for (const pk of this.pickups) {
       if (pk.collected) continue;
       pk.t += dt;
@@ -1201,7 +1413,17 @@ export class World {
       pk.vy *= fr;
       pk.x = clamp(pk.x + pk.vx * dt, 16, this.room.w - 16);
       pk.y = clamp(pk.y + pk.vy * dt, 16, this.room.h - 16);
+      // The nearest standing hero draws it in and picks it up (a cast shard goes back to its thrower).
+      const p = pk.owner instanceof Player && this.players.includes(pk.owner) ? pk.owner : this.nearestPlayer(pk.x, pk.y);
       if (pk.delay > 0 || p.state === 'dead') continue;
+      this.as(p, () => this.collect(pk, p, dt));
+    }
+    this.pickups = this.pickups.filter((pk) => !pk.collected);
+  }
+
+  private collect(pk: Pickup, p: Player, dt: number): void {
+    const s = this.stats;
+    {
       const d = Math.hypot(p.x - pk.x, p.y - pk.y);
       const magnetRange = pk.kind === 'soul' ? 360 : pk.kind === 'gold' ? 140 : pk.kind === 'shard' || pk.kind === 'ash' || pk.kind === 'loot' ? 120 : 0;
       if (pk.kind === 'shard' && pk.t > 6) pk.magnet = true;
@@ -1251,38 +1473,51 @@ export class World {
         }
       }
     }
-    this.pickups = this.pickups.filter((pk) => !pk.collected);
   }
 
-  private updateInteract(): void {
-    const p = this.player;
+  /** What hero `p` stands close enough to use (and may use). */
+  focusOf(p: Player): Interactable | null {
     let best: Interactable | null = null;
     let bd = Infinity;
     for (const it of this.interactables) {
       if (it.used) continue;
+      if (this.host.canInteract && !this.host.canInteract(p, it)) continue;
       const d = Math.hypot(p.x - it.x, p.y - it.y);
       if (d < it.r && d < bd) {
         bd = d;
         best = it;
       }
     }
-    this.focus = best;
-    if (best && this.input.pressed('interact') && p.state !== 'dead') {
-      this.input.consume('interact');
-      this.host.onInteract(this, best);
+    return best;
+  }
+
+  private updateInteract(): void {
+    // The prompt on screen is for this device's first hero.
+    const view = this.host.viewPlayers?.()[0] ?? this.players[0];
+    this.focus = this.focusOf(view);
+    for (const p of this.players) {
+      if (p.state === 'dead') continue;
+      const best = p === view ? this.focus : this.focusOf(p);
+      const ctl = p.ctl(this);
+      if (best && ctl.pressed('interact')) {
+        ctl.consume('interact');
+        this.as(p, () => this.host.onInteract(this, best));
+      }
     }
   }
 
   private updateDoors(): void {
     if (!this.cleared || this.exiting) return;
-    const p = this.player;
-    for (const d of this.doors) {
-      if (!d.open) continue;
-      if (p.y < 6 && Math.abs(p.x - d.x) < DOOR_W / 2) {
-        this.exiting = true;
-        audio.play('door');
-        this.host.onDoorEntered(this, d);
-        return;
+    for (const p of this.players) {
+      if (p.state === 'dead') continue;
+      for (const d of this.doors) {
+        if (!d.open) continue;
+        if (p.y < 6 && Math.abs(p.x - d.x) < DOOR_W / 2) {
+          this.exiting = true;
+          audio.play('door');
+          this.as(p, () => this.host.onDoorEntered(this, d, p));
+          return;
+        }
       }
     }
   }
@@ -1295,6 +1530,9 @@ export class World {
 /** Solid size of each kind of interactable (its `r` is the reach to use it). */
 /** Seconds a foe may stay stuck out of reach before it reappears. */
 const STUCK_TIME = 6;
+/** Party play: how close and how long a partner stands by to revive a downed hero. */
+export const REVIVE_RANGE = 70;
+export const REVIVE_TIME = 2.5;
 
 /** Seconds a loot-feed line stays on screen. */
 export const LOOT_FEED_TIME = 4;

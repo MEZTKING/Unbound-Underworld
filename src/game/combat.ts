@@ -333,8 +333,10 @@ export function hostileBlast(w: World, x: number, y: number, r: number, dmg: num
   w.flashLight(x, y, r * 2.2, color, 0.3);
   audio.play('explode');
   w.camera.shake(0.25);
-  const p = w.player;
-  if (Math.hypot(p.x - x, p.y - y) < r + p.r) w.hurtPlayer(dmg, source ?? { x, y });
+  // Every hero caught in it is hurt (party play).
+  for (const p of w.players) {
+    if (p.state !== 'dead' && Math.hypot(p.x - x, p.y - y) < r + p.r) w.as(p, () => w.hurtPlayer(dmg, source ?? { x, y }));
+  }
 }
 
 export function deflectProjectiles(w: World, x: number, y: number, r: number, team: Team): number {

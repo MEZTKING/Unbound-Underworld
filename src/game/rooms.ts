@@ -1,6 +1,7 @@
 import { circleCircle, circleRect, type Circle, type Rect } from '../engine/collision';
 import type { Rng } from '../engine/math';
 import { CHEST, eliteChance as eliteOdds } from './odds';
+import { PARTY_FOES } from './party';
 import type { BiomeId, BossKind, EliteMod, EnemyKind, RoomKind } from './types';
 
 export interface BiomeInfo {
@@ -457,9 +458,10 @@ export interface SpawnSpec {
 
 export type Wave = SpawnSpec[];
 
-export function generateEncounter(rng: Rng, biome: BiomeInfo, biomeIndex: number, depth: number, elite = false): Wave[] {
+export function generateEncounter(rng: Rng, biome: BiomeInfo, biomeIndex: number, depth: number, elite = false, party = 1): Wave[] {
   const waves = depth === 0 ? 1 : depth < 3 ? 2 : 3;
-  const budget = 6 + depth * 2.2 + biomeIndex * 4 + (elite ? 6 : 0);
+  // Party play brings more foes: +35% per extra hero.
+  const budget = (6 + depth * 2.2 + biomeIndex * 4 + (elite ? 6 : 0)) * (1 + PARTY_FOES * Math.max(0, party - 1));
   const perWave = budget / waves;
   const eliteChance = eliteOdds(depth, biomeIndex, elite);
   const mods: EliteMod[] = ['armored', 'swift', 'volatile', 'regenerating'];

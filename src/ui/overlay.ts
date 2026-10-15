@@ -36,6 +36,21 @@ function glossaryFor(texts: string[]): string {
   return `<aside class="glossary">${hits.map(([, t, d]) => `<div class="gloss"><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('')}</aside>`;
 }
 
+/** A card choice: what the screen shows and what each answer does. */
+export interface ChoiceOpts {
+  title: string;
+  subtitle?: string;
+  color: string;
+  cards: Card[];
+  onPick: (i: number) => void;
+  skip?: { label: string; onSkip: () => void };
+  quote?: string;
+  /** A corner button that opens another screen on top (e.g. your current boons). */
+  info?: { label: string; onOpen: () => void };
+  /** Party play: whose choice this is (shown above the title). */
+  who?: { name: string; color: string };
+}
+
 /** How long a new card choice ignores picks (ms). */
 export const CHOICE_LOCK_MS = 2000;
 
@@ -211,17 +226,7 @@ export class UI {
   }
 
   /** Card-picker used for boons, poms, anvils, enchants and artifacts. */
-  choice(opts: {
-    title: string;
-    subtitle?: string;
-    color: string;
-    cards: Card[];
-    onPick: (i: number) => void;
-    skip?: { label: string; onSkip: () => void };
-    quote?: string;
-    /** A corner button that opens another screen on top (e.g. your current boons). */
-    info?: { label: string; onOpen: () => void };
-  }): void {
+  choice(opts: ChoiceOpts): void {
     const cards = opts.cards
       .map(
         (c, i) => `
@@ -245,6 +250,7 @@ export class UI {
       'choice',
       `<div class="panel choice-panel" style="--c:${opts.color}">
         ${opts.info ? `<button class="btn corner" data-nav data-info>${esc(opts.info.label)}</button>` : ''}
+        ${opts.who ? `<div class="choice-who" style="--w:${opts.who.color}">${esc(opts.who.name)}</div>` : ''}
         <h2 class="title" style="color:${opts.color}">${esc(opts.title)}</h2>
         ${opts.subtitle ? `<div class="subtitle">${esc(opts.subtitle)}</div>` : ''}
         ${opts.quote ? `<div class="quote">“${esc(opts.quote)}”</div>` : ''}

@@ -50,25 +50,52 @@ export interface Spoils {
   gear: { name: string; rarity: GearRarity }[];
 }
 
-/** Everything that lives for the duration of one escape attempt. */
+/** One hero's build for the escape: weapon, boons, upgrades, artifacts and extras. */
+export interface Build {
+  weapon: WeaponId;
+  boons: OwnedBoon[];
+  hammers: string[];
+  enchants: OwnedEnchant[];
+  artifacts: (string | null)[];
+  bonusHp: number;
+  deathDefiance: number;
+}
+
+/** A fresh build from a player's save: their weapon, starting artifact, Death Defiance. */
+export function newBuild(save: SaveData): Build {
+  return {
+    weapon: save.weapon,
+    boons: [],
+    hammers: [],
+    enchants: [],
+    artifacts: [save.startArtifact || null, null, null],
+    bonusHp: 0,
+    deathDefiance: rank(save, 'defiance'),
+  };
+}
+
+/**
+ * Everything that lives for the duration of one escape attempt. Rooms, gold
+ * and the run's progress are shared by the party; each hero has their own
+ * build (`builds`), and `boons`, `weapon` and the rest mean the active hero's
+ * (see `setActive`, which the game points at whoever is acting).
+ */
 export class Run {
   readonly seed: number;
   rng: Rng;
-  weapon: WeaponId;
   biomeIndex = 0;
   /** Combat rooms cleared in the current biome. */
   depth = 0;
   roomsCleared = 0;
-  boons: OwnedBoon[] = [];
-  hammers: string[] = [];
-  enchants: OwnedEnchant[] = [];
-  artifacts: (string | null)[] = [null, null, null];
+  /** Each hero's build, by party member id (0 = this device's first player). */
+  builds = new Map<number, Build>();
+  private activeId = 0;
   gold = 0;
   ash = 0;
   kills = 0;
-  bonusHp = 0;
-  deathDefiance: number;
   heat: number;
+  /** Heroes in the party (scales foes). */
+  partySize = 1;
   time = 0;
   /** Your level, which gates enchantments, artifacts and anvils behind doors. */
   level = 99;
@@ -80,11 +107,68 @@ export class Run {
   constructor(save: SaveData, seed = (Math.random() * 2 ** 31) | 0) {
     this.seed = seed;
     this.rng = new Rng(seed);
-    this.weapon = save.weapon;
     this.heat = save.heat;
-    this.deathDefiance = rank(save, 'defiance');
     this.gold = rank(save, 'fortune') * 40;
-    if (save.startArtifact) this.artifacts[0] = save.startArtifact;
+    this.builds.set(0, newBuild(save));
+  }
+
+  /** Adds a party member's build (from their own save). */
+  addMember(id: number, save: SaveData): Build {
+    const b = newBuild(save);
+    this.builds.set(id, b);
+    return b;
+  }
+
+  /** Makes member `id` the one `boons`, `weapon` and the rest refer to. */
+  setActive(id: number): void {
+    if (this.builds.has(id)) this.activeId = id;
+  }
+
+  get build(): Build {
+    return this.builds.get(this.activeId) ?? this.builds.get(0)!;
+  }
+
+  get weapon(): WeaponId {
+    return this.build.weapon;
+  }
+  set weapon(v: WeaponId) {
+    this.build.weapon = v;
+  }
+  get boons(): OwnedBoon[] {
+    return this.build.boons;
+  }
+  set boons(v: OwnedBoon[]) {
+    this.build.boons = v;
+  }
+  get hammers(): string[] {
+    return this.build.hammers;
+  }
+  set hammers(v: string[]) {
+    this.build.hammers = v;
+  }
+  get enchants(): OwnedEnchant[] {
+    return this.build.enchants;
+  }
+  set enchants(v: OwnedEnchant[]) {
+    this.build.enchants = v;
+  }
+  get artifacts(): (string | null)[] {
+    return this.build.artifacts;
+  }
+  set artifacts(v: (string | null)[]) {
+    this.build.artifacts = v;
+  }
+  get bonusHp(): number {
+    return this.build.bonusHp;
+  }
+  set bonusHp(v: number) {
+    this.build.bonusHp = v;
+  }
+  get deathDefiance(): number {
+    return this.build.deathDefiance;
+  }
+  set deathDefiance(v: number) {
+    this.build.deathDefiance = v;
   }
 
   /** Captures the run (plus the player's health and souls) for saving. */
