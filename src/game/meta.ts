@@ -1,6 +1,7 @@
 import type { MetaBonuses } from './boons';
 import { isCharacterId, type CharacterId } from './characters';
 import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
+import type { RunSnapshot } from './run';
 import type { PlayerStats } from './stats';
 import type { WeaponId } from './types';
 
@@ -185,6 +186,7 @@ export function writeSave(s: SaveData): void {
 export function clearSave(): void {
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(RUN_KEY);
   } catch {
     /* nothing stored */
   }
@@ -224,4 +226,31 @@ export function applyMetaExtras(s: SaveData, st: PlayerStats): void {
 /** Torment level modifiers: tougher foes for more Ash. */
 export function heatScale(heat: number): { hp: number; dmg: number; ash: number } {
   return { hp: 1 + heat * 0.15, dmg: 1 + heat * 0.1, ash: 1 + heat * 0.25 };
+}
+
+// ---------------------------------------------------------------- saved escape
+
+const RUN_KEY = 'unbound-underworld-run-v1';
+
+/** Saves the escape in progress (or clears it with null). */
+export function writeRun(snap: RunSnapshot | null): void {
+  try {
+    if (snap) localStorage.setItem(RUN_KEY, JSON.stringify(snap));
+    else localStorage.removeItem(RUN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** The saved escape, if there is a valid one. */
+export function loadRun(): RunSnapshot | null {
+  try {
+    const raw = localStorage.getItem(RUN_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw) as RunSnapshot;
+    if (snap?.v !== 1 || !snap.current || !Array.isArray(snap.boons) || !isWeaponId(snap.weapon)) return null;
+    return snap;
+  } catch {
+    return null;
+  }
 }

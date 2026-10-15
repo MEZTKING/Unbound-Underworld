@@ -27,7 +27,7 @@ import type { Enemy } from './enemies/enemy';
 import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
 import { drawHUD } from './hud';
-import { applyMetaExtras, loadSave, metaBonuses, writeSave, type SaveData } from './meta';
+import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, type SaveData } from './meta';
 import { Player } from './player';
 import { prefs } from './prefs';
 import { applyFeatures, applyForge, applyTalents, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
@@ -420,6 +420,7 @@ export class Game implements WorldHost {
   // ---------------------------------------------------------------- run flow
 
   startRun(): void {
+    if (loadRun()) this.ui.toast('A new escape begins. The saved one was set aside.', 3000);
     const seedParam = this.params.get('seed');
     this.run = new Run(this.save, seedParam ? Number(seedParam) : undefined);
     const biomeParam = Number(this.params.get('biome'));
@@ -441,6 +442,9 @@ export class Game implements WorldHost {
   goToRoom(plan: RoomPlan): void {
     const run = this.run!;
     run.enter(plan);
+    // Autosave at the start of every chamber, so Save & Quit (or closing the
+    // app) resumes here.
+    writeRun(run.snapshot(this.player.hp, this.player.souls));
     this.particles.clear();
     const biome = run.biome;
     const layout = generateLayout(run.rng, biome, plan.kind, this.stats.chestChance);
@@ -606,6 +610,7 @@ export class Game implements WorldHost {
     this.mode = 'over';
     this.save.stats.deaths++;
     this.persist();
+    writeRun(null);
     const summary: RunSummary = {
       victory: false,
       rooms: run.roomsCleared,
@@ -622,6 +627,7 @@ export class Game implements WorldHost {
     const run = this.run;
     if (!run) return;
     this.mode = 'over';
+    writeRun(null);
     const bonus = Math.round(60 * run.ashMult());
     this.addAsh(bonus);
     const couldJump = this.has('jump');
@@ -999,8 +1005,42 @@ export class Game implements WorldHost {
   }
 
   abandonRun(): void {
+    writeRun(null);
     this.ui.closeAll();
     this.transition(() => this.enterHub());
+  }
+
+  /** The saved escape, if any (shown on the title screen). */
+  savedRun(): ReturnType<typeof loadRun> {
+    return loadRun();
+  }
+
+  /** Continues a saved escape from the start of the chamber it was saved in. */
+  resumeRun(): boolean {
+    const snap = loadRun();
+    if (!snap) return false;
+    this.ui.closeAll();
+    const run = Run.restore(this.save, snap);
+    this.run = run;
+    this.player = new Player(run.weapon, this.save.character);
+    run.level = this.level;
+    this.recomputeStats(true);
+    this.player.hp = Math.max(1, Math.min(this.player.maxHp, snap.hp));
+    this.player.souls = snap.souls;
+    this.player.dashCharges = this.stats.dashCharges;
+    this.mode = 'run';
+    this.goToRoom(snap.current);
+    return true;
+  }
+
+  /** Leaves to the title screen; an escape in progress stays saved at its last chamber. */
+  quitToTitle(): void {
+    this.ui.closeAll();
+    this.transition(() => {
+      this.enterHub(true);
+      this.mode = 'title';
+      screens.title(this);
+    });
   }
 
   rewardLabel(r: RewardSpec): string {

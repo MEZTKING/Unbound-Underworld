@@ -1,6 +1,7 @@
 import { audio } from '../engine/audio';
 import { ARTIFACT_BY_ID, ARTIFACTS } from '../game/artifacts';
 import { BOON_BY_ID, describeBoon, GODS, HAMMER_BY_ID, RARITY_COLOR } from '../game/boons';
+import { BIOMES } from '../game/rooms';
 import { ENCHANT_BY_ID } from '../game/enchants';
 import type { Game, RunSummary } from '../game/game';
 import { CHARACTERS, characterUnlocked, type CharacterId } from '../game/characters';
@@ -8,6 +9,7 @@ import { clearSave, heatScale, nextCost, rank, UPGRADES, WEAPON_IDS } from '../g
 import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, WEAPON_LEVEL } from '../game/progression';
 import type { WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
+import { CAN_EXIT, exitGame } from '../platform';
 import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type UpdateState } from '../updates';
 import { esc, type Card } from './overlay';
 
@@ -40,8 +42,6 @@ function touchControls(g: Game): string {
   <p class="small">A controller or keyboard also works if you connect one.</p>`;
 }
 
-/** True inside the packaged desktop app, where a Quit button makes sense. */
-const DESKTOP = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
 
 function fmtTime(t: number): string {
   const s = Math.floor(t);
@@ -95,17 +95,29 @@ function updateBox(g: Game, screen: HTMLElement, box: HTMLElement, inSettings: b
 
 // ---------------------------------------------------------------- title
 
+/** "Asphodel · Chamber 3" for a saved escape. */
+function savedRunLabel(g: Game): string | null {
+  const snap = g.savedRun();
+  if (!snap) return null;
+  const biome = BIOMES[snap.biomeIndex]?.name ?? 'the Underworld';
+  const k = snap.current.kind;
+  const where = k === 'boss' ? 'Guardian' : k === 'antechamber' ? 'Antechamber' : k === 'shop' ? 'Wares' : k === 'fountain' ? 'Fountain' : `Chamber ${snap.depth + 1}`;
+  return `${biome} · ${where}`;
+}
+
 export function title(g: Game): void {
+  const saved = savedRunLabel(g);
   const el = g.ui.push(
     'title-screen',
     `<div class="title-wrap">
       <div class="logo">UNBOUND<span>UNDERWORLD</span></div>
       <div class="tagline">Fight your way out of the realm of the dead.</div>
       <div class="menu">
-        <button class="btn primary" data-nav data-a="play">${g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
+        ${saved ? `<button class="btn primary resume" data-nav data-a="resume">Resume Escape<small>${esc(saved)}</small></button>` : ''}
+        <button class="btn${saved ? '' : ' primary'}" data-nav data-a="play">${saved ? 'Hall of Shades' : g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
         <button class="btn" data-nav data-a="settings">Settings</button>
-        ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit</button>' : ''}
+        ${CAN_EXIT ? '<button class="btn" data-nav data-a="quit">Exit Game</button>' : ''}
       </div>
       <div class="update-box" data-box></div>
       <div class="credits">An original action roguelike inspired by Hades &amp; Minecraft Dungeons. Not affiliated with either.</div>
@@ -117,7 +129,12 @@ export function title(g: Game): void {
     audio.unlock();
     audio.play('select');
     const a = b.dataset.a;
-    if (a === 'play') {
+    if (a === 'resume') {
+      if (!g.resumeRun()) {
+        audio.play('deny');
+        g.ui.toast('That saved escape could not be loaded.');
+      }
+    } else if (a === 'play') {
       g.ui.pop();
       g.mode = 'hub';
       if (!g.save.seenIntro) {
@@ -127,7 +144,7 @@ export function title(g: Game): void {
       }
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
-    else if (a === 'quit') window.close();
+    else if (a === 'quit') exitGame();
     else settings(g);
   });
 }
@@ -295,8 +312,10 @@ export function pause(g: Game): void {
           <button class="btn primary" data-nav data-a="resume">Resume</button>
           <button class="btn" data-nav data-a="help">Controls</button>
           <button class="btn" data-nav data-a="settings">Settings</button>
+          ${run ? '<button class="btn" data-nav data-a="title">Save &amp; Quit to Title</button>' : '<button class="btn" data-nav data-a="title">Title Screen</button>'}
+          ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit">${run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
           ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
-          ${DESKTOP ? '<button class="btn" data-nav data-a="quit">Quit to desktop</button>' : ''}
+          ${run ? '<p class="small save-note">Your escape is saved at the start of each chamber. You\'ll resume from this chamber.</p>' : ''}
         </div>
         <div class="build">${build}</div>
       </div>
@@ -308,13 +327,11 @@ export function pause(g: Game): void {
     if (a === 'resume') g.ui.pop();
     else if (a === 'help') help(g);
     else if (a === 'settings') settings(g);
-    else if (a === 'quit') {
-      // Ash and upgrades are already saved; only an escape in progress is lost.
-      if (!run || b.dataset.armed) window.close();
-      else {
-        b.dataset.armed = '1';
-        b.textContent = 'Confirm: this escape will be lost';
-      }
+    else if (a === 'title') g.quitToTitle();
+    else if (a === 'exit') {
+      // Ash, experience and the escape (at its last chamber) are already saved.
+      g.persist();
+      exitGame();
     } else if (a === 'abandon') {
       if (b.dataset.armed) {
         g.save.stats.deaths++;

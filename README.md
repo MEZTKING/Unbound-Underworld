@@ -29,6 +29,8 @@ The builds are **not code-signed** by a store, so your system will warn you the 
 
 In the desktop app, press `F11` or `Alt+Enter` to toggle fullscreen. Your progress is saved on your device.
 
+**Saving and quitting.** An escape in progress is saved automatically at the start of every chamber. In the pause menu, *Save & Quit to Title* (or *Save & Exit Game* in the desktop and Android apps) lets you stop at any time. *Resume Escape* on the title screen picks up at the start of that chamber, even if the app was closed.
+
 ### Updates
 
 When a new version comes out, the title screen shows **Update now**. You can also check under *Settings → Check for updates*. Your progress carries over.
@@ -146,6 +148,8 @@ The **App builds** GitHub workflow builds Windows, macOS, Linux, Android and the
 npm version patch               # bump the version in package.json and create a tag such as v0.1.1
 git push --follow-tags
 ```
+
+Build artifacts are kept for only one day and aren't uploaded for pull requests. After a release is published, the release job deletes them, because the downloads live on the Release. The **Clean up artifacts** workflow runs weekly and can be started from the Actions tab: it removes leftovers to keep the account's Actions storage low.
 
 You can also release without the command line: open *Actions → App builds → Run workflow* and enter the version from `package.json` (for example `0.1.1`). The workflow builds everything, creates the `v0.1.1` tag and publishes the Release. If you leave the version empty, the installers are only attached to the run as downloadable artifacts.
 

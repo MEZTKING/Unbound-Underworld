@@ -1,0 +1,42 @@
+name: Clean up artifacts
+
+# Build artifacts count toward the account's Actions storage. Releases keep the
+# real downloads, so old artifacts are just clutter: this deletes every artifact
+# older than a day by default (the Play Store bundle is kept for a week). Runs weekly, or
+# from the Actions tab.
+on:
+  workflow_dispatch:
+    inputs:
+      min_age_hours:
+        description: 'Only delete artifacts older than this many hours (0 deletes all but the latest Play Store bundle).'
+        default: '24'
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const now = Date.now();
+            const hour = 60 * 60 * 1000;
+            const minAge = Number(context.payload.inputs?.min_age_hours ?? 24) * hour;
+            const day = 24 * hour;
+            let deleted = 0;
+            let freed = 0;
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, { ...context.repo, per_page: 100 });
+            for (const a of artifacts) {
+              if (a.expired) continue;
+              const age = now - new Date(a.created_at).getTime();
+              const keep = a.name.startsWith('Play-Store-Bundle') ? 7 * day : minAge;
+              if (age < keep) continue;
+              await github.rest.actions.deleteArtifact({ ...context.repo, artifact_id: a.id });
+              deleted++;
+              freed += a.size_in_bytes;
+            }
+            core.notice(`Deleted ${deleted} artifacts, freeing ${(freed / 1e9).toFixed(2)} GB.`);
