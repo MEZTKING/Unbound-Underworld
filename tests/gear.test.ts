@@ -27,7 +27,14 @@ describe('gear', () => {
       expect(total).toBeCloseTo(1, 6);
       for (const k of RARITY_ORDER) if (k !== 'ghost') expect(o.ghost).toBeLessThan(o[k] || 1);
       expect(o.ghost).toBeLessThanOrEqual(0.01);
+      // Each tier is rarer than the one below it.
+      RARITY_ORDER.slice(1).forEach((k, i) => expect(o[k]).toBeLessThan(o[RARITY_ORDER[i]]));
     }
+    // Luck lifts every tier from Rare up, at Common's expense.
+    const lo = rarityOdds(0);
+    const hi = rarityOdds(0.6);
+    for (const k of RARITY_ORDER.slice(2)) expect(hi[k]).toBeGreaterThan(lo[k]);
+    expect(hi.common).toBeLessThan(lo.common);
     // Power and bonus count never drop as tiers rise.
     RARITY_ORDER.slice(1).forEach((k, i) => {
       expect(GEAR_RARITY[k].power).toBeGreaterThan(GEAR_RARITY[RARITY_ORDER[i]].power);

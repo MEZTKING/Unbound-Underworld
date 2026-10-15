@@ -213,23 +213,26 @@ export function describeAffix(item: GearItem, i: number): string {
   return AFFIXES[item.affixes[i].id].name(affixValue(item, i));
 }
 
+/** Tier weights with no luck, and how much full luck multiplies each (×1 + luck × boost). */
+const TIER_WEIGHT = { common: 0.5, uncommon: 0.28, rare: 0.14, epic: 0.055, legendary: 0.025 };
+const TIER_LUCK = { common: 0, uncommon: 0.5, rare: 1.5, epic: 3, legendary: 5 };
+
 /**
- * The chance of each tier for a given luck (0..1). Ghost stays the hardest
- * to find whatever the luck: 0.3% normally, 1% at best.
+ * The chance of each tier for a given luck (0..1). Each tier is rarer than
+ * the one below it whatever the luck; luck moves odds from Common to the
+ * better tiers, the best ones most. Ghost stays the hardest to find: 0.3%,
+ * 1% at best.
  */
 export function rarityOdds(luck = 0): Record<GearRarity, number> {
   const ghost = 0.003 + luck * 0.007;
   const unique = 0.015 + luck * 0.02;
   const rest = 1 - ghost - unique;
-  // The rest is split along a scale that luck slides toward the better tiers.
-  const shift = luck * 0.25;
-  const cut = (x: number) => Math.max(0, Math.min(1, x + shift));
-  const legendary = cut(0.05);
-  const epic = cut(0.15) - legendary;
-  const rare = cut(0.35) - cut(0.15);
-  const uncommon = cut(0.62) - cut(0.35);
-  const common = 1 - cut(0.62);
-  return { common: common * rest, uncommon: uncommon * rest, rare: rare * rest, epic: epic * rest, legendary: legendary * rest, unique, ghost };
+  const tiers = Object.keys(TIER_WEIGHT) as (keyof typeof TIER_WEIGHT)[];
+  const w = tiers.map((k) => TIER_WEIGHT[k] * (1 + luck * TIER_LUCK[k]));
+  const sum = w.reduce((a, b) => a + b, 0);
+  const odds = { unique, ghost } as Record<GearRarity, number>;
+  tiers.forEach((k, i) => (odds[k] = (w[i] / sum) * rest));
+  return odds;
 }
 
 /** Rolls a piece of gear. `luck` (0..1) raises the chance of better rarities. */

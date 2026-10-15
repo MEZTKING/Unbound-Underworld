@@ -18,6 +18,7 @@
 - [Enemies](#enemies)
 - [Torment (difficulty)](#torment-difficulty)
 - [Door rewards](#door-rewards)
+- [Probabilities](#probabilities)
 
 ## Progression: levels, ranks and unlocks
 
@@ -87,7 +88,7 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 2 | Healing Potion | Drink to restore health. It refills over time. | R / ⚗ |
 | 3 | Cast | Hurl a shard that lodges in foes. Walk over it to pick it up again. | Q / Middle mouse / ◆ |
 | 4 | Artifacts | One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf. | 1 / the artifact button |
-| 5 | Jump & Slam | Leap over lava, chasms and shockwaves. Attack mid-air to Slam the ground. Also unlocks after slaying the final guardian. | Shift / C / ⤒ |
+| 5 | Jump & Slam | Leap over lava, chasms and shockwaves. Attack mid-air to Slam the ground. Also unlocks after slaying the final guardian. | Space / C / ⤒ |
 | 6 | Enchantments | Enchanting Tomes now appear behind doors and in chests. |  |
 | 7 | Hephaestus' Anvil | Anvils that reforge your weapon now appear in the Underworld. |  |
 | 8 | Second Artifact Slot | Carry two artifacts at once. | 2 / the artifact button |
@@ -401,7 +402,7 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 | ➶ Fleet Shadow | 1 | 60 | +1 Dash charge |
 | ◆ Shard Keeper | 2 | 25 / 75 | +2 Cast shards |
 | ◎ Ferryman’s Purse | 3 | 10 / 25 / 45 | Begin each run with 120 obols |
-| ✦ Favor of the Gods | 3 | 20 / 45 / 90 | Boons are more often Rare or better (+3) |
+| ✦ Favor of the Gods | 3 | 20 / 45 / 90 | Boons are more often Rare or better: +19.5% (not the first boon of an escape) |
 | ⛨ Iron Will | 3 | 20 / 45 / 80 | Take 15% less damage |
 | ⚗ Alchemy | 2 | 25 / 60 | Potion recharges 40% faster and heals +20% |
 | ✧ Soulcraft | 2 | 20 / 50 | +50 max souls, +40% souls gathered |
@@ -409,7 +410,7 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 
 ## Loot and gear
 
-Unlocks at level 2. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Up to 40 pieces are kept; a full inventory salvages new finds.
+Unlocks at level 2. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Every drop chance is listed under *Probabilities*. Up to 40 pieces are kept; a full inventory salvages new finds.
 
 | Material | Source |
 |---|---|
@@ -421,12 +422,12 @@ Unlocks at level 2. Foes drop materials; gear drops from foes (1.2%), enchanted 
 
 | Tier | Bonuses | Bonus strength × | Chance (foe) | Chance (guardian luck) | Perk |
 |---|---|---|---|---|---|
-| Common | 1 | 1 | 37% | 22% | — |
-| Uncommon | 2 | 1.15 | 27% | 26% | — |
-| Rare | 2 | 1.3 | 20% | 19% | — |
-| Epic | 3 | 1.55 | 10% | 10% | — |
-| Legendary | 4 | 1.85 | 5% | 19% | — |
-| Unique | 4 | 2.1 | 2% | 3% | One Unique perk |
+| Common | 1 | 1 | 49% | 35% | — |
+| Uncommon | 2 | 1.15 | 27% | 25% | — |
+| Rare | 2 | 1.3 | 14% | 19% | — |
+| Epic | 3 | 1.55 | 5.4% | 11% | — |
+| Legendary | 4 | 1.85 | 2.5% | 7% | — |
+| Unique | 4 | 2.1 | 1.5% | 2.7% | One Unique perk |
 | Ghost | 5 | 2.5 | 0.3% | 0.7% | One Ghost perk |
 
 Guardians always drop Rare or better (lower tiers roll up to Rare).
@@ -558,3 +559,113 @@ Unlocked at the *Oath of Torment* after slaying a guardian; each escape raises t
 | ⌂ Antechamber | Shop and fountain before the guardian |
 | ✧ Enchanting Tome | Fight, then add an enchantment |
 | ⚱ Artifact Cache | Enchanted foes · find an artifact |
+
+## Probabilities
+
+Every chance roll in an escape. The weights and chances come from `src/game/odds.ts`, `boons.ts` (boon rarity), `gear.ts` (gear tiers) and `enchants.ts` (enchantment procs).
+
+### Doors
+
+| Doors after a chamber | Weight | Chance |
+|---|---|---|
+| 1 | 1 | 11% |
+| 2 | 5 | 56% |
+| 3 | 3 | 33% |
+
+Each door then rolls its reward from the weights below, among the rewards allowed right now. A reward shows on at most one door of a set, and two boon doors never share a god. *Chance* is for one door when every reward is allowed.
+
+| Reward | Weight | Chance | Allowed when |
+|---|---|---|---|
+| ✦ Boon | 38 | 34% | Always (a god you can still take) |
+| ❂ Pomegranate | 12 | 11% | You own a boon that can level up |
+| ◎ Obols | 9 | 8.1% | Always |
+| ♥ Titan Heart | 7 | 6.3% | Always |
+| ◆ Ash | 9 | 8.1% | Always |
+| ⚒ Hephaestus' Anvil | 6 | 5.4% | Anvil unlocked, from chamber 2, once per region |
+| ➶ Hermes | 4 | 3.6% | From chamber 2, once per region |
+| ✧ Enchanting Tome | 9 | 8.1% | Enchantments unlocked, something left to learn |
+| ⚱ Artifact Cache | 6 | 5.4% | Artifacts unlocked, one left to find |
+| ⚖ Charon's Wares | 7 | 6.3% | From chamber 3, once per region |
+| ♒ Fountain | 4 | 3.6% | From chamber 3, once per region |
+
+Fixed doors: after the last chamber of a region comes the antechamber, then the guardian; after a guardian, a boon door into the next region.
+
+### Boon rarity
+
+Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike; deeper regions raise the odds. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon.
+
+| When | Common | Rare | Epic | Heroic |
+|---|---|---|---|---|
+| First boon of an escape | 90% | 10% | — | — |
+| The Shackled Deep | 85% | 14% | 1% | — |
+| The Ember Fields | 70% | 24% | 5% | 1% |
+| The Gilded Groves | 55% | 30% | 12% | 3% |
+| The Last Gate | 42% | 33% | 19% | 6% |
+| The Shackled Deep, Favor 3 | 67% | 26% | 7% | — |
+| The Ember Fields, Favor 3 | 51% | 36% | 11% | 2.5% |
+| The Gilded Groves, Favor 3 | 36% | 42% | 18% | 4.5% |
+| The Last Gate, Favor 3 | 23% | 45% | 25% | 7.5% |
+
+Boon offers: up to 3 of the god's boons you can take, drawn evenly. A Duo boon (when its two gods are both in your build) replaces one of them 40% of the time. Duo boons have no rarity. Anvil upgrades: 3 drawn evenly from the ones you don't own. A Pomegranate levels a boon by 2 instead of 1 20% of the time.
+
+### Chambers and foes
+
+Chamber 1 of a region has 1 wave, chambers 2–3 have 2 and later chambers 3. Foes are drawn by weight from the region's pool until the wave's budget is spent. A foe that costs 2 or more may carry an elite trait (Armored, Swift, Volatile or Regenerating, evenly). Chambers behind an Anvil or Artifact door hold *enchanted foes*: +30%, up to 45%.
+
+| Chamber | The Shackled Deep | The Ember Fields | The Gilded Groves | The Shackled Deep (enchanted) | The Ember Fields (enchanted) | The Gilded Groves (enchanted) |
+|---|---|---|---|---|---|---|
+| 1 | 5% | 13% | 21% | 35% | 43% | 45% |
+| 2 | 9% | 17% | 25% | 39% | 45% | 45% |
+| 3 | 13% | 21% | 29% | 43% | 45% | 45% |
+| 4 | 17% | 25% | 33% | 45% | 45% | 45% |
+| 5 | 21% | 29% | 37% | 45% | 45% | 45% |
+
+### Foe drops
+
+| Drop | Foe | Elite foe | Guardian |
+|---|---|---|---|
+| Obols (gold) | 55% | 55% | 55% |
+| Souls | 1, +1 at 40% | 4 | 25 |
+| ☗ Bone Dust | 30% (×2 at 30%) | 48% (×2 at 30%) | 90% (×10) |
+| Region material (Ember Shard / Golden Ichor / Gate Pearl) | 14% | 22% | 42% (×6) |
+| ⬢ Titan Scale | — | 25% | 100% (×3–5) |
+| Gear | 1.2% | 12% | 100% (Rare or better) |
+
+Breaking a pot: 35% obols (1–5), else 20% two souls: 13% overall, nothing 52%.
+
+### Treasure chests
+
+| Roll | Chance |
+|---|---|
+| A combat chamber holds a chest | 25% (+10% per Treasure Sense tier) |
+| The chest is a Mimic (combat chambers) | 15% |
+| Always inside | 15–35 obols, 6 souls, 3 Bone Dust |
+| Also a piece of gear | 30% |
+| An artifact pops out | 35% (artifacts unlocked, one left to find) |
+| Otherwise an enchantment | 25% (60% when no artifact is left) |
+
+### Gear tiers by source
+
+Luck slides the tier odds toward the better tiers. Guardians then lift anything below Rare up to Rare.
+
+| Source | Luck | Common | Uncommon | Rare | Epic | Legendary | Unique | Ghost |
+|---|---|---|---|---|---|---|---|---|
+| Foe, The Shackled Deep | 0.0 | 49% | 27% | 14% | 5.4% | 2.5% | 1.5% | 0.3% |
+| Foe, The Ember Fields | 0.1 | 46% | 27% | 15% | 6.6% | 3.5% | 1.7% | 0.4% |
+| Foe, The Gilded Groves | 0.2 | 43% | 27% | 16% | 7.6% | 4.3% | 1.9% | 0.4% |
+| Foe, The Last Gate | 0.3 | 41% | 26% | 17% | 8.5% | 5.1% | 2.1% | 0.5% |
+| Chest | 0.2 | 43% | 27% | 16% | 7.6% | 4.3% | 1.9% | 0.4% |
+| Guardian | 0.6 | 35% | 25% | 19% | 11% | 7% | 2.7% | 0.7% |
+
+### Enchantment procs
+
+| Enchantment | Roll | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|---|
+| Reverberation | Attack strikes again | 15% | 25% | 35% |
+| Shackling | Hit roots nearby foes | 10% | 18% | 26% |
+| Concussive | Hit stuns for 1.5s | 5% | 9% | 13% |
+| Bloom | Hit blooms a healing circle | 6% | 10% | 14% |
+| Frenzy | Kill grants +50% attack speed | 10% | 15% | 20% |
+| Soul Harvest | Hit grants souls | 12% | 12% | 12% |
+
+Critical hits come only from boons and riposte (a riposte is always critical).

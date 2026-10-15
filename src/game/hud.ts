@@ -23,7 +23,7 @@ interface Tip {
 let tips: Tip[] = [];
 
 /** The key shown for an action ("R", "4"…); the game points this at the live bindings. */
-let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'F', guard: 'V', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
+let keyOf: (action: string) => string = (a) => ({ potion: 'R', wrath: 'F', guard: 'V', dash: 'Left Shift', jump: 'Space', artifact1: '1', artifact2: '2', artifact3: '3' })[a] ?? '';
 export function useKeyLabels(fn: (action: string) => string): void {
   keyOf = fn;
 }
@@ -554,7 +554,7 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
     const lines = [
       'WASD move · Mouse aim',
       `LMB / J Attack · RMB / K Special${s.canCast ? ' · Q Cast' : ''}`,
-      `Space Dash${s.canJump ? ' · Shift / C Jump (attack mid-air to Slam)' : ''}`,
+      `${keyOf('dash')} Dash${s.canJump ? ` · ${keyOf('jump')} Jump (attack mid-air to Slam)` : ''}`,
       extras.join(' · '),
     ];
     lines.forEach((l, i) => ctx.fillText(l, vw - 20, vh - 80 + i * 17));

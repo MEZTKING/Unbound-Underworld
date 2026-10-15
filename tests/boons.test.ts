@@ -9,6 +9,7 @@ import {
   MAX_GODS_PER_RUN,
   OLYMPIANS,
   pomCandidates,
+  boonRarityOdds,
   rollBoonOffers,
   rollHammerOffers,
   takeBoon,
@@ -116,5 +117,22 @@ describe('offers', () => {
     expect(pomCandidates(owned).map((b) => b.id)).toEqual(['zeus_attack']);
     const hammers = rollHammerOffers(new Rng(4), 'sword', ['sword_double']);
     expect(hammers.every((h) => h.weapon === 'sword' && h.id !== 'sword_double')).toBe(true);
+  });
+
+  it('keeps early boons mostly common and grows rarer deeper in', () => {
+    const sum = (o: ReturnType<typeof boonRarityOdds>) => o.common + o.rare + o.epic + o.heroic;
+    const first = boonRarityOdds(0, true, 3);
+    expect(first.epic + first.heroic).toBe(0);
+    let prev = -1;
+    for (let r = 0; r < 4; r++) {
+      const o = boonRarityOdds(r, false, 0);
+      expect(sum(o)).toBeCloseTo(1, 6);
+      expect(o.epic + o.heroic).toBeGreaterThan(prev);
+      prev = o.epic + o.heroic;
+    }
+    expect(boonRarityOdds(0).heroic).toBe(0);
+    // Favor of the Gods shifts odds toward the rare tiers.
+    expect(boonRarityOdds(2, false, 3).common).toBeLessThan(boonRarityOdds(2).common);
+    expect(sum(boonRarityOdds(3, false, 3))).toBeCloseTo(1, 6);
   });
 });

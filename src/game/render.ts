@@ -7,7 +7,7 @@ import type { RewardSpec, Shape } from './types';
 import type { Interactable, World } from './world';
 import { prefs } from './prefs';
 import { GEAR_RARITY, MATERIALS, SLOT_GLYPH } from './gear';
-import { isSpear } from './weapons';
+import { isSpear, WEAPON_INFO } from './weapons';
 
 const PAD = 90;
 
@@ -1295,6 +1295,7 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
   for (const e of w.enemies) if (!e.dead && !e.spawning) e.drawStatus(ctx);
+  drawChargeMeter(ctx, w, false);
   drawDoorIcons(ctx, w);
 
   drawPrompt(ctx, w);
@@ -1371,7 +1372,113 @@ function drawScreenOverlays(ctx: CanvasRenderingContext2D, w: World, dpr: number
 
 
 /** Telegraphs, shockwaves, zones, swipes, projectiles and lightning: everything flat or glowing. */
+/**
+ * Where the next attack lands: a faint dashed outline in the weapon colour
+ * while foes are about. A charging move shows its full reach instead, filling
+ * as it powers up and turning gold in the Perfect window.
+ */
+function drawAttackPreview(ctx: CanvasRenderingContext2D, w: World): void {
+  const p = w.player;
+  if (!prefs.attackPreview || p.state === 'dead' || p.state === 'falling') return;
+  const run = p.state === 'action' ? p.action : null;
+  const charging = run?.def.hold && !run.released ? run : null;
+  let shapes: Shape[] | undefined;
+  let k = 0;
+  let perfect = false;
+  if (charging) {
+    const h = charging.def.hold!;
+    shapes = charging.def.preview?.(p, p.aim);
+    k = clamp(charging.holdT / h.max, 0, 1);
+    perfect = !!h.perfect && charging.holdT >= h.max && charging.holdT <= h.max + h.perfect;
+  } else if ((p.state === 'free' || (run && run.fired)) && w.enemies.some((e) => !e.dead && !e.spawning)) {
+    shapes = p.weapon.preview?.(p, w);
+  }
+  if (!shapes?.length) return;
+  const color = perfect ? '#fff0b0' : WEAPON_INFO[p.weapon.id].color;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  for (const s of shapes) {
+    ctx.globalAlpha = charging ? 0.06 + 0.16 * k : 0.05;
+    pathShape(ctx, s);
+    ctx.fill();
+    if (charging) {
+      ctx.globalAlpha = 0.18;
+      pathShape(ctx, s, k);
+      ctx.fill();
+    }
+    ctx.globalAlpha = charging ? 0.45 + 0.45 * k : 0.3;
+    ctx.lineWidth = charging ? 2.5 : 1.5;
+    ctx.setLineDash(charging ? [] : [7, 6]);
+    pathShape(ctx, s);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The charge meter over the hero while a move charges: how far it has
+ * powered up, the Perfect window (gold), the chain level it carries (pips)
+ * and the damage a release would deal now.
+ */
+function drawChargeMeter(ctx: CanvasRenderingContext2D, w: World, view3d: boolean): void {
+  const p = w.player;
+  const run = p.state === 'action' ? p.action : null;
+  const def = run?.def;
+  if (!prefs.attackPreview || !run || !def?.hold || !def.power || run.released || run.holdT < 0.1) return;
+  const lift = p.height + 34 + p.z;
+  const draw = () => {
+    const h = def.hold!;
+    const pw = def.power!;
+    const perfectLen = h.perfect ?? 0;
+    const total = h.max + perfectLen + 0.12;
+    const W = 76;
+    const H = 7;
+    const x = p.x - W / 2;
+    const y = p.y - lift;
+    const k = Math.min(run.holdT, total) / total;
+    const full = run.holdT >= h.max;
+    const perfect = perfectLen > 0 && full && run.holdT <= h.max + perfectLen;
+    const color = WEAPON_INFO[p.weapon.id].color;
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,4,10,0.78)';
+    ctx.fillRect(x - 2, y - 2, W + 4, H + 4);
+    if (perfectLen > 0) {
+      ctx.fillStyle = 'rgba(255,220,120,0.35)';
+      ctx.fillRect(x + (W * h.max) / total, y, (W * perfectLen) / total, H);
+    }
+    ctx.fillStyle = perfect ? '#fff0b0' : full && perfectLen > 0 ? '#9a8a90' : color;
+    ctx.fillRect(x, y, W * k, H);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x + (W * h.max) / total - 1, y - 3, 2, H + 6);
+    // Chain level pips: a longer chain before it powers the move up further.
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = i < pw.level ? color : 'rgba(255,255,255,0.18)';
+      ctx.beginPath();
+      const px = p.x - 12 + i * 12;
+      ctx.moveTo(px, y + H + 4);
+      ctx.lineTo(px + 4, y + H + 8);
+      ctx.lineTo(px, y + H + 12);
+      ctx.lineTo(px - 4, y + H + 8);
+      ctx.fill();
+    }
+    const amount = pw.mult ? `×${pw.mult(run.holdT).toFixed(2)}` : `${Math.round(clamp(run.holdT / h.max, 0, 1) * 100)}%`;
+    ctx.font = '700 12px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    const text = perfect ? `PERFECT ${amount}` : `${pw.label} ${amount}`;
+    ctx.strokeText(text, p.x, y - 5);
+    ctx.fillStyle = perfect ? '#fff0b0' : '#f0e6d8';
+    ctx.fillText(text, p.x, y - 5);
+    ctx.restore();
+  };
+  if (view3d) upright(ctx, w, p.x, p.y, lift, draw);
+  else draw();
+}
+
 function drawEffects(ctx: CanvasRenderingContext2D, w: World): void {
+  drawAttackPreview(ctx, w);
   for (const tg of w.telegraphs) {
     const k = clamp(tg.t / tg.dur, 0, 1);
     const fade = tg.cancelled ? Math.max(0, 1 - (tg.t - tg.dur) / 0.15) : 1;
@@ -1519,6 +1626,7 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
   drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
   for (const e of w.enemies) if (!e.dead && !e.spawning) upright(ctx, w, e.x, e.y, e.height, () => e.drawStatus(ctx));
+  drawChargeMeter(ctx, w, true);
   drawDoorIcons(ctx, w);
   drawPrompt(ctx, w);
   drawScreenOverlays(ctx, w, dpr);

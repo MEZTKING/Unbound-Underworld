@@ -4,7 +4,8 @@ import { clamp, fromAngle, TAU } from '../engine/math';
 import { applyDoom, damageEnemy, playerBlast } from './combat';
 import type { Enemy } from './enemies/enemy';
 import type { Player } from './player';
-import { gravityPull, meleeHit, poweredAttack, powerLevel, slamCommon, swirl, thrust, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
+import type { Shape } from './types';
+import { gravityPull, meleeHit, nextStep, poweredAttack, powerLevel, reachArc, reachCircle, slamCommon, swirl, thrust, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
 import type { World } from './world';
 
 // ---------------------------------------------------------------- Titan Gauntlets
@@ -82,7 +83,12 @@ export class Gauntlets implements Weapon {
       ww.addSwipe(pp.x, pp.y, 110, aim, 0.9, 0.2, '#f0ffb0', 22, false, 1);
       ww.camera.shake(0.3);
       audio.play('explode');
-    });
+    }, (pp, aim) => [reachArc(pp, aim, 110, 0.9), reachCircle(pp.x, pp.y, 140)], 'Titan Uppercut');
+  }
+
+  preview(p: Player, w: World): Shape[] {
+    const last = nextStep(w, this.lastFire, 0.45, this.combo, FIST_COMBO.length) === FIST_COMBO.length - 1;
+    return [reachArc(p, p.aim, last ? 95 : 78, last ? 0.9 : 0.6)];
   }
 
   private uppercut(w: World): ActionDef {
@@ -279,7 +285,7 @@ export class Scythe implements Weapon {
   }
 
   /** Harvest: drags foes in, then one great reap. */
-  powered(_p: Player, _w: World, step: number): ActionDef {
+  powered(_p: Player, w: World, step: number): ActionDef {
     return poweredAttack('harvest', '#b48cff', powerLevel(step, 3), (pp, ww, power, aim) => {
       this.combo = -1;
       gravityPull(ww, pp.x, pp.y, 260);
@@ -294,7 +300,14 @@ export class Scythe implements Weapon {
         ww.camera.shake(0.3);
         audio.play('heavySwing');
       });
-    });
+    }, (pp) => [reachCircle(pp.x, pp.y, 260), reachCircle(pp.x, pp.y, 170 * this.reach(w))], 'Harvest');
+  }
+
+  preview(p: Player, w: World): Shape[] {
+    const i = nextStep(w, this.lastFire, 0.7, this.combo, SCYTHE_COMBO.length);
+    const c = SCYTHE_COMBO[i];
+    const r = c.r * this.reach(w);
+    return [i === 2 ? reachCircle(p.x, p.y, r) : reachArc(p, p.aim, r, c.half / 2)];
   }
 
   private swing(aim: number, dir: number, dur: number, spin: boolean): void {

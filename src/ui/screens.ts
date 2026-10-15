@@ -30,9 +30,9 @@ function keyControls(g: Game): string {
   const rows = [
     '<div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>',
     '<div><kbd>LMB</kbd>/<kbd>J</kbd> Attack</div><div><kbd>RMB</kbd>/<kbd>K</kbd> Special</div>',
-    `<div><kbd>Space</kbd> Dash</div><div>${st.canCast ? '<kbd>Q</kbd> Cast shard' : '<kbd>E</kbd> Interact'}</div>`,
+    `<div>${k('dash')} Dash</div><div>${st.canCast ? '<kbd>Q</kbd> Cast shard' : '<kbd>E</kbd> Interact'}</div>`,
     st.canGuard ? `<div>${k('guard')} Guard (hold) · tap to <b>Parry</b></div><div>Parry, then attack: <b>Riposte</b></div>` : '',
-    st.canJump ? '<div><kbd>Shift</kbd>/<kbd>C</kbd> Jump</div><div>Attack mid-air: <b>Slam</b></div>' : '',
+    st.canJump ? `<div>${k('jump')} Jump</div><div>Attack mid-air: <b>Slam</b></div>` : '',
     st.canPotion || st.artifactSlots ? `<div>${st.artifactSlots ? `<kbd>1</kbd>${st.artifactSlots > 1 ? '<kbd>2</kbd>' : ''}${st.artifactSlots > 2 ? '<kbd>3</kbd>' : ''} Artifacts` : ''}</div><div>${st.canPotion ? `${k('potion')} Potion` : ''}</div>` : '',
     st.canWrath ? `<div>${k('wrath')} Wrath (when full)</div><div></div>` : '',
     `<div>${st.canCast ? '<kbd>E</kbd> Interact' : ''}</div><div><kbd>Esc</kbd> Pause · <kbd>M</kbd> Mute</div>`,
@@ -351,7 +351,7 @@ export function help(g: Game, intro = false): void {
 
 export function settings(g: Game): void {
   const s = g.save.settings;
-  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration' | 'view3d';
+  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'attackPreview' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration' | 'view3d';
   type Slider = 'volume' | 'music' | 'shake' | 'flashes' | 'touchSize' | 'touchOpacity' | 'uiSize';
   const toggleLabel: Record<Toggle, string> = {
     muted: 'Sound',
@@ -360,6 +360,7 @@ export function settings(g: Game): void {
     damageNumbers: 'Damage numbers',
     hints: 'Control hints',
     doorInfo: 'Show what every door leads to',
+    attackPreview: 'Attack range outline',
     hitstop: 'Hit-stop (impact pause)',
     showFps: 'Show FPS',
     leftHanded: 'Left-handed layout',
@@ -383,6 +384,7 @@ export function settings(g: Game): void {
       ${toggle('assist')}
       ${toggle('aimAssist')}
       ${toggle('damageNumbers')}
+      ${toggle('attackPreview')}
       ${toggle('hints')}
       ${document.body.classList.contains('touch') ? toggle('doorInfo') : ''}
       ${document.body.classList.contains('touch') ? '' : '<h3 class="section">Controls</h3><button class="btn toggle" data-nav data-a="keys"><span>Key bindings</span><b>⌨</b></button>'}

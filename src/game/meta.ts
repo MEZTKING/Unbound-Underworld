@@ -25,6 +25,8 @@ export interface Settings {
   hints: boolean;
   assist: boolean;
   doorInfo: boolean;
+  /** Outline where the next attack will land. */
+  attackPreview: boolean;
   /** Touch button scale (0.8..1.3). */
   touchSize: number;
   touchOpacity: number;
@@ -52,6 +54,7 @@ export function defaultSettings(): Settings {
     hints: true,
     assist: false,
     doorInfo: true,
+    attackPreview: true,
     touchSize: 1,
     touchOpacity: 0.9,
     leftHanded: false,
@@ -77,7 +80,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'reflex', name: 'Fleet Shadow', glyph: '➶', desc: (r) => `+${r} Dash charge`, costs: [60] },
   { id: 'shards', name: 'Shard Keeper', glyph: '◆', desc: (r) => `+${r} Cast shard${r === 1 ? '' : 's'}`, costs: [25, 75] },
   { id: 'fortune', name: 'Ferryman’s Purse', glyph: '◎', desc: (r) => `Begin each run with ${r * 40} obols`, costs: [10, 25, 45] },
-  { id: 'favor', name: 'Favor of the Gods', glyph: '✦', desc: (r) => `Boons are more often Rare or better (+${r})`, costs: [20, 45, 90] },
+  { id: 'favor', name: 'Favor of the Gods', glyph: '✦', desc: (r) => `Boons are more often Rare or better: +${+(r * 6.5).toFixed(1)}% (not the first boon of an escape)`, costs: [20, 45, 90] },
   { id: 'resilience', name: 'Iron Will', glyph: '⛨', desc: (r) => `Take ${r * 5}% less damage`, costs: [20, 45, 80] },
   { id: 'brewing', name: 'Alchemy', glyph: '⚗', desc: (r) => `Potion recharges ${r * 20}% faster and heals +${r * 10}%`, costs: [25, 60] },
   { id: 'soulcraft', name: 'Soulcraft', glyph: '✧', desc: (r) => `+${r * 25} max souls, +${r * 20}% souls gathered`, costs: [20, 50] },

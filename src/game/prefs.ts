@@ -16,6 +16,8 @@ export const prefs = {
   assist: false,
   /** Show what's behind every door, not only the one you walk up to. */
   doorInfo: true,
+  /** Outline where the next attack will land, and the charge meter. */
+  attackPreview: true,
 };
 
 export type Prefs = typeof prefs;

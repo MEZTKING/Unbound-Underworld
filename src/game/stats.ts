@@ -1,4 +1,5 @@
 import type { AbilitySlot, GodPower, HitEffect } from './types';
+import { CHEST } from './odds';
 
 /** Everything the boon/upgrade layer can tweak about the player. Rebuilt whenever the build changes. */
 export interface PlayerStats {
@@ -106,7 +107,7 @@ export function baseStats(): PlayerStats {
     potionCooldown: 40,
     potionHeal: 0.35,
     artifactCdMult: 1,
-    chestChance: 0.25,
+    chestChance: CHEST.spawn,
     canGuard: true,
     canPotion: true,
     canCast: true,

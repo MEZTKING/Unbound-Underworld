@@ -88,7 +88,7 @@ export const UNLOCKS: Unlock[] = [
   { level: 2, feature: 'potion', title: 'Healing Potion', desc: 'Drink to restore health. It refills over time.', keys: { pc: 'R', touch: '⚗' } },
   { level: 3, feature: 'cast', title: 'Cast', desc: 'Hurl a shard that lodges in foes. Walk over it to pick it up again.', keys: { pc: 'Q / Middle mouse', touch: '◆' } },
   { level: 4, feature: 'artifacts', title: 'Artifacts', desc: 'One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf.', keys: { pc: '1', touch: 'the artifact button' } },
-  { level: 5, feature: 'jump', title: 'Jump & Slam', desc: 'Leap over lava, chasms and shockwaves. Attack mid-air to Slam the ground.', keys: { pc: 'Shift / C', touch: '⤒' } },
+  { level: 5, feature: 'jump', title: 'Jump & Slam', desc: 'Leap over lava, chasms and shockwaves. Attack mid-air to Slam the ground.', keys: { pc: 'Space / C', touch: '⤒' } },
   { level: 6, feature: 'enchants', title: 'Enchantments', desc: 'Enchanting Tomes now appear behind doors and in chests.' },
   { level: 7, feature: 'anvil', title: "Hephaestus' Anvil", desc: 'Anvils that reforge your weapon now appear in the Underworld.' },
   { level: 8, feature: 'artifact2', title: 'Second Artifact Slot', desc: 'Carry two artifacts at once.', keys: { pc: '2', touch: 'the artifact button' } },

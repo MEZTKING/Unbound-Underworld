@@ -13,6 +13,7 @@ import { createEnemy } from './enemies';
 import { Enemy } from './enemies/enemy';
 import { Pickup, Projectile, Zone, type Hitbox, type Loot, type Telegraph } from './entities';
 import { Player } from './player';
+import { FOE_DROP, POT } from './odds';
 import { prefs } from './prefs';
 import { WRATH_PER_TAKEN } from './progression';
 import { buildGrid, CELL, DOOR_W, hazardContains, TRAP_SIZE, type BiomeInfo, type RoomLayout, type Wave } from './rooms';
@@ -165,6 +166,7 @@ export class World {
   titleDrift = false;
   /** Extra attack tokens for foes (more at higher Torment). */
   tokenBonus = 0;
+  private unstickT = 1;
   /** Scales foes' aim error (smaller at higher Torment). */
   foeAimError = 1;
   /** Recent pickups listed on the HUD (newest last). */
@@ -489,6 +491,37 @@ export class World {
     return this.enemies.filter((e) => !e.dead && !e.isDummy && !e.passive).length;
   }
 
+  /**
+   * Foes that end up outside the floor, or stand still out of reach for
+   * STUCK_TIME seconds (behind a wall with no way round), reappear somewhere
+   * open so a chamber can always be cleared. Turrets and guardians stay put.
+   */
+  private unstick(dt: number): void {
+    this.unstickT -= dt;
+    if (this.unstickT > 0) return;
+    this.unstickT = 1;
+    const p = this.player;
+    for (const e of this.enemies) {
+      if (e.dead || e.spawning || e.isBoss || e.isDummy || e.speed <= 0) continue;
+      const off = e.x < 8 || e.y < 8 || e.x > this.room.w - 8 || e.y > this.room.h - 8 || (!e.flying && this.grid.block[this.cellIndex(e.x, e.y)] !== 0);
+      const moved = Math.hypot(e.x - e.lastPos.x, e.y - e.lastPos.y);
+      e.lastPos = { x: e.x, y: e.y };
+      const reachable = Math.hypot(e.x - p.x, e.y - p.y) < 520 && this.lineOfSight(e.x, e.y, p.x, p.y, e.r);
+      e.stuckT = off ? STUCK_TIME : moved < 20 && !reachable ? e.stuckT + 1 : 0;
+      if (e.stuckT < STUCK_TIME) continue;
+      this.particles.burst(e.x, e.y - e.height / 2, '#6a5a70', 12, 200, { kind: 'smoke', size: 10, gravity: 0, life: 0.5, additive: false });
+      const pt = this.spawnPoint();
+      e.x = pt.x;
+      e.y = pt.y;
+      e.lastPos = { ...pt };
+      e.vx = e.vy = e.kx = e.ky = 0;
+      e.stuckT = 0;
+      e.spawnT = 0.6;
+      e.cancelTelegraphs(this);
+      e.setState('idle');
+    }
+  }
+
   private spawnPoint(): Vec {
     const p = this.player;
     for (let i = 0; i < 60; i++) {
@@ -714,8 +747,8 @@ export class World {
     if (!e.isDummy) {
       const [lo, hi] = e.gold;
       const gold = Math.round(fx.range(lo, hi + 0.99) * this.stats.goldMult);
-      if (gold > 0 && Math.random() < 0.55) this.dropGold(e.x, e.y, gold);
-      this.dropSouls(e.x, e.y, e.isBoss ? 25 : e.isElite ? 4 : 1 + (Math.random() < 0.4 ? 1 : 0));
+      if (gold > 0 && Math.random() < FOE_DROP.gold) this.dropGold(e.x, e.y, gold);
+      this.dropSouls(e.x, e.y, e.isBoss ? 25 : e.isElite ? 4 : 1 + (Math.random() < FOE_DROP.extraSoul ? 1 : 0));
       if (e.eliteMod === 'volatile') {
         const x = e.x;
         const y = e.y;
@@ -737,8 +770,8 @@ export class World {
     b.dead = true;
     audio.play('armorBreak');
     this.particles.burst(b.x, b.y - 12, '#9a6a50', 16, 260, { kind: 'shard', size: 4, gravity: 600, spin: 10, additive: false });
-    if (Math.random() < 0.35) this.dropGold(b.x, b.y, Math.round(fx.range(1, 5) * this.stats.goldMult));
-    else if (Math.random() < 0.2) this.dropSouls(b.x, b.y, 2);
+    if (Math.random() < POT.gold) this.dropGold(b.x, b.y, Math.round(fx.range(1, 5) * this.stats.goldMult));
+    else if (Math.random() < POT.souls) this.dropSouls(b.x, b.y, 2);
   }
 
   // ---------------------------------------------------------------- update
@@ -787,6 +820,7 @@ export class World {
     for (const a of this.allies) a.update(this, dt);
     this.separate();
     this.updateEncounter(dt);
+    this.unstick(dt);
     this.updateHitboxes(dt);
     this.updateProjectiles(dt);
     this.updateZones(dt);
@@ -1259,6 +1293,9 @@ export class World {
 }
 
 /** Solid size of each kind of interactable (its `r` is the reach to use it). */
+/** Seconds a foe may stay stuck out of reach before it reappears. */
+const STUCK_TIME = 6;
+
 /** Seconds a loot-feed line stays on screen. */
 export const LOOT_FEED_TIME = 4;
 
