@@ -641,7 +641,7 @@ export class World {
     this.unstickT = 1;
     for (const e of this.enemies) {
       if (e.dead || e.spawning || e.isBoss || e.isDummy || e.speed <= 0) continue;
-      const off = e.x < 8 || e.y < 8 || e.x > this.room.w - 8 || e.y > this.room.h - 8 || (!e.flying && this.grid.block[this.cellIndex(e.x, e.y)] !== 0);
+      const off = !Number.isFinite(e.x) || !Number.isFinite(e.y) || e.x < 8 || e.y < 8 || e.x > this.room.w - 8 || e.y > this.room.h - 8 || (!e.flying && this.grid.block[this.cellIndex(e.x, e.y)] !== 0);
       const moved = Math.hypot(e.x - e.lastPos.x, e.y - e.lastPos.y);
       e.lastPos = { x: e.x, y: e.y };
       const reachable = this.players.some((p) => Math.hypot(e.x - p.x, e.y - p.y) < 520 && this.lineOfSight(e.x, e.y, p.x, p.y, e.r));
@@ -783,7 +783,23 @@ export class World {
     p.souls = Math.min(this.stats.soulMax, p.souls + n * this.stats.soulGain);
   }
 
+  /** The nearest open floor to a point, so whatever lands there can be reached. */
+  openSpot(x: number, y: number): Vec {
+    const free = (px: number, py: number) => px > 70 && py > 170 && px < this.room.w - 70 && py < this.room.h - 70 && this.grid.block[this.cellIndex(px, py)] === 0;
+    if (free(x, y)) return { x, y };
+    for (let r = CELL / 2; r < 900; r += CELL / 2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * TAU;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        if (free(px, py)) return { x: px, y: py };
+      }
+    }
+    return { x, y };
+  }
+
   spawnReward(reward: RewardSpec, x: number, y: number): void {
+    ({ x, y } = this.openSpot(x, y));
     const pk = new Pickup('reward', x, y, 0);
     pk.reward = reward;
     pk.r = 28;

@@ -2,6 +2,8 @@ import { Rng } from '../engine/math';
 import { ARTIFACTS } from './artifacts';
 import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
 import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
+import type { CharacterId } from './characters';
+import type { Loot } from './entities';
 import type { GearRarity, MaterialId } from './gear';
 import { altarDefiance, altarFavor, applyAltar, rankOf } from './altar';
 import { heatScale, type SaveData } from './meta';
@@ -16,7 +18,10 @@ export interface RoomPlan {
   reward: RewardSpec | null;
 }
 
-/** A saved escape: the run as it stood when its current chamber began. */
+/**
+ * A saved escape: the run as it stood when its current chamber began, or
+ * (`cleared`) once that chamber was won and its doors opened.
+ */
 export interface RunSnapshot {
   v: 1;
   seed: number;
@@ -43,6 +48,27 @@ export interface RunSnapshot {
   souls: number;
   /** Loot gathered so far (added in v0.7). */
   spoils?: Spoils;
+  /** The hero played (v0.9.1; older saves use the save's hero). */
+  character?: CharacterId;
+  /** Saved after the chamber was won: it resumes with its doors open (v0.9.1). */
+  cleared?: boolean;
+  /** The random state the chamber was built from, to rebuild the same room. */
+  roomRng?: number;
+  /** The doors that were open. */
+  doors?: RoomPlan[];
+  /** Chests, wares and fountains already used in the chamber. */
+  usedHere?: string[];
+  /** What was still lying in the won chamber, or being chosen, to put back on resume. */
+  left?: LeftBehind;
+}
+
+/** Rewards and drops not yet taken in a won chamber. */
+export interface LeftBehind {
+  rewards: RewardSpec[];
+  gold: number;
+  souls: number;
+  ash: number;
+  loot: Loot[];
 }
 
 /** What an escape has gathered, for the Spoils list at its end. */
@@ -101,6 +127,10 @@ export class Run {
   /** Your level, which gates enchantments, artifacts and anvils behind doors. */
   level = 99;
   current: RoomPlan = { kind: 'combat', reward: { kind: 'boon' } };
+  /** The random state the current chamber was built from (saved, to rebuild it on resume). */
+  roomRng = 0;
+  /** The final guardian fell (the escape is already counted). */
+  won = false;
   /** Per-biome once-only rooms and rewards. */
   used = new Set<string>();
   spoils: Spoils = { materials: {}, gear: [] };
@@ -173,8 +203,9 @@ export class Run {
   }
 
   /** Captures the run (plus the player's health and souls) for saving. */
-  snapshot(hp: number, souls: number): RunSnapshot {
+  snapshot(hp: number, souls: number, extra: Partial<RunSnapshot> = {}): RunSnapshot {
     return {
+      ...extra,
       v: 1,
       seed: this.seed,
       rng: this.rng.state,
@@ -198,6 +229,7 @@ export class Run {
       hp,
       souls,
       spoils: { materials: { ...this.spoils.materials }, gear: this.spoils.gear.map((g) => ({ ...g })) },
+      roomRng: this.roomRng,
     };
   }
 
@@ -210,18 +242,19 @@ export class Run {
     run.depth = snap.depth;
     run.roomsCleared = snap.roomsCleared;
     run.boons = snap.boons.map((b) => ({ ...b }));
-    run.hammers = [...snap.hammers];
-    run.enchants = snap.enchants.map((e) => ({ ...e }));
-    run.artifacts = [...snap.artifacts];
-    run.gold = snap.gold;
-    run.ash = snap.ash;
-    run.kills = snap.kills;
-    run.bonusHp = snap.bonusHp;
-    run.deathDefiance = snap.deathDefiance;
-    run.heat = snap.heat;
-    run.time = snap.time;
+    run.hammers = [...(snap.hammers ?? [])];
+    run.enchants = (snap.enchants ?? []).map((e) => ({ ...e }));
+    if (Array.isArray(snap.artifacts)) run.artifacts = [...snap.artifacts];
+    run.gold = snap.gold ?? 0;
+    run.ash = snap.ash ?? 0;
+    run.kills = snap.kills ?? 0;
+    run.bonusHp = snap.bonusHp ?? 0;
+    run.deathDefiance = snap.deathDefiance ?? 0;
+    run.heat = snap.heat ?? 0;
+    run.time = snap.time ?? 0;
     run.current = snap.current;
-    run.used = new Set(snap.used);
+    run.roomRng = typeof snap.roomRng === 'number' ? snap.roomRng : snap.rng;
+    run.used = new Set(snap.used ?? []);
     if (snap.spoils) run.spoils = { materials: { ...snap.spoils.materials }, gear: [...(snap.spoils.gear ?? [])] };
     return run;
   }

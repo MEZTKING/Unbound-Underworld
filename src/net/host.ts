@@ -514,6 +514,12 @@ export class NetHost implements NetSession {
     this.link.close();
     for (const f of this.undo) f();
     this.undo = [];
+    // Choices still open for players who were here resolve on their behalf,
+    // so the chamber's doors still open.
+    for (const p of this.peers.values()) {
+      for (const opts of p.choices.values()) (opts.skip ? opts.skip.onSkip : () => opts.onPick(0))();
+      p.choices.clear();
+    }
     for (const p of this.peers.values()) if (p.member) g.removeMember(p.member);
     this.peers.clear();
     g.remoteControl = null;
