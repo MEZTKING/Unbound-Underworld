@@ -34,7 +34,7 @@ export function localCoop(g: Game): void {
       .join('');
     const full = g.members.length >= MAX_PARTY;
     const online = g.net?.role === 'client';
-    return `<div class="party-row" style="--w:${MEMBER_COLORS[0]}"><div class="party-name">${esc(g.me.name === 'You' ? 'Player 1' : g.me.name)}<span class="small"> · keyboard &amp; mouse${g.input.padIndices().length ? ' or a gamepad' : ''}</span></div></div>
+    return `<div class="party-row" style="--w:${MEMBER_COLORS[0]}"><div class="party-name">${esc(g.me.name)}<span class="small"> · keyboard &amp; mouse${g.input.padIndices().length ? ' or a gamepad' : ''}</span></div></div>
       ${rows}
       ${
         online
@@ -98,6 +98,9 @@ function waitForPad(g: Game, done: () => void): void {
       g.ui.toast('That gamepad already has a player');
       return;
     }
+    if (g.input.padIndices().length < 2 && !g.members.some((m) => m.kind === 'pad')) {
+      g.ui.toast('Player 1: play with the keyboard and mouse now (that gamepad is player 2\'s).', 4000);
+    }
     const n = g.members.length + 1;
     pickHero(g, null, pad, done, `Player ${n}`);
   };
@@ -107,6 +110,11 @@ function waitForPad(g: Game, done: () => void): void {
 function pickHero(g: Game, m: Member | null, pad: number | null, done: () => void, name = m?.name ?? 'Player 2'): void {
   const open = CHARACTERS.filter((c) => characterUnlocked(c, g.save, g.level));
   const current = m?.character;
+  // Backing out of a new player's pick frees their gamepad again.
+  const cancel = () => {
+    if (pad !== null && !g.members.some((x) => x.pad === pad)) g.input.claimed.delete(pad);
+    g.ui.pop();
+  };
   const el = g.ui.push(
     'station',
     `<div class="panel wide"><h2 class="title" style="color:#7fe8ff">${esc(name)}: choose a hero</h2>
@@ -120,9 +128,9 @@ function pickHero(g: Game, m: Member | null, pad: number | null, done: () => voi
         )
         .join('')}</div>
       <button class="btn" data-nav data-a="back">Back</button></div>`,
-    { onBack: () => g.ui.pop(), cols: 2 },
+    { onBack: cancel, cols: 2 },
   );
-  bind(el, '[data-a]', () => g.ui.pop());
+  bind(el, '[data-a]', cancel);
   bind(el, '[data-c]', (b) => {
     const id = b.dataset.c as CharacterId;
     audio.play('boon');
@@ -131,10 +139,8 @@ function pickHero(g: Game, m: Member | null, pad: number | null, done: () => voi
       g.setHero(m, id);
     } else if (pad !== null) {
       const added = g.addMember('pad', g.save, id, name, { pad });
-      if (added) {
-        g.input.claimed.add(pad);
-        g.ui.toast(`${name} joined`);
-      }
+      if (added) g.ui.toast(`${name} joined`);
+      else g.input.claimed.delete(pad);
     }
     done();
   });

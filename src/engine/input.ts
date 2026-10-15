@@ -406,6 +406,8 @@ export class Input implements Control {
       if (fresh.length && this.capturePad) {
         const fn = this.capturePad;
         this.capturePad = null;
+        // From now on this pad is the new player's: its presses no longer reach player 1.
+        this.claimed.add(p.index);
         fn(p.index);
         continue;
       }

@@ -163,7 +163,7 @@ export class Game implements WorldHost {
       this.save.character = 'kael';
       this.save.weapon = CHARACTER_BY_ID.kael.weapon;
     }
-    this.members = [this.makeMember(0, 'local', this.save, this.save.character, 'You')];
+    this.members = [this.makeMember(0, 'local', this.save, this.save.character, 'Player 1')];
     this.active = this.members[0];
     const unlock = () => audio.unlock();
     // iOS only lets audio start inside touchend/click, so listen for those too.
@@ -231,7 +231,7 @@ export class Game implements WorldHost {
 
   /** Back to just this device's player (leaving an online game). */
   soloParty(): void {
-    this.members = [this.makeMember(0, 'local', this.save, this.save.character, 'You')];
+    this.members = [this.makeMember(0, 'local', this.save, this.save.character, 'Player 1')];
     this.active = this.members[0];
   }
 

@@ -1683,6 +1683,8 @@ function drawPlayerRings(ctx: CanvasRenderingContext2D, w: World): void {
  */
 function drawPartyMarks(ctx: CanvasRenderingContext2D, w: World): void {
   if (w.players.length < 2) return;
+  // Heroes standing together: stack their names instead of overprinting them.
+  const placed: { x: number; y: number }[] = [];
   for (const p of w.players) {
     const color = p.tagColor;
     if (p.state === 'dead') {
@@ -1710,7 +1712,9 @@ function drawPartyMarks(ctx: CanvasRenderingContext2D, w: World): void {
       ctx.restore();
     }
     if (!p.tag) continue;
-    const lift = p.height + 24 + p.z;
+    let lift = p.height + 24 + p.z;
+    while (placed.some((q) => Math.abs(q.x - p.x) < 80 && Math.abs(q.y - (p.y - lift)) < 15)) lift += 16;
+    placed.push({ x: p.x, y: p.y - lift });
     upright(ctx, w, p.x, p.y, lift, () => {
       const y = p.y - lift;
       ctx.font = '700 13px "Cinzel", Georgia, serif';

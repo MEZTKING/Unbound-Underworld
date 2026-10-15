@@ -520,7 +520,7 @@ export class NetHost implements NetSession {
     g.remoteChoice = null;
     g.grant = null;
     g.net = null;
-    g.me.name = 'You';
+    g.me.name = 'Player 1';
     if (g.members.length === 1) g.me.player.tag = '';
   }
 }

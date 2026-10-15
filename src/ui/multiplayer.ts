@@ -373,6 +373,8 @@ export function saveSync(g: Game, server = ''): void {
 /** Puts `save` in the slot in use and restarts the game with it. */
 function replaceSave(g: Game, save: ReturnType<typeof importSave>): void {
   void leaveOnline(g);
+  // The game saves itself as the page unloads: make sure it saves this one.
+  g.save = save;
   writeSave(save);
   g.ui.toast('Save loaded. Restarting…');
   setTimeout(() => location.reload(), 600);

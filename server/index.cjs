@@ -60,6 +60,11 @@ const tls = !!(opts.cert && opts.key);
 const server = tls ? https.createServer({ cert: fs.readFileSync(opts.cert), key: fs.readFileSync(opts.key) }) : http.createServer();
 serve(server, relay);
 
+server.on('error', (err) => {
+  console.error(err.code === 'EADDRINUSE' ? `Port ${opts.port} is already in use. Pick another with --port.` : `Server error: ${err.message}`);
+  process.exit(1);
+});
+
 server.listen(opts.port, opts.bind, () => {
   const scheme = tls ? 'wss' : 'ws';
   console.log(`Unbound Underworld server "${relay.name}" is running.`);
