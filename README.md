@@ -49,6 +49,11 @@ Open your link in Safari and tap *Share → Add to Home Screen* (in Chrome on An
 
 On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (hold to repeat or charge, drag to aim), **✦** Special, **◆** Cast, **»** Dash and **⤒** Jump. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
 
+## Game documentation
+
+- **[docs/DESIGN.md](docs/DESIGN.md):** how the game works. Covers the run structure, progression and unlock order, combat, build systems, heroes, enemy and boss behaviour, where everything lives in the code, and how to add new content.
+- **[docs/GAME_DATA.md](docs/GAME_DATA.md):** every number in the game, generated from the code. This includes the level table, talents, heroes, weapons and forge tiers, every boon, enchantment and artifact, regions, enemies, guardians and Torment. Run `npm run docs` after changing game data; CI checks that it's up to date.
+
 ## Play from source
 
 ```bash
@@ -85,7 +90,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 
 ### Progression
 - **Levels and ranks.** Slain foes, cleared chambers, guardians and escapes earn experience that carries over between runs. There are 30 levels in five rank tiers: Shade, Wraith, Revenant, Champion and Unbound.
-- **Gentle onboarding.** The first runs only have Attack, Special and Dash. New mechanics unlock one at a time, each announced with a short explanation: Healing Potion (level 2), Cast (3), Jump & Slam (4), Artifacts (5), Enchantments (6), Hephaestus' Anvil (7), a second artifact slot (8), Wrath (10) and a third artifact slot (12).
+- **Gentle onboarding.** The first runs only have Attack, Special and Dash. New mechanics unlock one at a time, each announced with a short explanation: Healing Potion (level 2), Cast (3), Artifacts (4), Jump & Slam (5, or as soon as you slay the final guardian), Enchantments (6), Hephaestus' Anvil (7), a second artifact slot (8), Wrath (10) and a third artifact slot (12).
 - **Talents.** Every level gives a point to spend at *Ascension* in the hub. There are 14 talents in five rows, and each row opens with a new rank tier. Resetting your talents is free.
 - **Weapon forging.** At the Armory, spend Ash to forge each weapon from Tier I up to Tier V (Mythic) for more damage. From Tier III (Awakened), every fourth Attack also unleashes an arcane wave. The waves grow at Tier IV, and at Tier V they split in three and the weapon blazes.
 - **Heroes.** Six heroes, each with their own look, perks and **Wrath** ultimate. You choose them in the Hall of Heroes. *Kael* (Inferno Nova), *Lyra* (Moonfall) and *Doran* (Titan's Quake) are available from the start. *Ione* (Tidal Surge) unlocks at level 8, *Erebos* (Eclipse) after slaying 2 guardians, and *Selene* (Starfall) after your first escape.
@@ -96,7 +101,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 - **Combat.** Each weapon has a combo, a dash-strike and a special. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
 - **Five weapons.** *Nightblade* (sword: combo plus Nova Smash), *Thornspear* (thrusts, a charged spin, and a spear you throw and recall) and *Moonbow* (charged shots with a perfect-timing Power Shot, plus a volley), followed later by the *Titan Gauntlets* and *Reaper's Crescent*. Each weapon has its own anvil upgrades.
 - **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity. There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
-- **The run.** Tartarus, then Asphodel, then Elysium, then the Gates of the Styx: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain). Charon sells wares, and an antechamber with a shop and a fountain comes before each guardian.
+- **The run.** Tartarus, then Asphodel, then Elysium, then the Gates of the Styx: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have. Charon sells wares, and an antechamber with a shop and a fountain comes before each guardian.
 - **Four guardians.** *Campe*, Jailer of Tartarus. *The Hydra*, which grows extra heads. *Talos, the Bronze Colossus*: break his armor and he overheats, leaving him open. *Cerberus*, Warden of the Gate, who charges, breathes fire and leap-slams.
 - **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your stats in the Chronicle, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
 
@@ -112,7 +117,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 ### Settings
 *Settings* (on the title screen or in the pause menu) has:
 - **Audio:** sound and music volume, mute.
-- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints.
+- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, control hints, and door descriptions for every door (or only the one you walk up to).
 - **Display:** screen shake, flash intensity, hit-stop, an FPS counter and fullscreen.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 
@@ -120,6 +125,7 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 
 ```bash
 npm test           # Vitest unit tests (combat pipeline, boons, rooms, run flow, saves)
+npm run docs       # regenerate docs/GAME_DATA.md from the game data
 npm run typecheck
 npm run build
 ```
@@ -204,6 +210,8 @@ src/
     render.ts    room art, lighting, effects     hud.ts  HUD
   ui/            DOM menus (boon cards, altar, armory, pause…) and touch controls
 tests/           Vitest suites
+scripts/         gen-docs.ts (writes docs/GAME_DATA.md)
+docs/            DESIGN.md (how the game works), GAME_DATA.md (generated reference), screenshots
 ```
 
 The art is all drawn in code on the canvas, and every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. The fonts (Cinzel and EB Garamond, under the SIL Open Font License) are bundled, so the game also runs offline. Progress is saved to `localStorage`.

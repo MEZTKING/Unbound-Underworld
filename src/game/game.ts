@@ -166,6 +166,7 @@ export class Game implements WorldHost {
     prefs.showFps = st.showFps;
     prefs.hints = st.hints;
     prefs.assist = st.assist;
+    prefs.doorInfo = st.doorInfo;
     this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
   }
 
@@ -175,7 +176,7 @@ export class Game implements WorldHost {
   }
 
   has(feature: Parameters<typeof hasFeature>[1]): boolean {
-    return hasFeature(this.level, feature);
+    return hasFeature(this.level, feature, this.save.stats.escapes > 0);
   }
 
   /** Grants experience and announces any level-ups and what they unlock. */
@@ -372,7 +373,7 @@ export class Game implements WorldHost {
       applyMetaExtras(this.save, s);
     }
     // Order matters: features decide what exists, then talents, hero and forge build on top.
-    applyFeatures(this.level, s);
+    applyFeatures(this.level, s, this.save.stats.escapes > 0);
     applyTalents(this.save.talents, s);
     this.player.hero.apply(s);
     applyForge(this.save.forge[this.player.weapon.id] ?? 1, s);
@@ -623,8 +624,13 @@ export class Game implements WorldHost {
     this.mode = 'over';
     const bonus = Math.round(60 * run.ashMult());
     this.addAsh(bonus);
+    const couldJump = this.has('jump');
     this.save.stats.escapes++;
     this.gainXp(XP.escape);
+    if (!couldJump) {
+      this.recomputeStats();
+      this.ui.toast('Unlocked: Jump & Slam (slaying the final guardian)', 4000);
+    }
     this.save.maxHeat = Math.max(this.save.maxHeat, run.heat + 1);
     if (!this.save.stats.bestTime || run.time < this.save.stats.bestTime) this.save.stats.bestTime = run.time;
     this.persist();
@@ -827,6 +833,7 @@ export class Game implements WorldHost {
     }
     this.ui.choice({
       title: g.name,
+      info: this.buildInfo(),
       subtitle: g.title,
       color: g.color,
       quote: fx.pick(g.greeting),
@@ -849,6 +856,7 @@ export class Game implements WorldHost {
     const gain = run.rng.chance(0.2) ? 2 : 1;
     this.ui.choice({
       title: 'Pomegranate',
+      info: this.buildInfo(),
       subtitle: `Level up a boon by ${gain}.`,
       color: '#ff4a5a',
       cards: cands.map((b) => {
@@ -884,6 +892,7 @@ export class Game implements WorldHost {
     }
     this.ui.choice({
       title: "Hephaestus' Anvil",
+      info: this.buildInfo(),
       subtitle: `Reforge the ${WEAPON_INFO[run.weapon].name}.`,
       color: '#d8d8e8',
       cards: offers.map((h) => ({ title: h.name, subtitle: WEAPON_INFO[h.weapon].name, color: '#d8d8e8', desc: h.desc, icon: '⚒' })),
@@ -904,6 +913,7 @@ export class Game implements WorldHost {
     }
     this.ui.choice({
       title: 'Enchanting Tome',
+      info: this.buildInfo(),
       subtitle: 'Imbue your gear. Find an enchantment again to empower it (up to III).',
       color: '#c98bff',
       cards: offers.map((o) => {
@@ -927,6 +937,7 @@ export class Game implements WorldHost {
     }
     this.ui.choice({
       title: 'Artifact Cache',
+      info: this.buildInfo(),
       subtitle: 'Equip an artifact (keys 1–3 to use).',
       color: '#7fe8ff',
       cards: pool.map((a) => ({
@@ -951,6 +962,12 @@ export class Game implements WorldHost {
   }
 
   // ---------------------------------------------------------------- menus helpers
+
+  /** The "Your build" button shown on reward choices. */
+  private buildInfo(): { label: string; onOpen: () => void } | undefined {
+    if (!this.run || this.run.boons.length + this.run.hammers.length + this.run.enchants.length === 0) return undefined;
+    return { label: 'Your build', onOpen: () => screens.buildView(this) };
+  }
 
   selectWeapon(id: Parameters<typeof createWeapon>[0]): void {
     this.save.weapon = id;

@@ -407,6 +407,25 @@ p.small,
   font-style: italic;
 }
 
+/* ---------------------------------------------------------------- choice extras */
+
+.choice-panel {
+  position: relative;
+}
+
+.btn.corner {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  margin: 0;
+  padding: 5px 12px;
+  font-size: 12px;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  z-index: 1;
+}
+
 /* ---------------------------------------------------------------- upgrades / lists */
 
 .upgrades {
@@ -743,16 +762,17 @@ kbd {
   bottom: calc(24px + var(--sb));
 }
 
+/* Special sits above Attack; Dash sits beside it. */
 .tb.special {
   --c: #ffc070;
-  right: calc(128px + var(--sr));
-  bottom: calc(16px + var(--sb));
+  right: calc(20px + var(--sr));
+  bottom: calc(124px + var(--sb));
 }
 
 .tb.dash {
   --c: #ffe8b0;
-  right: calc(20px + var(--sr));
-  bottom: calc(124px + var(--sb));
+  right: calc(128px + var(--sr));
+  bottom: calc(16px + var(--sb));
 }
 
 .tb.cast {
@@ -905,6 +925,64 @@ kbd {
   }
   .card-desc {
     font-size: 14px;
+    line-height: 1.3;
+    margin-top: 4px;
+  }
+  .card-sub {
+    font-size: 12px;
+  }
+  /* Choice cards: the god icon tucks into the corner so all three fit without scrolling. */
+  .cards > .card .card-icon {
+    position: absolute;
+    top: 8px;
+    right: 24px;
+    width: 26px;
+    height: 26px;
+    font-size: 15px;
+    border-width: 1.5px;
+  }
+  .cards > .card .card-head {
+    padding-right: 34px;
+  }
+  .choice-panel .quote {
+    display: none;
+  }
+  .choice-panel .title {
+    font-size: 22px;
+    margin-bottom: 2px;
+  }
+  .choice-panel .subtitle {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .choice-panel .cards {
+    margin: 6px 0 8px;
+  }
+  .btn.corner {
+    top: 8px;
+    right: 8px;
+  }
+  /* Armory: one weapon per row, with its forge button beside it. */
+  .cards.list {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cards.list .weapon-row {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .cards.list .weapon-row > .card {
+    flex: 1 1 auto;
+    padding: 8px 12px;
+  }
+  .cards.list .btn.forge {
+    width: 210px;
+    min-width: 0;
+    flex: none;
+    margin: 0;
+    font-size: 12px;
+    padding: 6px 10px;
   }
   .btn {
     padding: 8px 16px;

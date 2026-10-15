@@ -9,6 +9,7 @@ import {
   applyTalents,
   artifactSlots,
   canRaiseTalent,
+  hasFeature,
   levelFromXp,
   MAX_LEVEL,
   TALENTS,
@@ -53,7 +54,11 @@ describe('feature unlocks', () => {
     applyFeatures(3, s);
     expect(s.canPotion && s.canCast).toBe(true);
     expect(s.canJump).toBe(false);
-    expect([artifactSlots(4), artifactSlots(5), artifactSlots(8), artifactSlots(12)]).toEqual([0, 1, 2, 3]);
+    expect([artifactSlots(3), artifactSlots(4), artifactSlots(8), artifactSlots(12)]).toEqual([0, 1, 2, 3]);
+    // Jump comes at level 5, or as soon as you've slain the final guardian.
+    expect(hasFeature(4, 'jump')).toBe(false);
+    expect(hasFeature(5, 'jump')).toBe(true);
+    expect(hasFeature(2, 'jump', true)).toBe(true);
     const all = baseStats();
     applyFeatures(MAX_LEVEL, all);
     expect(all.canPotion && all.canCast && all.canJump && all.canWrath).toBe(true);

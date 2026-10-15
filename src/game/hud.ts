@@ -53,12 +53,14 @@ export function drawHUD(
   // and the potion/artifacts are on-screen buttons there).
   // Left-handed touch layout: the buttons move left, so the panel moves right.
   const mirror = touch && lefty;
-  const hx = mirror ? vw - 330 : 24;
+  const hx = mirror ? vw - (touch ? 250 : 330) : 24;
   // The panel grows as the potion and artifacts unlock; on desktop it hugs the bottom edge.
-  const ph = touch ? 86 : s.canPotion || s.artifactSlots ? 104 : s.canWrath ? 70 : 64;
+  // Touch screens use a narrower, shorter panel so it doesn't crowd small phones.
+  const ph = touch ? (s.artifactSlots ? 86 : s.canWrath ? 66 : 58) : s.canPotion || s.artifactSlots ? 104 : s.canWrath ? 70 : 64;
+  const pw = touch ? 250 : 330;
   const hy = touch ? 44 : vh + 18 - ph;
-  panel(ctx, hx - 10, hy - 34, 330, ph);
-  const bw = 230;
+  panel(ctx, hx - 10, hy - 34, pw, ph);
+  const bw = touch ? 170 : 230;
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(hx, hy, bw, 18);
   const frac = Math.max(0, p.hp / p.maxHp);
@@ -115,11 +117,12 @@ export function drawHUD(
   }
   // Dash charges
   ctx.fillStyle = '#c8b8c0';
-  ctx.fillText('DASH', hx + 150, hy - 12);
+  const dx = touch ? 110 : 150;
+  ctx.fillText('DASH', hx + dx, hy - 12);
   for (let i = 0; i < s.dashCharges; i++) {
     ctx.fillStyle = i < p.dashCharges ? '#ffd890' : 'rgba(255,255,255,0.15)';
     ctx.beginPath();
-    ctx.arc(hx + 202 + i * 16, hy - 16, 5, 0, TAU);
+    ctx.arc(hx + dx + 52 + i * 16, hy - 16, 5, 0, TAU);
     ctx.fill();
   }
   if (touch) {
@@ -129,15 +132,17 @@ export function drawHUD(
       ctx.font = `700 11px ${FONT}`;
       ctx.fillText(`SOULS ${Math.floor(p.souls)}`, hx, hy + 44);
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(hx + 80, hy + 37, 150, 8);
+      ctx.fillRect(hx + 80, hy + 37, bw - 80, 8);
       ctx.fillStyle = '#7fe8ff';
-      ctx.fillRect(hx + 80, hy + 37, 150 * (p.souls / s.soulMax), 8);
+      ctx.fillRect(hx + 80, hy + 37, (bw - 80) * (p.souls / s.soulMax), 8);
     }
   } else drawLoadout(ctx, w, hx, hy);
 
-  drawBuild(ctx, run, touch ? 104 : 0, s.canCast, mirror ? vw - 24 - 140 : 24);
-  drawTopRight(ctx, w, run, save, mirror ? 70 : vw - (touch ? 70 : 24), hub, level, mirror);
-  drawOverlays(ctx, w, vw, vh, run, hub, touch);
+  drawBuild(ctx, run, touch ? ph + 20 : 0, s.canCast, mirror ? vw - 24 - 140 : 24);
+  drawTopRight(ctx, w, run, save, mirror ? 70 : vw - (touch ? 70 : 24), hub, level, mirror, touch);
+  // On touch the boss bar fits between the health panel and the currency column.
+  const bossSpan: [number, number] | null = touch ? (mirror ? [210, vw - pw - 30] : [hx + pw + 6, vw - 210]) : null;
+  drawOverlays(ctx, w, vw, vh, run, hub, touch, bossSpan);
   ctx.restore();
 }
 
@@ -302,17 +307,33 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number, 
 }
 
 /** Currencies, location and run timer, right-aligned at x = rx. */
-function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, rx: number, hub: boolean, level: number, left = false): void {
+function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, rx: number, hub: boolean, level: number, left = false, compact = false): void {
   ctx.textAlign = left ? 'left' : 'right';
   ctx.font = `700 17px ${FONT}`;
   let ry = 34;
-  if (run) {
+  if (compact) {
+    // Phones: obols and Ash share one line to keep clear of the buttons below.
+    const ash = `${save.ash} ◆`;
+    const gold = run ? `${run.gold} ◎` : '';
+    const gap = gold ? 16 : 0;
+    const ashW = ctx.measureText(ash).width;
+    const goldW = ctx.measureText(gold).width;
+    const start = left ? rx : rx - ashW - gap - goldW;
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#ffd04a';
-    ctx.fillText(`${run.gold} ◎`, rx, ry);
-    ry += 24;
+    if (gold) ctx.fillText(gold, start, ry);
+    ctx.fillStyle = '#c8a8ff';
+    ctx.fillText(ash, start + goldW + gap, ry);
+    ctx.textAlign = left ? 'left' : 'right';
+  } else {
+    if (run) {
+      ctx.fillStyle = '#ffd04a';
+      ctx.fillText(`${run.gold} ◎`, rx, ry);
+      ry += 24;
+    }
+    ctx.fillStyle = '#c8a8ff';
+    ctx.fillText(`${save.ash} ◆`, rx, ry);
   }
-  ctx.fillStyle = '#c8a8ff';
-  ctx.fillText(`${save.ash} ◆`, rx, ry);
   ry += 22;
   // Level, rank and experience toward the next level.
   const tier = tierFor(level);
@@ -329,6 +350,14 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
   ry += 22;
   ctx.font = `600 13px ${FONT}`;
   ctx.fillStyle = '#c8b8c0';
+  if (compact) {
+    // Location and timer are left out on phones; banners announce each room.
+    if (run && run.heat > 0) {
+      ctx.fillStyle = '#ff6a5a';
+      ctx.fillText(`Torment ${run.heat}`, rx, ry);
+    }
+    return;
+  }
   if (run) {
     const label = run.current.kind === 'boss' ? 'Guardian' : run.current.kind === 'combat' ? `Chamber ${run.depth + 1}` : run.current.kind === 'antechamber' ? 'Antechamber' : run.current.kind === 'shop' ? 'Wares' : 'Rest';
     ctx.fillText(`${w.biome.name} · ${label}`, rx, ry);
@@ -347,21 +376,22 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
 }
 
 /** Boss bar, room banner and hints. */
-function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: number, run: Run | null, hub: boolean, touch: boolean): void {
+function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: number, run: Run | null, hub: boolean, touch: boolean, span: [number, number] | null): void {
   const p = w.player;
   const boss = w.boss;
   if (boss && !boss.dead && !boss.spawning) {
-    const bw2 = Math.min(640, vw - 120);
-    const bx2 = vw / 2 - bw2 / 2;
+    const bw2 = span ? Math.max(140, span[1] - span[0]) : Math.min(640, vw - 120);
+    const bx2 = span ? span[0] : vw / 2 - bw2 / 2;
+    const cx = bx2 + bw2 / 2;
     const by2 = 34;
     ctx.textAlign = 'center';
-    ctx.font = `700 20px ${FONT}`;
+    ctx.font = `700 ${span ? 15 : 20}px ${FONT}`;
     ctx.fillStyle = '#ffd8d0';
-    ctx.fillText(boss.name.toUpperCase(), vw / 2, by2 - 6);
+    ctx.fillText(boss.name.toUpperCase(), cx, by2 - 6);
     if (boss instanceof Boss) {
       ctx.font = `600 12px ${FONT}`;
       ctx.fillStyle = '#c8a8a0';
-      ctx.fillText(boss.title, vw / 2, by2 + 30);
+      ctx.fillText(boss.title, cx, by2 + 30);
     }
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(bx2, by2, bw2, 12);
@@ -379,6 +409,8 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
   }
 
   // ---------------------------------------------------------------- banner
+  // Phones: a little lower so the banner clears the health panel and boss bar.
+  const bannerY = touch ? 0.36 : 0.22;
   const bn = w.banner;
   if (bn) {
     const a = Math.min(1, bn.t * 3, (3.2 - bn.t) * 2);
@@ -389,13 +421,13 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
     g.addColorStop(0.5, 'rgba(0,0,0,0.6)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(vw / 2 - 300, vh * 0.22 - 44, 600, 84);
+    ctx.fillRect(vw / 2 - 300, vh * bannerY - 44, 600, 84);
     ctx.font = `700 36px ${FONT}`;
     ctx.fillStyle = '#ffd890';
-    ctx.fillText(bn.title, vw / 2, vh * 0.22);
+    ctx.fillText(bn.title, vw / 2, vh * bannerY);
     ctx.font = `italic 600 16px ${FONT}`;
     ctx.fillStyle = '#d8c8c0';
-    ctx.fillText(bn.sub, vw / 2, vh * 0.22 + 28);
+    ctx.fillText(bn.sub, vw / 2, vh * bannerY + 28);
     ctx.globalAlpha = 1;
   }
 
