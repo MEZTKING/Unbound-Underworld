@@ -28,6 +28,8 @@ export interface Settings {
   touchSize: number;
   touchOpacity: number;
   leftHanded: boolean;
+  /** 3D voxel view; off draws the classic 2D view. */
+  view3d: boolean;
 }
 
 export function defaultSettings(): Settings {
@@ -48,6 +50,7 @@ export function defaultSettings(): Settings {
     touchSize: 1,
     touchOpacity: 0.9,
     leftHanded: false,
+    view3d: true,
   };
 }
 

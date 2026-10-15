@@ -31,7 +31,8 @@ import { applyMetaExtras, loadRun, loadSave, metaBonuses, writeRun, writeSave, t
 import { Player } from './player';
 import { prefs } from './prefs';
 import { applyFeatures, applyForge, applyTalents, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
-import { REWARD_INFO, renderOpts } from './render';
+import { REWARD_INFO, renderOpts, renderOverlay } from './render';
+import type { VoxelQuality, VoxelRenderer } from '../render3d/voxel';
 import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
 import { Run, type RoomPlan } from './run';
 import type { PlayerStats } from './stats';
@@ -53,11 +54,19 @@ export interface RunSummary {
   cause: string;
 }
 
+/** The 3D view's camera: yaw turns the room, pitch is how far it looks down. */
+const VIEW_YAW = Math.PI / 4;
+const VIEW_PITCH = 0.7;
+
 const CHARON_LINES = ['Hrrrnnngh…', 'Mmmmhhhaaaah.', 'Hhhrrrraaaagh!', '…Hmmmm.'];
 
 export class Game implements WorldHost {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
+  /** The 3D voxel view's canvas, under the 2D one (which then holds effects and text). */
+  readonly canvas3d: HTMLCanvasElement | null;
+  private voxel: VoxelRenderer | null = null;
+  private voxelState: 'off' | 'loading' | 'ready' | 'failed' = 'off';
   dpr = 1;
   /** HUD and menu scale: 1 at the 1280×760 design size, larger on bigger screens. */
   uiScale = 1;
@@ -87,7 +96,14 @@ export class Game implements WorldHost {
 
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
+    this.ctx = canvas.getContext('2d')!;
+    this.canvas3d = document.getElementById('game3d') as HTMLCanvasElement | null;
+    // If the GPU drops the 3D view, carry on in 2D.
+    this.canvas3d?.addEventListener('webglcontextlost', () => {
+      this.voxelState = 'failed';
+      this.voxel = null;
+      this.applyView();
+    });
     this.input = new Input(canvas);
     this.ui = new UI(overlay, this.input);
     this.touch = new TouchControls(this.input);
@@ -132,6 +148,10 @@ export class Game implements WorldHost {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.camera.resize(w, h);
+    if (this.voxel) {
+      this.voxel.setQuality(this.voxelQuality);
+      this.voxel.resize(w, h, this.dpr);
+    }
     // Grow the HUD and menus with the screen so they keep their proportions on
     // 1440p and 4K displays. Smaller screens keep the compact layouts.
     this.uiScale = Math.max(1, Math.min(3, Math.min(w / 1280, h / 760)));
@@ -168,6 +188,54 @@ export class Game implements WorldHost {
     prefs.assist = st.assist;
     prefs.doorInfo = st.doorInfo;
     this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
+    this.applyView();
+  }
+
+  /** Phones skip shadows and render the 3D view at a lower resolution. */
+  private get voxelQuality(): VoxelQuality {
+    const q = this.params.get('quality');
+    if (q === 'high' || q === 'balanced') return q;
+    return this.touch.enabled ? 'balanced' : 'high';
+  }
+
+  /** True while the 3D voxel view is drawing the world. */
+  get view3d(): boolean {
+    return !!this.voxel && this.save.settings.view3d && this.voxelState === 'ready';
+  }
+
+  /**
+   * Switches between the 3D voxel view and the classic 2D view. three.js is
+   * only downloaded the first time the 3D view is used; if WebGL isn't
+   * available the game stays in 2D.
+   */
+  applyView(): void {
+    const want = this.save.settings.view3d && !!this.canvas3d && this.params.get('view') !== '2d';
+    if (want && this.voxelState === 'off') {
+      this.voxelState = 'loading';
+      import('../render3d/voxel')
+        .then(({ VoxelRenderer }) => {
+          this.voxel = new VoxelRenderer(this.canvas3d!, this.voxelQuality);
+          this.voxel.resize(this.camera.vw, this.camera.vh, this.dpr);
+          this.voxelState = 'ready';
+        })
+        .catch((err) => {
+          console.warn('3D view unavailable, using 2D', err);
+          this.voxelState = 'failed';
+        })
+        .finally(() => this.applyView());
+    }
+    const on = want && this.view3d;
+    if (this.canvas3d) this.canvas3d.style.display = on ? 'block' : 'none';
+    // A Hades-style angle: the room turned 45° and seen from about 40° up.
+    const cam = this.camera;
+    if ((cam.yaw !== 0) !== on) {
+      cam.setAngle(VIEW_YAW, on ? VIEW_PITCH : null);
+      cam.viewScale = on ? 1.15 : 1;
+      cam.resize(cam.vw, cam.vh);
+      const up = cam.lift;
+      this.particles.liftX = up.x;
+      this.particles.liftY = up.y;
+    }
   }
 
   /** Your level (from total experience). */
@@ -207,7 +275,7 @@ export class Game implements WorldHost {
     audio.play('boon');
     if (w) {
       w.particles.ring(this.player.x, this.player.y, tier.color, 160, 0.6, 8);
-      w.particles.text(this.player.x, this.player.y - 100, `LEVEL ${level}`, tier.color, 26);
+      w.particles.text(this.player.x, this.player.y, 100, `LEVEL ${level}`, tier.color, 26);
     }
     if (unlocks.length) {
       const u = unlocks[unlocks.length - 1];
@@ -291,7 +359,14 @@ export class Game implements WorldHost {
     const w = this.world;
     renderOpts.touch = this.touch.enabled;
     if (w) {
-      w.render(ctx, this.dpr);
+      if (this.view3d && this.voxel) {
+        this.particles.uprightScale = this.camera.zoom * this.dpr;
+        this.voxel.render(w, this.camera);
+        renderOverlay(w, ctx, this.dpr);
+      } else {
+        this.particles.uprightScale = 0;
+        w.render(ctx, this.dpr);
+      }
       if (this.mode !== 'title') {
         const k = this.dpr * this.uiScale;
         ctx.setTransform(k, 0, 0, k, 0, 0);
@@ -554,7 +629,7 @@ export class Game implements WorldHost {
     const p = this.player;
     if (s.afterParty > 0 && p.hp < p.maxHp * s.afterParty) {
       p.hp = p.maxHp * s.afterParty;
-      w.particles.text(p.x, p.y - 80, 'After Party!', GODS.dionysus.color, 18);
+      w.particles.text(p.x, p.y, 80, 'After Party!', GODS.dionysus.color, 18);
     }
     this.save.stats.bestDepth = Math.max(this.save.stats.bestDepth, run.roomsCleared);
     const cx = clamp(p.x, 200, w.room.w - 200);
@@ -786,21 +861,21 @@ export class Game implements WorldHost {
       case 'gold': {
         const amount = Math.round(rng.range(40, 75) * (1 + run.biomeIndex * 0.3) * this.stats.goldMult);
         run.gold += amount;
-        w.particles.text(p.x, p.y - 90, `+${amount} ◎`, '#ffd04a', 22);
+        w.particles.text(p.x, p.y, 90, `+${amount} ◎`, '#ffd04a', 22);
         audio.play('gold');
         break;
       }
       case 'heart': {
         run.bonusHp += 25;
         this.recomputeStats();
-        w.particles.text(p.x, p.y - 90, '+25 Max Health', '#ff5a6a', 20);
+        w.particles.text(p.x, p.y, 90, '+25 Max Health', '#ff5a6a', 20);
         audio.play('heal');
         break;
       }
       case 'ash': {
         const amount = Math.round((10 + run.biomeIndex * 6 + rng.int(0, 6)) * run.ashMult());
         this.addAsh(amount);
-        w.particles.text(p.x, p.y - 90, `+${amount} Ash`, '#c8a8ff', 22);
+        w.particles.text(p.x, p.y, 90, `+${amount} Ash`, '#c8a8ff', 22);
         break;
       }
       default:

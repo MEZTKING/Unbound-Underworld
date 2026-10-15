@@ -471,12 +471,42 @@ function drawDoors(ctx: CanvasRenderingContext2D, w: World): void {
   }
 }
 
+let overlayDpr = 1;
+
+/**
+ * Draws `fn` unturned and unsquashed for the 3D view, so text, icons and
+ * health bars stay upright. `fn` draws as if in the flat view around the point
+ * (x, y - z); that point lands where the 3D scene shows height z above the
+ * ground point (x, y). In the flat view it just draws.
+ */
+function upright(ctx: CanvasRenderingContext2D, w: World, x: number, y: number, z: number, fn: () => void): void {
+  const cam = w.camera;
+  if (cam.yScale === 1 && cam.yaw === 0) {
+    fn();
+    return;
+  }
+  const up = cam.lift;
+  const s = cam.worldToScreen({ x: x + up.x * z, y: y + up.y * z });
+  const k = cam.zoom * overlayDpr;
+  ctx.save();
+  ctx.setTransform(k, 0, 0, k, s.x * overlayDpr - x * k, s.y * overlayDpr - (y - z) * k);
+  fn();
+  ctx.restore();
+}
+
+/** The ground point under height z at (x, y), for 2D drawing. */
+function lifted(w: World, x: number, y: number, z: number): { x: number; y: number } {
+  const up = w.camera.lift;
+  return { x: x + up.x * z, y: y + up.y * z };
+}
+
 function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
   const p = w.player;
   for (const d of w.doors) {
     if (!d.reward) continue;
+    const reward = d.reward;
     const bob = Math.sin(w.time * 2 + d.x) * 4;
-    drawRewardIcon(ctx, d.reward, d.x, -150 + bob, 22, w.time);
+    upright(ctx, w, d.x, 0, 150 - bob, () => drawRewardIcon(ctx, reward, d.x, -150 + bob, 22, w.time));
     // What lies beyond: always (setting) or when you walk up to the door.
     const near = Math.hypot(p.x - d.x, p.y) < 460;
     if (!d.open || !(prefs.doorInfo || near)) continue;
@@ -491,21 +521,23 @@ function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
     // (the wall above the door can be out of view). Fades when you stand on it.
     const y = 84;
     const onIt = Math.abs(p.x - d.x) < bw / 2 + 10 && Math.abs(p.y - y) < 50;
+    upright(ctx, w, d.x, y, 0, () => {
     ctx.globalAlpha = onIt ? 0.35 : near ? 1 : 0.85;
     ctx.fillStyle = 'rgba(8,4,12,0.82)';
     ctx.fillRect(d.x - bw / 2, y - 16, bw, 42);
-    ctx.strokeStyle = rewardColor(d.reward);
+    ctx.strokeStyle = rewardColor(reward);
     ctx.lineWidth = 1;
     ctx.strokeRect(d.x - bw / 2, y - 16, bw, 42);
-    drawRewardIcon(ctx, d.reward, d.x - tw / 2 - 6, y - 4, 9, w.time);
+    drawRewardIcon(ctx, reward, d.x - tw / 2 - 6, y - 4, 9, w.time);
     ctx.textAlign = 'center';
-    ctx.fillStyle = rewardColor(d.reward);
+    ctx.fillStyle = rewardColor(reward);
     ctx.font = '700 15px "Cinzel", Georgia, serif';
     ctx.fillText(title, d.x + 10, y + 1);
     ctx.fillStyle = '#d8c8c0';
     ctx.font = 'italic 13px "EB Garamond", Georgia, serif';
     ctx.fillText(info.desc, d.x, y + 18);
     ctx.globalAlpha = 1;
+    });
   }
 }
 
@@ -846,8 +878,9 @@ function drawStation(ctx: CanvasRenderingContext2D, it: Interactable, t: number)
 
 // ---------------------------------------------------------------- emissive
 
-function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number): void {
-  const y = pr.y - pr.z;
+function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number, up: { x: number; y: number }): void {
+  const px = pr.x + up.x * pr.z;
+  const y = pr.y + up.y * pr.z;
   if (pr.lob || pr.style === 'glob' || pr.style === 'bomb') {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
@@ -862,8 +895,8 @@ function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(pr.x - Math.cos(a) * 26, y - Math.sin(a) * 26);
-      ctx.lineTo(pr.x, y);
+      ctx.moveTo(px - Math.cos(a) * 26, y - Math.sin(a) * 26);
+      ctx.lineTo(px, y);
       ctx.stroke();
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -874,7 +907,7 @@ function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number
     }
     case 'spear': {
       ctx.save();
-      ctx.translate(pr.x, y);
+      ctx.translate(px, y);
       ctx.rotate(a);
       ctx.strokeStyle = '#6a4630';
       ctx.lineWidth = 4;
@@ -893,7 +926,7 @@ function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number
     }
     case 'shard': {
       ctx.save();
-      ctx.translate(pr.x, y);
+      ctx.translate(px, y);
       ctx.rotate(a);
       ctx.globalCompositeOperation = 'lighter';
       ctx.fillStyle = pr.color;
@@ -913,7 +946,7 @@ function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number
     case 'crescent': {
       // Awakened-weapon wave: a glowing arc facing its flight direction.
       ctx.save();
-      ctx.translate(pr.x, y);
+      ctx.translate(px, y);
       ctx.rotate(a);
       ctx.globalCompositeOperation = 'lighter';
       const fade = Math.min(1, pr.ttl * 5);
@@ -934,30 +967,30 @@ function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number
     case 'bomb': {
       ctx.fillStyle = '#1a1a1a';
       ctx.beginPath();
-      ctx.arc(pr.x, y, pr.r, 0, TAU);
+      ctx.arc(px, y, pr.r, 0, TAU);
       ctx.fill();
       ctx.fillStyle = Math.floor(t * 16) % 2 ? '#ffd04a' : pr.color;
       ctx.beginPath();
-      ctx.arc(pr.x + 4, y - pr.r, 3, 0, TAU);
+      ctx.arc(px + 4, y - pr.r, 3, 0, TAU);
       ctx.fill();
       break;
     }
     default: {
       ctx.globalCompositeOperation = 'lighter';
       const r = pr.r * (pr.style === 'fire' ? 1.4 : 1.2);
-      const g = ctx.createRadialGradient(pr.x, y, 1, pr.x, y, r * 1.6);
+      const g = ctx.createRadialGradient(px, y, 1, px, y, r * 1.6);
       g.addColorStop(0, '#ffffff');
       g.addColorStop(0.35, pr.color);
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(pr.x, y, r * 1.6, 0, TAU);
+      ctx.arc(px, y, r * 1.6, 0, TAU);
       ctx.fill();
       if (pr.charged) {
         ctx.strokeStyle = GODS.zeus.color;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(pr.x, y, r + 3 + Math.sin(t * 40) * 2, 0, TAU);
+        ctx.arc(px, y, r + 3 + Math.sin(t * 40) * 2, 0, TAU);
         ctx.stroke();
       }
       ctx.globalCompositeOperation = 'source-over';
@@ -1191,6 +1224,63 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
 
   // ---- emissive & UI-in-world
   cam.apply(ctx, dpr);
+  drawEffects(ctx, w);
+  w.particles.draw(ctx, 'air');
+  for (const e of w.enemies) if (!e.dead && !e.spawning) e.drawStatus(ctx);
+  drawDoorIcons(ctx, w);
+
+  drawPrompt(ctx, w);
+  drawScreenOverlays(ctx, w, dpr);
+}
+
+/** "[E] Open: Treasure Chest" above whatever you can interact with. */
+function drawPrompt(ctx: CanvasRenderingContext2D, w: World): void {
+  const f = w.focus;
+  if (!f) return;
+  const label = f.kind === 'shop' && f.price !== undefined ? `${f.label} — ${f.price} ◎` : f.label;
+  const y = f.y - (f.kind === 'shop' ? 120 : 110);
+  upright(ctx, w, f.x, f.y, f.y - y, () => {
+    ctx.font = '600 15px "Cinzel", Georgia, serif';
+    ctx.textAlign = 'center';
+    const tw = ctx.measureText(`${label}`).width;
+    ctx.fillStyle = 'rgba(8,4,12,0.85)';
+    ctx.fillRect(f.x - tw / 2 - 40, y - 20, tw + 80, 30);
+    ctx.strokeStyle = 'rgba(255,216,144,0.6)';
+    ctx.strokeRect(f.x - tw / 2 - 40, y - 20, tw + 80, 30);
+    ctx.fillStyle = '#ffd890';
+    ctx.fillText(renderOpts.touch ? `${f.prompt}: ${label}` : `[E] ${f.prompt}: ${label}`, f.x, y);
+  });
+}
+
+/** Vignette, low-health pulse and Eclipse darkness, in screen space. */
+function drawScreenOverlays(ctx: CanvasRenderingContext2D, w: World, dpr: number): void {
+  const cam = w.camera;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const vg = ctx.createRadialGradient(cam.vw / 2, cam.vh / 2, Math.min(cam.vw, cam.vh) * 0.35, cam.vw / 2, cam.vh / 2, Math.max(cam.vw, cam.vh) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.65)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, cam.vw, cam.vh);
+  const p = w.player;
+  const low = p.hp / p.maxHp;
+  if (w.hurtFlash > 0 || (low < 0.3 && p.state !== 'dead')) {
+    const a = Math.max(w.hurtFlash * 1.2 * (0.3 + 0.7 * prefs.flashes), low < 0.3 ? (0.3 - low) * 1.2 * (0.6 + Math.sin(w.time * 5) * 0.4) : 0);
+    const hg = ctx.createRadialGradient(cam.vw / 2, cam.vh / 2, Math.min(cam.vw, cam.vh) * 0.3, cam.vw / 2, cam.vh / 2, Math.max(cam.vw, cam.vh) * 0.7);
+    hg.addColorStop(0, 'rgba(255,0,0,0)');
+    hg.addColorStop(1, `rgba(200,0,20,${Math.min(0.6, a)})`);
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, 0, cam.vw, cam.vh);
+  }
+  if (w.eclipseT > 0) {
+    // Erebos' Eclipse: the room sinks into violet darkness.
+    ctx.fillStyle = `rgba(20,0,40,${Math.min(0.45, w.eclipseT * 0.3)})`;
+    ctx.fillRect(0, 0, cam.vw, cam.vh);
+  }
+}
+
+
+/** Telegraphs, shockwaves, zones, swipes, projectiles and lightning: everything flat or glowing. */
+function drawEffects(ctx: CanvasRenderingContext2D, w: World): void {
   for (const tg of w.telegraphs) {
     const k = clamp(tg.t / tg.dur, 0, 1);
     const fade = tg.cancelled ? Math.max(0, 1 - (tg.t - tg.dur) / 0.15) : 1;
@@ -1230,8 +1320,9 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
 
   for (const s of w.swipes) {
     const k = s.t / s.dur;
-    const x = s.owner ? s.owner.x : s.x;
-    const y = (s.owner ? s.owner.y : s.y) - 22;
+    const c = lifted(w, s.owner ? s.owner.x : s.x, s.owner ? s.owner.y : s.y, 22);
+    const x = c.x;
+    const y = c.y;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 1 - k;
@@ -1252,7 +1343,7 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
     ctx.restore();
   }
 
-  for (const pr of w.projectiles) drawProjectile(ctx, pr, w.time);
+  for (const pr of w.projectiles) drawProjectile(ctx, pr, w.time, w.camera.lift);
   drawBeam(ctx, w);
 
   ctx.save();
@@ -1274,48 +1365,104 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   }
   ctx.restore();
 
+}
+
+/**
+ * The voxel view's 2D layer: everything the 3D scene doesn't model (effects,
+ * floating text, health bars, icons, prompts), drawn over it with the camera's
+ * 45° squash so it lines up.
+ */
+export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: number): void {
+  overlayDpr = dpr;
+  const cam = w.camera;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, cam.vw * dpr, cam.vh * dpr);
+  cam.apply(ctx, dpr);
+  for (const z of w.zones) if (z.kind === 'web' || z.kind === 'fog') drawZone(ctx, z, w.time);
+  // Brief light bursts (hits, explosions) as soft additive glows.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const f of w.flashes) {
+    const a = (1 - f.t / f.dur) * 0.3 * (0.25 + 0.75 * prefs.flashes);
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * 0.6);
+    g.addColorStop(0, f.color);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r * 0.6, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+  drawPlayerRings(ctx, w);
+  for (const it of w.interactables) {
+    if (it.kind !== 'shop') continue;
+    const y = it.y - 68 + Math.sin(w.time * 2 + it.x) * 4;
+    upright(ctx, w, it.x, it.y, it.y - y, () => {
+      ctx.textAlign = 'center';
+      if (it.used) {
+        ctx.fillStyle = '#8a7a8a';
+        ctx.font = '600 12px Georgia, serif';
+        ctx.fillText('SOLD', it.x, it.y - 50);
+        return;
+      }
+      drawRewardIcon(ctx, shopIconSpec(it), it.x, y, 18, w.time);
+      ctx.fillStyle = '#ffd04a';
+      ctx.font = '700 14px "Cinzel", Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${it.price ?? 0} ◎`, it.x, y + 40);
+    });
+  }
+  for (const pk of w.pickups) upright(ctx, w, pk.x, pk.y, 0, () => drawPickup(ctx, w, pk));
+  const weapon = w.player.weapon;
+  if (isSpear(weapon)) weapon.drawWorld(ctx, w);
+  for (const e of w.enemies) {
+    if (e.dead || e.spawning) continue;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    e.drawFx(ctx, w);
+    ctx.restore();
+  }
+  drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
-  for (const e of w.enemies) if (!e.dead && !e.spawning) e.drawStatus(ctx);
+  for (const e of w.enemies) if (!e.dead && !e.spawning) upright(ctx, w, e.x, e.y, e.height, () => e.drawStatus(ctx));
   drawDoorIcons(ctx, w);
+  drawPrompt(ctx, w);
+  drawScreenOverlays(ctx, w, dpr);
+}
 
-  // Interact prompt
-  const f = w.focus;
-  if (f) {
-    const label = f.kind === 'shop' && f.price !== undefined ? `${f.label} — ${f.price} ◎` : f.label;
-    const y = f.y - (f.kind === 'shop' ? 120 : 110);
-    ctx.font = '600 15px "Cinzel", Georgia, serif';
-    ctx.textAlign = 'center';
-    const tw = ctx.measureText(`${label}`).width;
-    ctx.fillStyle = 'rgba(8,4,12,0.85)';
-    ctx.fillRect(f.x - tw / 2 - 40, y - 20, tw + 80, 30);
-    ctx.strokeStyle = 'rgba(255,216,144,0.6)';
-    ctx.strokeRect(f.x - tw / 2 - 40, y - 20, tw + 80, 30);
-    ctx.fillStyle = '#ffd890';
-    ctx.fillText(renderOpts.touch ? `${f.prompt}: ${label}` : `[E] ${f.prompt}: ${label}`, f.x, y);
-  }
-
-  // ---- screen-space overlays
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const vg = ctx.createRadialGradient(cam.vw / 2, cam.vh / 2, Math.min(cam.vw, cam.vh) * 0.35, cam.vw / 2, cam.vh / 2, Math.max(cam.vw, cam.vh) * 0.75);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.65)');
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, cam.vw, cam.vh);
+/** The hero's Wrath-ready ring and shields, drawn on the floor around them. */
+function drawPlayerRings(ctx: CanvasRenderingContext2D, w: World): void {
   const p = w.player;
-  const low = p.hp / p.maxHp;
-  if (w.hurtFlash > 0 || (low < 0.3 && p.state !== 'dead')) {
-    const a = Math.max(w.hurtFlash * 1.2 * (0.3 + 0.7 * prefs.flashes), low < 0.3 ? (0.3 - low) * 1.2 * (0.6 + Math.sin(w.time * 5) * 0.4) : 0);
-    const hg = ctx.createRadialGradient(cam.vw / 2, cam.vh / 2, Math.min(cam.vw, cam.vh) * 0.3, cam.vw / 2, cam.vh / 2, Math.max(cam.vw, cam.vh) * 0.7);
-    hg.addColorStop(0, 'rgba(255,0,0,0)');
-    hg.addColorStop(1, `rgba(200,0,20,${Math.min(0.6, a)})`);
-    ctx.fillStyle = hg;
-    ctx.fillRect(0, 0, cam.vw, cam.vh);
+  if (p.state === 'dead') return;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  if (p.wrathReady && w.stats.canWrath) {
+    ctx.strokeStyle = `rgba(255,208,74,${0.45 + Math.sin(p.t * 8) * 0.25})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 26, 26, 0, 0, TAU);
+    ctx.stroke();
   }
-  if (w.eclipseT > 0) {
-    // Erebos' Eclipse: the room sinks into violet darkness.
-    ctx.fillStyle = `rgba(20,0,40,${Math.min(0.45, w.eclipseT * 0.3)})`;
-    ctx.fillRect(0, 0, cam.vw, cam.vh);
+  const up = w.camera.lift;
+  ctx.translate(up.x * (p.z + 30), up.y * (p.z + 30));
+  if (p.ironHideT > 0) {
+    ctx.strokeStyle = `rgba(190,200,220,${0.4 + Math.sin(p.t * 8) * 0.2})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 34, 0, TAU);
+    ctx.stroke();
   }
+  if (p.holyShield && w.stats.holyShield) {
+    ctx.strokeStyle = `rgba(242,211,138,${0.35 + Math.sin(p.t * 4) * 0.15})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 28, 40, 0, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 export function invalidateRoomCache(w: World): void {

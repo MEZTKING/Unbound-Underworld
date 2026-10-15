@@ -105,13 +105,13 @@ export function onAbilityHit(w: World, e: Enemy, base: number, o: DamageOpts): v
       if (other === e || other.isBoss) continue;
       other.knock(e.x - other.x, e.y - other.y, 520);
       other.status.stun = Math.max(other.status.stun ?? 0, 1);
-      w.addBolt(e.x, e.y - 20, other.x, other.y - 20, '#b0b8c8');
+      w.addBolt(e.x, e.y, other.x, other.y, '#b0b8c8', 20, 20);
     }
     e.status.stun = Math.max(e.status.stun ?? 0, e.isBoss ? 0.2 : 1);
   }
   if (ench.stunning && Math.random() < T(ench.stunning, STUNNING)) {
     e.status.stun = Math.max(e.status.stun ?? 0, e.isBoss ? 0.3 : 1.5);
-    w.particles.text(e.x, e.y - e.height - 24, 'STUN', '#ffe680', 13);
+    w.particles.text(e.x, e.y, e.height + 24, 'STUN', '#ffe680', 13);
   }
   if (ench.radiance && Math.random() < T(ench.radiance, RADIANCE)) {
     const p = w.player;
@@ -147,6 +147,6 @@ export function onEnemyKilled(w: World, e: Enemy): void {
   if (ench.leeching) w.healPlayer(T(ench.leeching, LEECHING), false);
   if (ench.rampaging && Math.random() < T(ench.rampaging, RAMPAGING)) {
     w.player.rampageT = 5;
-    w.particles.text(w.player.x, w.player.y - 80, 'RAMPAGE', '#ffd04a', 16);
+    w.particles.text(w.player.x, w.player.y, 80, 'RAMPAGE', '#ffd04a', 16);
   }
 }

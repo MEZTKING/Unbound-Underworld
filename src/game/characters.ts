@@ -45,7 +45,7 @@ function wrathFlash(w: World, color: string, title: string): void {
   w.camera.shake(0.6);
   w.flashLight(p.x, p.y, 900, color, 0.6);
   w.particles.ring(p.x, p.y, color, 140, 0.4, 10);
-  w.particles.text(p.x, p.y - 100, title, color, 28);
+  w.particles.text(p.x, p.y, 100, title, color, 28);
   p.iframes = Math.max(p.iframes, 1);
   audio.play('roar', 0.35);
   audio.play('explode');
@@ -107,7 +107,7 @@ export const CHARACTERS: CharacterDef[] = [
           for (const e of foes) {
             w.later(0.12 + k * 0.28 + fx.range(0, 0.1), () => {
               if (e.dead) return;
-              w.addBolt(e.x + fx.range(-30, 30), e.y - 520, e.x, e.y - 10, '#d8f4ff');
+              w.addBolt(e.x + fx.range(-30, 30), e.y, e.x, e.y, '#d8f4ff', 520, 10);
               w.particles.ring(e.x, e.y, '#c8f0ff', 50, 0.25, 4);
               damageEnemy(w, e, 45, { source: 'effect', crit: 0.25, noEffects: true, color: '#d8f4ff' });
             });
@@ -202,7 +202,7 @@ export const CHARACTERS: CharacterDef[] = [
           e.status.stun = Math.max(e.status.stun ?? 0, e.isBoss ? 1 : 3);
           e.status.doom = undefined;
           applyDoom(e, 140);
-          w.addBolt(p.x, p.y - 30, e.x, e.y - 20, '#c86bff');
+          w.addBolt(p.x, p.y, e.x, e.y, '#c86bff', 30, 20);
         }
         w.healPlayer(p.maxHp * 0.2, true);
       },
@@ -243,7 +243,7 @@ export const CHARACTERS: CharacterDef[] = [
             color: 'rgba(255,240,160,1)',
             owner: null,
             onDone: () => {
-              w.addBolt(x - 120, y - 600, x, y, '#fff0a0');
+              w.addBolt(x - 120, y, x, y, '#fff0a0', 600, 0);
               playerBlast(w, x, y, 80, 55, { color: '#fff0a0', knock: 250 });
             },
           });

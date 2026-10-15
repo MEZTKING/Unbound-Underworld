@@ -22,7 +22,7 @@ This is the readable overview of how the game works and how its parts fit togeth
 
 ## 1. The game in one page
 
-A top-down action roguelike. You are a shade escaping the Underworld one chamber at a time. The core loop is modelled on *Hades*, with systems inspired by *Minecraft Dungeons II* (jump attacks, artifacts, enchantments, chests). All art is drawn in code and all audio is synthesized, so the game ships without asset files. Names are original or taken from Greek myth.
+A top-down action roguelike. You are a shade escaping the Underworld one chamber at a time. The core loop is modelled on *Hades*, with systems inspired by *Minecraft Dungeons II* (jump attacks, artifacts, enchantments, chests). All art is made in code (blocks in the 3D view, canvas drawing in the 2D view) and all audio is synthesized, so the game ships without asset files. Names are original or taken from Greek myth.
 
 **Loop:** Hall of Shades (hub) → walk through the gate → fight through 4 regions → slay each region's guardian → escape. When you die you return to the hub and keep **Ash** (a currency) and **experience**, then spend them on permanent growth and try again.
 
@@ -206,11 +206,12 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
   - Desktop: Electron. Windows, macOS and Linux, with a one-button self-updater for the Windows installer and the Linux AppImage.
   - Android: Capacitor APK, plus a Play Store bundle build.
 - **Touch:** a floating joystick on the left and an action cluster on the right: Attack, Special above it, Dash beside it, Cast, Jump, Wrath, potion and artifacts. Buttons appear as their mechanics unlock.
+- **Views:** the 3D voxel view (default) renders the world with three.js, which is only loaded when this view is used. It has a Hades-style camera: the room is turned 45° and seen from about 40° up, so rooms show as diamonds with the doors on the far edges. Movement, sticks and mouse aim are turned to match, so up on the keyboard is up on screen. Effects, damage numbers, health bars, pickups and prompts are drawn by a 2D layer on top. That layer uses the same angle (`Camera.setAngle`), and heights go through `Camera.lift`, so the effects line up with the 3D scene. The classic 2D view looks straight down and draws everything on the canvas. On desktop the 3D view has shadows and point lights; phones get no shadows and a lower resolution.
 - **Scaling:** the HUD and menus scale with screen size (1 at 1280×760, up to ×3 on 4K). Phones get compact layouts: a narrower health panel and boon choices that fit without scrolling.
 - **Settings:**
   - Audio.
   - Assist mode, aim assist, damage numbers, control hints, and door descriptions (every door, or only the nearest).
-  - Shake, flashes, hit-stop, FPS counter, fullscreen.
+  - 3D voxel view or classic 2D view, shake, flashes, hit-stop, FPS counter, fullscreen.
   - Touch button size, opacity, left-handed layout and vibration.
 
 ## 11. Where things live in the code
@@ -229,7 +230,8 @@ Slaying Cerberus is an **escape**. It raises the Torment cap, gives a large amou
 | Damage pipeline and status effects | `src/game/combat.ts` |
 | Run state and door rewards | `src/game/run.ts` |
 | Orchestration (hub, rewards, level-ups, settings) | `src/game/game.ts` |
-| HUD / world rendering | `src/game/hud.ts` / `src/game/render.ts` |
+| HUD / 2D world rendering and the 3D view's overlay | `src/game/hud.ts` / `src/game/render.ts` |
+| 3D voxel view (rooms, props, figures, lights) | `src/render3d/voxel.ts` |
 | Menus / touch controls | `src/ui/screens.ts` / `src/ui/touch.ts` |
 
 ## 12. How to add content
@@ -242,8 +244,8 @@ After any change: run `npm test`, then `npm run docs`, and commit the regenerate
 - **A hero:** add it to `CHARACTERS` in `characters.ts`. Fields: palette and headwear (`crown`), `apply(stats)` for perks, an `unlock` condition and a `wrath.use(world)` ultimate.
 - **A talent:** add it to `TALENTS` in `progression.ts`. Its `tier` picks the row.
 - **A mechanic unlock:** add a `Feature` and an entry in `UNLOCKS`, set a stat flag in `applyFeatures()`, then gate the input in `player.ts`, the HUD in `hud.ts`, the touch button in `game.ts → syncTouch` and the reward pool in `run.ts`.
-- **An enemy:** subclass `Enemy` in `enemies/types.ts`, add its kind to `EnemyKind`, `ENEMY_COST` and `createEnemy()`, and put it in a region's `pool` in `rooms.ts`.
-- **A guardian:** subclass `Boss` in `enemies/bosses.ts`, add it to `BossKind` and `createBoss()`, and set it as a region's `boss`.
+- **An enemy:** subclass `Enemy` in `enemies/types.ts`, add its kind to `EnemyKind`, `ENEMY_COST` and `createEnemy()`, and put it in a region's `pool` in `rooms.ts`. For the 3D view, give its name a `LOOKS` entry in `render3d/voxel.ts` (body shape and colours); without one it is drawn as a plain humanoid.
+- **A guardian:** subclass `Boss` in `enemies/bosses.ts`, add it to `BossKind` and `createBoss()`, and set it as a region's `boss`. Add a `LOOKS` entry for the 3D view too.
 - **An artifact / enchantment:** add it to `ARTIFACTS` / `ENCHANTS`. Enchantment effects hook into `enchants.ts → onAbilityHit / onEnemyKilled`.
 
 ## 13. Keeping docs up to date

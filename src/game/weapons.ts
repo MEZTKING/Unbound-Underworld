@@ -685,7 +685,7 @@ class Bow implements Weapon {
           }
           if (power) {
             ww.particles.ring(pp.x, pp.y - 24, '#fff0a0', 50, 0.3, 4);
-            ww.particles.text(pp.x, pp.y - 80, 'POWER SHOT', '#fff0a0', 14);
+            ww.particles.text(pp.x, pp.y, 80, 'POWER SHOT', '#fff0a0', 14);
           }
           audio.play('bow');
         },
