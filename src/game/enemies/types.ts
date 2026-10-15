@@ -40,10 +40,9 @@ export class Grunt extends Enemy {
       case 'idle':
       case 'chase':
         this.chase(w, this.speed, dt);
-        if (d < 80 && this.cd <= 0) {
+        if (d < 80 && this.cd <= 0 && this.canAttack(w, 'melee')) {
           this.setState('windup');
-          this.facing = this.angleToPlayer(w);
-          const a = this.facing;
+          const a = this.aimAtPlayer(w);
           this.telegraph(w, { type: 'arc', x: this.x, y: this.y, r: 85, angle: a, half: 0.9 }, 0.5 / this.haste, () => {
             w.addHitbox({ team: 'enemy', shape: { type: 'arc', x: this.x, y: this.y, r: 85, angle: a, half: 0.9 }, damage: this.dmg, source: 'enemy', knock: 200, ttl: 0.1, hit: new Set(), owner: this });
             audio.play('swing');
@@ -101,9 +100,9 @@ export class Skitter extends Enemy {
       case 'idle':
       case 'chase':
         this.chase(w, this.speed, dt);
-        if (d < 170 && this.cd <= 0 && w.lineOfSight(this.x, this.y, w.player.x, w.player.y)) {
+        if (d < 170 && this.cd <= 0 && w.lineOfSight(this.x, this.y, w.player.x, w.player.y) && this.canAttack(w, 'melee')) {
           this.setState('windup');
-          this.lunge = fromAngle(this.angleToPlayer(w));
+          this.lunge = fromAngle(this.aimAtPlayer(w, 0.08, 0.6));
           audio.play('telegraph');
         }
         break;
@@ -161,6 +160,7 @@ export class Brute extends Enemy {
   private aim = 0;
   constructor(x: number, y: number, s = 1) {
     super(x, y, { hp: 140, speed: 90, r: 28, height: 66, damage: 20, knockResist: 0.65, gold: [3, 6] }, s);
+    this.turnRate = 2.5;
   }
   protected think(w: World, dt: number): void {
     const d = this.distToPlayer(w);
@@ -168,10 +168,9 @@ export class Brute extends Enemy {
       case 'idle':
       case 'chase':
         this.chase(w, this.speed, dt);
-        if (d < 150 && this.cd <= 0) {
+        if (d < 150 && this.cd <= 0 && this.canAttack(w, 'melee')) {
           this.setState('windup');
-          this.aim = this.angleToPlayer(w);
-          this.facing = this.aim;
+          this.aim = this.aimAtPlayer(w, 0, 0.35);
           const cx = this.x + Math.cos(this.aim) * 70;
           const cy = this.y + Math.sin(this.aim) * 70;
           this.telegraph(w, { type: 'circle', x: cx, y: cy, r: 110 }, 0.9 / this.haste, () => {
@@ -248,16 +247,16 @@ export class Caster extends Enemy {
       case 'idle':
       case 'chase':
         this.kite(w, 380, this.speed, dt);
-        if (this.cd <= 0 && w.lineOfSight(this.x, this.y, w.player.x, w.player.y, 0, true)) {
+        if (this.cd <= 0 && w.lineOfSight(this.x, this.y, w.player.x, w.player.y, 0, true) && this.canAttack(w, 'ranged')) {
           this.setState('windup');
           audio.play('telegraph');
         }
         break;
       case 'windup':
         this.stop(dt);
-        this.facing = this.angleToPlayer(w);
+        this.turnTo(this.angleToPlayer(w), dt);
         if (this.stateT > 0.6) {
-          const a = this.angleToPlayer(w);
+          const a = this.aimAtPlayer(w, 0.1, 0.45);
           for (const off of [-0.22, 0, 0.22]) shoot(w, this, a + off, 340, this.dmg, '#ff7a4a');
           this.setState('recover');
         }
@@ -306,7 +305,7 @@ export class Bomber extends Enemy {
       case 'idle':
       case 'chase':
         this.kite(w, 420, this.speed, dt);
-        if (this.cd <= 0) this.setState('windup');
+        if (this.cd <= 0 && this.canAttack(w, 'ranged')) this.setState('windup');
         break;
       case 'windup':
         this.stop(dt);
@@ -439,6 +438,7 @@ export class Charger extends Enemy {
   private dir = { x: 0, y: 0 };
   constructor(x: number, y: number, s = 1) {
     super(x, y, { hp: 75, speed: 115, r: 22, height: 44, damage: 16, knockResist: 0.4, gold: [2, 5] }, s);
+    this.turnRate = 2.2;
   }
   protected think(w: World, dt: number): void {
     const p = w.player;
@@ -447,10 +447,9 @@ export class Charger extends Enemy {
       case 'idle':
       case 'chase':
         this.chase(w, this.speed, dt);
-        if (d < 520 && this.cd <= 0 && w.lineOfSight(this.x, this.y, p.x, p.y)) {
+        if (d < 520 && this.cd <= 0 && w.lineOfSight(this.x, this.y, p.x, p.y) && this.canAttack(w, 'melee')) {
           this.setState('windup');
-          const a = this.angleToPlayer(w);
-          this.facing = a;
+          const a = this.aimAtPlayer(w, 0.05, 0.45);
           this.dir = fromAngle(a);
           const len = 560;
           this.telegraph(w, { type: 'capsule', x1: this.x, y1: this.y, x2: this.x + this.dir.x * len, y2: this.y + this.dir.y * len, r: this.r + 4 }, 0.75 / this.haste, () => {});
@@ -540,7 +539,7 @@ export class Shield extends Enemy {
       case 'chase': {
         this.moveToward(w, w.player.x, w.player.y, this.speed, dt);
         this.facing += clamp(angleDiff(this.facing, want), -2.2 * dt, 2.2 * dt);
-        if (d < 120 && this.cd <= 0) {
+        if (d < 120 && this.cd <= 0 && this.canAttack(w, 'melee')) {
           this.setState('windup');
           this.aim = this.facing;
           const x2 = this.x + Math.cos(this.aim) * 120;
@@ -688,7 +687,7 @@ export class Weaver extends Enemy {
       case 'idle':
       case 'chase':
         this.kite(w, 300, this.speed, dt);
-        if (this.cd <= 0) this.setState('windup');
+        if (this.cd <= 0 && this.canAttack(w, 'ranged')) this.setState('windup');
         break;
       case 'windup':
         this.stop(dt);
@@ -789,7 +788,7 @@ export class Bonecaller extends Enemy {
             }
             audio.play('spawn');
           } else {
-            const pr = shoot(w, this, this.angleToPlayer(w), 220, this.dmg, '#9dffcf', 11);
+            const pr = shoot(w, this, this.aimAtPlayer(w, 0.12, 0.6), 220, this.dmg, '#9dffcf', 11);
             pr.homing = 1.4;
             pr.ttl = 5;
           }

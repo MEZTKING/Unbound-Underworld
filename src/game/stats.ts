@@ -50,6 +50,7 @@ export interface PlayerStats {
   artifactCdMult: number;
   chestChance: number;
   // --- progression (level-gated mechanics, talents, heroes, forge)
+  canGuard: boolean;
   canPotion: boolean;
   canCast: boolean;
   canJump: boolean;
@@ -106,6 +107,7 @@ export function baseStats(): PlayerStats {
     potionHeal: 0.35,
     artifactCdMult: 1,
     chestChance: 0.25,
+    canGuard: true,
     canPotion: true,
     canCast: true,
     canJump: true,

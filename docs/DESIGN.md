@@ -61,7 +61,7 @@ Four layers, all permanent:
 | **Level & rank** | Experience (automatic) | — | Unlocks mechanics, heroes, weapons, forge tiers; 1 talent point per level |
 | **Talents** | Talent points | *Ascension* stone | 14 talents in 5 rows; each row opens with a rank tier (Shade → Wraith → Revenant → Champion → Unbound). Free respec |
 | **Altar of Ashes** | Ash | Altar (mirror) | 11 permanent stat upgrades |
-| **Armory** | Ash (+ level) | Weapon rack | Buy weapons; forge each from Tier I to Tier V |
+| **Armory** | Ash (+ level) | Weapon rack | Forge each class weapon from Tier I to Tier V |
 
 **Onboarding order.** The full table is in GAME_DATA.md. The intent is that each new mechanic arrives once the previous one is familiar:
 
@@ -77,13 +77,16 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
 ## 4. Combat
 
 - **Inputs.**
-  - Attack (hold to repeat or charge) and Special.
+  - Attack and Special. **Combat grammar:** taps chain (`ActionDef.chain` = the step); holding Attack for `POWER_HOLD` (0.22 s) after a chain hit swaps into `Weapon.powered(step)`, a charge built by `poweredAttack()` (level 1–3 from the chain step, a Perfect for releasing on the flash). Still holding after that = `Weapon.held()` (repeat, a spin, the bow's draw, the katana's ready stance…). A Special within 0.6 s of a chain hit is a combo special (30% faster windup, +25% damage).
   - Cast: a shard that lodges in foes; walk over it to pick it up again.
   - Dash: brief invulnerability. Attacking right after a dash gives a *Dash-Strike*.
   - Jump: attack mid-air to *Slam*.
+  - Guard (level 2): hold to block (front 140°, a 100-point meter that refills after 0.8 s; empty = Guard Break), tap to open a parry window (0.15 s; 0.18 blades, 0.2 brawlers; wider on touch and with Assist). A parry staggers the foe (guardians flinch), reflects shots, and makes the next attack a riposte (every hit crits). Ranged classes sidestep instead (Perfect Dodge in the first 0.15 s). Ground-tagged hits can't be guarded. All in `Player.defend()`, called first by `World.hurtPlayer()`.
+  - Combo meter: `Player.combo` counts hits in a row (reset when hurt or after 2.5 s without a hit); +1% damage per 10 (max +10%).
   - Potion, artifact slots 1–3, and Wrath. Keyboard keys can be rebound (`Settings.keys`, applied with `Input.setBindings`; menu keys always work).
 - **Moving while fighting** (`player.ts`, the `action` state): basic attack chains keep at least 85% of walking speed (`BASIC_MOVE`), casts 70%, other skills 45% and held charges 60%. Basic attacks never push the hero forward; only kit moves with a `lunge` (dash-strikes, some specials) do.
-- **Weapons** (5): each has a combo, a dash-strike, a special and a slam. See GAME_DATA.md → *Weapons* for names, costs and anvil upgrades.
+- **Weapons** (8, one per class; `weapons.ts`, `arsenal.ts`, `kits.ts`): each has a chain, a powered attack, a dash-strike, a special and a slam. See GAME_DATA.md → *Weapons* for names, classes and anvil upgrades.
+- **Classes:** each hero (`characters.ts`) has a `role`, a signature `weapon` and a `guard` style; choosing the hero sets the weapon. Heroes unlock by level, some also by guardians or escapes (`unlock.or`).
 - **Forging** adds weapon damage per tier. **Awakened** (Tier III and above) fires an arcane crescent wave every 4th Attack; it grows at Tier IV, and at Tier V (**Mythic**) it splits into three and gives a weapon aura.
 - **Damage pipeline** (`combat.ts → damageEnemy`), applied in this order:
   1. Bonuses: global, per-slot boons, enchantments, low-health frenzy, *Giantslayer* against bosses and elites.
@@ -110,16 +113,26 @@ Every reward choice screen has a **Your build** button to review what you alread
 
 ## 6. Heroes and Wrath
 
-Six heroes with different stats and perks, a distinct look (headwear and palette) and their own **Wrath** ultimate:
+Eight heroes, each a class: a signature weapon, a guard style, perks, a distinct look (headwear and palette) and their own **Wrath** ultimate:
 
-- **Starters:** Kael (balanced, Inferno Nova), Lyra (fast and precise, Moonfall) and Doran (tank, Titan's Quake).
-- **Unlockable:** Ione (level 8, Tidal Surge), Erebos (2 guardians slain, Eclipse) and Selene (first escape, Starfall).
+| Hero | Class | Weapon | Guard | Unlock | Wrath |
+|---|---|---|---|---|---|
+| Kael | Warrior | Nightblade | parry | Start | Inferno Nova |
+| Lyra | Ranger | Moonbow | evade | Start | Moonfall |
+| Doran | Vanguard | Thornspear | shield | Start | Titan's Quake |
+| Gorran | Brawler | Titan Gauntlets | catch | Level 5 | Hundred Fists |
+| Ione | Monk | Riptide Chains | catch | Level 8 | Tidal Surge |
+| Erebos | Reaper | Reaper's Crescent | mist | Level 10 or 2 guardians | Eclipse |
+| Rook | Gunner | Thunderbuss | evade | Level 12 | Cannonade |
+| Selene | Duelist | Starsplitter | parry | Level 15 or first escape | Starfall |
 
 The Wrath gauge fills from damage dealt and taken (talents and Kael speed it up). When full, press `F`, `R3` or the ☄ touch button. Every Wrath grants a moment of invulnerability and slow motion.
 
 ## 7. Enemies
 
 Base values; foes get tougher with region and Torment. The full stat table is in GAME_DATA.md → *Enemies*.
+
+**AI rules** (`enemies/enemy.ts`): foes turn at `turnRate` (5 rad/s; Brutes 2.5, Gorgehorns 2.2, guardians 3) and attacks lock to `aimAtPlayer()`: their facing pulled toward you by at most a snap angle, plus aim error for shots (`World.foeAimError`, smaller with Torment). `canAttack()` hands out **attack tokens**: 2 melee and 2 ranged at once, +1 per two Torment levels (`World.tokenBonus`); a foe without one circles at ~175 px. From afar, `chase()` heads for the foe's own `slot` around you so groups surround. Foes pause 0.15–0.6 s after spawning (`reactT`).
 
 | Foe | Behaviour | Counterplay |
 |---|---|---|
@@ -189,7 +202,7 @@ Slaying Threefang is an **escape**. It raises the Torment cap, gives a large amo
 
 ## 8b. Loot and gear
 
-Unlocks at level 10 (`feature: 'gear'`). Numbers are in GAME_DATA.md → *Loot and gear*; the code is `src/game/gear.ts` (data) and `src/ui/gear.ts` (screen).
+Loot drops from the first escape; the Gear & Inventory screen opens at level 2 (`feature: 'gear'`). Pickups fly to you within 120 px and all of them when a chamber is cleared; `World.feed()` lists them on the HUD, and `Run.spoils` is shown when the escape ends. Numbers are in GAME_DATA.md → *Loot and gear*; the code is `src/game/gear.ts` (data) and `src/ui/gear.ts` (screen).
 - **Materials** drop from foes during escapes and are kept forever (`save.materials`): Bone Dust everywhere, a region material (Ember Shard, Golden Ichor, Gate Pearl), and Titan Scales from guardians and enchanted foes.
 - **Gear** has a slot (helmet, armor, leggings, boots), one of seven tiers (Common, Uncommon, Rare, Epic, Legendary, Unique, Ghost: 1–5 random bonuses, stronger with each tier) and a star level. It drops from foes (rarely), enchanted foes, chests and guardians (always). It's kept in `save.gear` (40 pieces; a full bag salvages new finds).
 - **Tiers** (`rarityOdds`): Ghost is the rarest at any luck (0.3%, at most 1%); Unique is next. Unique pieces carry one of seven perks, Ghost pieces one of four stronger ones (`PERKS`): extra dashes, Death Defiance (added to the escape at its start), healing on kills and so on.
@@ -201,9 +214,9 @@ Unlocks at level 10 (`feature: 'gear'`). Numbers are in GAME_DATA.md → *Loot a
 
 | Station | Unlock | Purpose |
 |---|---|---|
-| Armory | Always | Buy, equip and forge weapons; Gear & Inventory from level 10 |
+| Armory | Always | Forge class weapons (picking one picks its hero); Gear & Inventory from level 2 |
 | Altar of Ashes | Always | Permanent upgrades for Ash |
-| Hall of Heroes | Always | Choose your hero; customise their colours and headwear |
+| Hall of Heroes | Always | Choose your hero (class); customise their colours and headwear |
 | Ascension | Always | Spend talent points (the prompt shows unspent points) |
 | Chronicle | Always | Records, bestiary (foes stay silhouettes until slain) and achievements |
 | Artifact Shelf | Level 4 | Choose (or buy) a starting artifact |

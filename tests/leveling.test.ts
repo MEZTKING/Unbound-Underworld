@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BOONS, needsCast, rollBoonOffers } from '../src/game/boons';
 import { CHARACTERS, characterUnlocked } from '../src/game/characters';
 import { Rng } from '../src/engine/math';
-import { defaultSave, normalizeSave } from '../src/game/meta';
+import { defaultSave, normalizeSave, WEAPON_IDS } from '../src/game/meta';
 import {
   applyFeatures,
   applyForge,
@@ -104,9 +104,18 @@ describe('heroes and the forge', () => {
     const save = defaultSave();
     const starters = CHARACTERS.filter((c) => characterUnlocked(c, save, 1)).map((c) => c.id);
     expect(starters).toEqual(['kael', 'lyra', 'doran']);
+    // Classes open as you rank up; guardians and escapes are a second way in.
+    expect(CHARACTERS.filter((c) => characterUnlocked(c, save, 8)).map((c) => c.id)).toEqual(['kael', 'lyra', 'doran', 'gorran', 'ione']);
     save.stats.bossesSlain = 2;
     save.stats.escapes = 1;
-    expect(CHARACTERS.every((c) => characterUnlocked(c, save, 8))).toBe(true);
+    expect(CHARACTERS.filter((c) => !characterUnlocked(c, save, 8)).map((c) => c.id)).toEqual(['rook']);
+    expect(CHARACTERS.every((c) => characterUnlocked(c, defaultSave(), 15))).toBe(true);
+  });
+
+  it('gives every hero their own signature weapon', () => {
+    const weapons = CHARACTERS.map((c) => c.weapon);
+    expect(new Set(weapons).size).toBe(CHARACTERS.length);
+    expect([...weapons].sort()).toEqual([...WEAPON_IDS].sort());
   });
 
   it('gives each hero a distinct stat profile', () => {

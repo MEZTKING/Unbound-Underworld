@@ -805,6 +805,15 @@ export const HAMMERS: HammerDef[] = [
   { id: 'scythe_orbit', weapon: 'scythe', name: 'Twin Specters', desc: 'Your Special summons two spectral scythes.' },
   { id: 'scythe_doom', weapon: 'scythe', name: 'Death Mark', desc: 'Your Attack inflicts Doom: 60 damage after a short delay.' },
   { id: 'scythe_long', weapon: 'scythe', name: 'Lingering Shade', desc: 'Your Special lasts 80% longer.' },
+  { id: 'katana_edge', weapon: 'katana', name: 'Moonlit Edge', desc: 'Your Attack deals +30% damage.' },
+  { id: 'katana_flurry', weapon: 'katana', name: 'Endless Flurry', desc: 'Thousand Cuts strikes 4 more times.' },
+  { id: 'katana_iaido', weapon: 'katana', name: 'Lingering Cut', desc: "Moonlit Iaido's delayed slashes deal +100% damage." },
+  { id: 'buss_pellets', weapon: 'blunderbuss', name: 'Packed Charge', desc: 'Your spread shots fire 3 more pellets.' },
+  { id: 'buss_slug', weapon: 'blunderbuss', name: 'Heavy Slug', desc: 'Your slug deals +50% damage and passes through 3 more foes.' },
+  { id: 'buss_keg', weapon: 'blunderbuss', name: 'Black Powder', desc: "Your Powder Keg's blast is 50% larger." },
+  { id: 'chain_flow', weapon: 'nunchaku', name: 'Flowing Current', desc: 'Your Attack deals +25% damage.' },
+  { id: 'chain_whirl', weapon: 'nunchaku', name: 'Maelstrom', desc: 'Whirlpool pulls from 50% farther and strikes 3 more times.' },
+  { id: 'chain_snap', weapon: 'nunchaku', name: 'Undertow', desc: 'Tidal Snap stuns the foe it pulls for 1.5 s.' },
 ];
 
 export const HAMMER_BY_ID: Record<string, HammerDef> = Object.fromEntries(HAMMERS.map((h) => [h.id, h]));

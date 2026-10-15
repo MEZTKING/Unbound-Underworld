@@ -1,12 +1,12 @@
 import type { MetaBonuses } from './boons';
 import { MATERIAL_IDS, normalizeGear, type GearState, type MaterialId, type Materials } from './gear';
-import { isCharacterId, type CharacterId, type Palette } from './characters';
+import { CHARACTER_BY_ID, isCharacterId, type CharacterId, type Palette } from './characters';
 import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
 import type { PlayerStats } from './stats';
 import type { WeaponId } from './types';
 
-export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'scythe'];
+export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'nunchaku', 'scythe', 'blunderbuss', 'katana'];
 
 const isWeaponId = (v: unknown): v is WeaponId => typeof v === 'string' && (WEAPON_IDS as string[]).includes(v);
 
@@ -127,6 +127,10 @@ export interface SaveData {
   lastPlayed: number;
   /** Crafting materials from loot. */
   materials: Materials;
+  /** Set once the save has moved to classes (v0.7), when weapons began to come with heroes. */
+  classes: number;
+  /** A one-time message for the next start (e.g. Ash refunded); cleared once shown. */
+  notice: string;
   /** Gear owned and equipped. */
   gear: GearState;
 }
@@ -222,8 +226,13 @@ export function defaultSave(): SaveData {
     lastPlayed: 0,
     materials: {},
     gear: { items: [], equipped: {} },
+    classes: 1,
+    notice: '',
   };
 }
+
+/** What weapons cost to unlock before v0.7; refunded when they began to come with heroes. */
+const OLD_WEAPON_COST: Partial<Record<WeaponId, number>> = { spear: 40, bow: 60, fists: 90, scythe: 140 };
 
 /** Experience for saves made before levels existed, so veterans keep their unlocks. */
 function legacyXp(stats: SaveData['stats']): number {
@@ -254,12 +263,16 @@ export function normalizeSave(raw: unknown): SaveData {
   const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
   const stats = { ...d.stats, ...(typeof r.stats === 'object' && r.stats ? r.stats : {}) };
   const xp = typeof r.xp === 'number' ? Math.max(0, num(r.xp, 0)) : legacyXp(stats);
+  const character = isCharacterId(r.character) ? r.character : 'kael';
+  // v0.7: each hero wields one weapon, so Ash spent unlocking weapons comes back.
+  const oldWeapons = Array.isArray(r.weapons) ? r.weapons.filter(isWeaponId) : [];
+  const refund = r.classes ? 0 : oldWeapons.reduce((n, w) => n + (OLD_WEAPON_COST[w] ?? 0), 0);
   return {
     version: 1,
-    ash: Math.max(0, num(r.ash, 0)),
+    ash: Math.max(0, num(r.ash, 0)) + refund,
     upgrades: typeof r.upgrades === 'object' && r.upgrades ? { ...r.upgrades } : {},
-    weapons: Array.isArray(r.weapons) && r.weapons.filter(isWeaponId).length ? r.weapons.filter(isWeaponId) : d.weapons,
-    weapon: isWeaponId(r.weapon) ? r.weapon : 'sword',
+    weapons: oldWeapons.length ? oldWeapons : d.weapons,
+    weapon: CHARACTER_BY_ID[character].weapon,
     artifacts: Array.isArray(r.artifacts) ? [...new Set([...d.artifacts, ...r.artifacts.filter((a) => typeof a === 'string')])] : d.artifacts,
     startArtifact: typeof r.startArtifact === 'string' || r.startArtifact === null ? r.startArtifact : d.startArtifact,
     heat: Math.max(0, num(r.heat, 0)),
@@ -270,7 +283,7 @@ export function normalizeSave(raw: unknown): SaveData {
     xp,
     seenLevel: Math.max(1, num(r.seenLevel, typeof r.xp === 'number' ? 1 : levelFromXp(xp).level)),
     talents: typeof r.talents === 'object' && r.talents ? { ...r.talents } : {},
-    character: isCharacterId(r.character) ? r.character : 'kael',
+    character,
     forge: typeof r.forge === 'object' && r.forge ? { ...r.forge } : {},
     bestiary: migrateBestiary(r.bestiary),
     achievements: Array.isArray(r.achievements) ? r.achievements.filter((a) => typeof a === 'string') : [],
@@ -279,6 +292,8 @@ export function normalizeSave(raw: unknown): SaveData {
     lastPlayed: num(r.lastPlayed, 0),
     materials: typeof r.materials === 'object' && r.materials ? Object.fromEntries(Object.entries(r.materials).filter(([k, v]) => MATERIAL_IDS.includes(k as MaterialId) && typeof v === 'number' && v > 0)) : {},
     gear: normalizeGear(r.gear),
+    classes: 1,
+    notice: refund > 0 ? `Weapons now come with their heroes: ${refund} Ash spent unlocking weapons was refunded.` : typeof r.notice === 'string' ? r.notice : '',
   };
 }
 

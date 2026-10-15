@@ -48,20 +48,20 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | Level | XP to next | Total XP | Rank | Talent points | Unlocks |
 |---|---|---|---|---|---|
 | 1 | 60 | 0 | Shade | 0 |  |
-| 2 | 108 | 60 | Shade | 1 | Healing Potion, Weapon: Thornspear |
+| 2 | 108 | 60 | Shade | 1 | Gear & Inventory, Guard & Parry, Healing Potion |
 | 3 | 162 | 168 | Shade | 2 | Cast, Forge: Tier II · Tempered |
-| 4 | 222 | 330 | Shade | 3 | Artifacts, Weapon: Moonbow |
-| 5 | 288 | 552 | Wraith | 4 | Jump & Slam |
+| 4 | 222 | 330 | Shade | 3 | Artifacts |
+| 5 | 288 | 552 | Wraith | 4 | Jump & Slam, Hero: Gorran, Weapon: Titan Gauntlets |
 | 6 | 360 | 840 | Wraith | 5 | Enchantments |
 | 7 | 438 | 1200 | Wraith | 6 | Hephaestus' Anvil |
-| 8 | 522 | 1638 | Wraith | 7 | Second Artifact Slot, Hero: Ione, Weapon: Titan Gauntlets |
+| 8 | 522 | 1638 | Wraith | 7 | Second Artifact Slot, Hero: Ione, Weapon: Riptide Chains |
 | 9 | 612 | 2160 | Wraith | 8 |  |
-| 10 | 708 | 2772 | Revenant | 9 | Wrath, Loot & Gear |
+| 10 | 708 | 2772 | Revenant | 9 | Wrath, Hero: Erebos, Weapon: Reaper's Crescent |
 | 11 | 810 | 3480 | Revenant | 10 |  |
-| 12 | 918 | 4290 | Revenant | 11 | Third Artifact Slot |
+| 12 | 918 | 4290 | Revenant | 11 | Third Artifact Slot, Hero: Rook, Weapon: Thunderbuss |
 | 13 | 1032 | 5208 | Revenant | 12 | Awakened Weapons, Forge: Tier III · Awakened |
-| 14 | 1152 | 6240 | Revenant | 13 | Weapon: Reaper's Crescent |
-| 15 | 1278 | 7392 | Champion | 14 |  |
+| 14 | 1152 | 6240 | Revenant | 13 |  |
+| 15 | 1278 | 7392 | Champion | 14 | Hero: Selene, Weapon: Starsplitter |
 | 16 | 1410 | 8670 | Champion | 15 | Forge: Tier IV · Exalted |
 | 17 | 1548 | 10080 | Champion | 16 |  |
 | 18 | 1692 | 11628 | Champion | 17 |  |
@@ -82,6 +82,8 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 
 | Level | Unlock | What it does | Keys (PC / touch) |
 |---|---|---|---|
+| 2 | Gear & Inventory | Equip the helmets, armor, leggings and boots foes drop, and craft or star them up with materials, at the Armory or from the pause menu. |  |
+| 2 | Guard & Parry | Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped. | V / ⛨ |
 | 2 | Healing Potion | Drink to restore health. It refills over time. | R / ⚗ |
 | 3 | Cast | Hurl a shard that lodges in foes. Walk over it to pick it up again. | Q / Middle mouse / ◆ |
 | 4 | Artifacts | One artifact slot. Find artifacts in the Underworld or pick one at the Artifact Shelf. | 1 / the artifact button |
@@ -90,7 +92,6 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 7 | Hephaestus' Anvil | Anvils that reforge your weapon now appear in the Underworld. |  |
 | 8 | Second Artifact Slot | Carry two artifacts at once. | 2 / the artifact button |
 | 10 | Wrath | Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate. | F / ☄ |
-| 10 | Loot & Gear | Foes now drop materials and gear. Equip helmets, armor, leggings and boots, and craft or upgrade them, at the Armory. |  |
 | 12 | Third Artifact Slot | Carry three artifacts at once. | 3 / the artifact button |
 | 13 | Awakened Weapons | Forge a weapon to Tier III at the Armory to awaken it. |  |
 
@@ -119,24 +120,33 @@ Spend one point per level at the *Ascension* stone in the Hall of Shades. Resett
 
 Choose a hero in the *Hall of Heroes*. Wrath (unlocks at level 10) fills by 3.13 per 100 damage dealt and 0.8 per damage taken; 100 unleashes the hero's ultimate.
 
-| Hero | Title | Unlock | Perks | Wrath | Wrath effect |
-|---|---|---|---|---|---|
-| Kael | Prince of Embers | Start | Balanced: no strengths, no weaknesses; +10% Wrath gain | Inferno Nova | A ring of hellfire bursts outward three times, burning everything it touches. |
-| Lyra | Moon Huntress | Start | +12% move speed; +8% critical chance; −10 max Health | Moonfall | Beams of moonlight strike every foe in sight three times. |
-| Doran | The Bronze Wall | Start | +30 max Health; Take 12% less damage; −8% move speed | Titan's Quake | Three quakes roll out from you, stunning and crushing foes. |
-| Ione | Tidecaller | Reach level 8 | +1 Cast shard (once Cast is unlocked); +20% Special damage; +15% knockback | Tidal Surge | A tidal wave hurls every nearby foe away, chilling them to the bone. |
-| Erebos | The Hollow King | Slay 2 guardians | +10% damage; Restore 2 Health per foe slain; +50% souls gathered; −15 max Health | Eclipse | Darkness falls: every foe in sight is stunned and Doomed, and you drink their life. |
-| Selene | Starbound | Escape the Underworld once | +1 Dash charge; +15% Attack damage; Dash recharges 20% faster | Starfall | A storm of falling stars pounds the area around you. |
+| Hero | Class | Weapon | Guard | Unlock | Perks | Wrath | Wrath effect |
+|---|---|---|---|---|---|---|---|
+| Kael, Prince of Embers | Warrior | Nightblade | parry | Start | Balanced: no strengths, no weaknesses; +10% Wrath gain | Inferno Nova | A ring of hellfire bursts outward three times, burning everything it touches. |
+| Lyra, Moon Huntress | Ranger | Moonbow | evade | Start | +12% move speed; +8% critical chance; −10 max Health | Moonfall | Beams of moonlight strike every foe in sight three times. |
+| Doran, The Bronze Wall | Vanguard | Thornspear | shield | Start | +30 max Health; Take 12% less damage; −8% move speed | Titan's Quake | Three quakes roll out from you, stunning and crushing foes. |
+| Gorran, The Unchained Fist | Brawler | Titan Gauntlets | catch | Reach level 5 | Combo meter builds twice as fast; +20 max Health | Hundred Fists | A storm of punches in front of you, ending in a crushing blast. |
+| Ione, Tidecaller | Monk | Riptide Chains | catch | Reach level 8 | +1 Cast shard (once Cast is unlocked); +20% Special damage; +15% knockback | Tidal Surge | A tidal wave hurls every nearby foe away, chilling them to the bone. |
+| Erebos, The Hollow King | Reaper | Reaper's Crescent | mist | Reach level 10 or slay 2 guardians | +10% damage; Restore 2 Health per foe slain; +50% souls gathered; −15 max Health | Eclipse | Darkness falls: every foe in sight is stunned and Doomed, and you drink their life. |
+| Rook, The Powder Ghost | Gunner | Thunderbuss | evade | Reach level 12 | Hits on foes close to you deal +30% damage; +15% knockback | Cannonade | Cannon shots rain down on the foes around you. |
+| Selene, Starbound | Duelist | Starsplitter | parry | Reach level 15 or escape once | +1 Dash charge; +15% Attack damage; Dash recharges 20% faster | Starfall | A storm of falling stars pounds the area around you. |
+
+Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes souls).
 
 ## Weapons, forging and anvil upgrades
 
-| Weapon | Id | Ash to unlock | Level needed | Description |
+Each weapon belongs to one class (hero): picking the hero picks the weapon. Every weapon chains on taps, and holding Attack after a chain hit starts its powered attack.
+
+| Weapon | Id | Class | Hero | Description |
 |---|---|---|---|---|
-| Nightblade | sword | Owned | 1 | A balanced blade. Three-hit combo; Special: Nova Smash knocks back everything nearby. |
-| Thornspear | spear | 40 | 2 | Long reach thrusts. Hold Attack to charge a spin. Special: throw the spear, press again to recall it. |
-| Moonbow | bow | 60 | 4 | Hold Attack to draw; release as it flashes for a Power Shot. Special: a wide volley. |
-| Titan Gauntlets | fists | 90 | 8 | A blur of punches with a crushing fifth blow. Special: Meteor Fist rockets you forward into a shockwave. |
-| Reaper's Crescent | scythe | 140 | 14 | Wide, heavy sweeps that end in a full spin. Special: Soul Reap sends a spectral scythe whirling around you. |
+| Nightblade | sword | Warrior | Kael | Slash, backslash, heavy cleave. Powered: Crescent Cleave throws a blade wave. Special: Nova Smash knocks back everything nearby. |
+| Thornspear | spear | Vanguard | Doran | Long-reach thrusts. Powered: Skewer Lance runs a whole line through; keep holding to spin. Special: throw the spear, press again to recall it. |
+| Moonbow | bow | Ranger | Lyra | Tap for quick shots (every third is a triple). Hold to draw a Power Shot; draw right after quick shots for Rain of Arrows. Special: a wide volley. |
+| Titan Gauntlets | fists | Brawler | Gorran | A blur of five punches. Powered: Titan Uppercut stuns and shakes the ground. Special: Meteor Fist rockets you forward into a shockwave. |
+| Riptide Chains | nunchaku | Monk | Ione | Six flowing strikes ending in a whirl. Powered: Whirlpool pulls foes in. Special: Tidal Snap drags a foe to you. |
+| Reaper's Crescent | scythe | Reaper | Erebos | Wide sweeps that end in a full spin. Powered: Harvest drags foes in for a giant reap. Special: Soul Reap sends a spectral scythe whirling around you. |
+| Thunderbuss | blunderbuss | Gunner | Rook | Spread shots, then a piercing slug. Powered: Grapeshot Cannon. Special: a Powder Keg that blows up after a short fuse. |
+| Starsplitter | katana | Duelist | Selene | Three lightning-fast draw-cuts. Powered: Moonlit Iaido blinks you through foes. Special: Thousand Cuts. |
 
 **Forge tiers** (per weapon, at the Armory)
 
@@ -189,6 +199,14 @@ Choose a hero in the *Hall of Heroes*. Wrath (unlocks at level 10) fills by 3.13
 | Life Tap | The final blow of your Attack combo restores 3 Health. |
 | Aftershock | Your Dash-Strike also releases a 30-damage shockwave. |
 
+*Riptide Chains*
+
+| Upgrade | Effect |
+|---|---|
+| Flowing Current | Your Attack deals +25% damage. |
+| Maelstrom | Whirlpool pulls from 50% farther and strikes 3 more times. |
+| Undertow | Tidal Snap stuns the foe it pulls for 1.5 s. |
+
 *Reaper's Crescent*
 
 | Upgrade | Effect |
@@ -197,6 +215,22 @@ Choose a hero in the *Hall of Heroes*. Wrath (unlocks at level 10) fills by 3.13
 | Twin Specters | Your Special summons two spectral scythes. |
 | Death Mark | Your Attack inflicts Doom: 60 damage after a short delay. |
 | Lingering Shade | Your Special lasts 80% longer. |
+
+*Thunderbuss*
+
+| Upgrade | Effect |
+|---|---|
+| Packed Charge | Your spread shots fire 3 more pellets. |
+| Heavy Slug | Your slug deals +50% damage and passes through 3 more foes. |
+| Black Powder | Your Powder Keg's blast is 50% larger. |
+
+*Starsplitter*
+
+| Upgrade | Effect |
+|---|---|
+| Moonlit Edge | Your Attack deals +30% damage. |
+| Endless Flurry | Thousand Cuts strikes 4 more times. |
+| Lingering Cut | Moonlit Iaido's delayed slashes deal +100% damage. |
 
 ## Gods and boons
 
@@ -375,7 +409,7 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 
 ## Loot and gear
 
-Unlocks at level 10. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Up to 40 pieces are kept; a full inventory salvages new finds.
+Unlocks at level 2. Foes drop materials; gear drops from foes (1.2%), enchanted foes (12%), chests (30%) and guardians (always, Rare or better). Up to 40 pieces are kept; a full inventory salvages new finds.
 
 | Material | Source |
 |---|---|

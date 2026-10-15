@@ -53,7 +53,7 @@ iPhones only install apps from the App Store, so on iOS you play the web version
 
 Open your link in Safari and tap *Share → Add to Home Screen* (in Chrome on Android: *⋮ → Add to Home screen*). The game then opens fullscreen like an app, works offline and keeps its saves on the phone. Hold your phone sideways to play.
 
-On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (hold to repeat or charge, drag to aim), **✦** Special, **◆** Cast, **»** Dash and **⤒** Jump. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
+On touch screens, drag anywhere on the left half to move. The buttons on the right are **⚔** Attack (tap to chain, hold after a hit for a powered attack, drag to aim), **✦** Special, **◆** Cast, **»** Dash, **⤒** Jump and **⛨** Guard. The small buttons above them are your artifacts and **⚗** potion. Without a drag, attacks aim at the nearest foe.
 
 ## Game documentation
 
@@ -77,12 +77,13 @@ To try the touch controls on a computer, open the browser's device toolbar (phon
 | Action | Keyboard & mouse | Gamepad |
 |---|---|---|
 | Move / aim | `WASD` / mouse | Left stick / right stick |
-| Attack (hold to repeat or charge) | `LMB` or `J` | `X` |
+| Attack (tap to chain; hold after a hit for the powered attack) | `LMB` or `J` | `X` |
 | Special | `RMB` or `K` | `Y` |
 | Cast a shard | `Q` or `L` | `RB` |
 | Dash (brief invulnerability) | `Space` | `A` |
 | Jump (attack mid-air to **Slam**) | `Shift` or `C` | `B` |
-| Artifacts | `1` `2` `3` | `RT` · `LT` · `L3` |
+| Guard (hold to block, tap just before a hit to parry) | `V` | `LT` |
+| Artifacts | `1` `2` `3` | `RT` · D-pad left · `L3` |
 | Healing potion | `R` or `4` | `LB` |
 | Wrath (ultimate, when the gauge is full) | `F` or `5` | `R3` |
 | Interact | `E` | `Select` / `R3` |
@@ -94,27 +95,31 @@ Every keyboard key can be changed under *Settings → Controls → Key bindings*
 
 You can walk while you fight: basic attacks keep most of your speed and never push you forward, and only moves that are meant to (dash-strikes, some specials) lunge.
 
+**The combat grammar.** Every weapon works the same way: tap Attack to chain hits; hold Attack after a chain hit to charge its **powered attack** (let go on the flash for a *Perfect*, +25%); use your Special straight out of a chain for a faster, stronger **combo special**. Hits in a row without getting hurt build the **combo meter** (+1% damage per 10 hits, up to +10%).
+
+**Guard and parry** (level 2). Hold Guard to block hits from the front; blocking drains a guard meter, and an empty meter staggers you. Tap Guard just before a hit lands to **parry**: no damage, the foe staggers, shots fly back, and your next attack is a sure critical **riposte**. Ground shockwaves can't be guarded: jump or dash. Each class guards its own way (see Heroes).
+
 New players start with just Attack, Special and Dash. The other controls unlock as you level up (see below), and the HUD, the touch buttons and the in-game control lists only show what you've unlocked.
 
 ## What's in it
 
 ### Progression
 - **Levels and ranks.** Slain foes, cleared chambers, guardians and escapes earn experience that carries over between runs. There are 30 levels in five rank tiers: Shade, Wraith, Revenant, Champion and Unbound.
-- **Gentle onboarding.** The first runs only have Attack, Special and Dash. New mechanics unlock one at a time, each announced with a short explanation: Healing Potion (level 2), Cast (3), Artifacts (4), Jump & Slam (5, or as soon as you slay the final guardian), Enchantments (6), Hephaestus' Anvil (7), a second artifact slot (8), Wrath (10) and a third artifact slot (12).
+- **Gentle onboarding.** The first runs only have Attack, Special and Dash. New mechanics unlock one at a time, each announced with a short explanation: Guard & Parry, Healing Potion and Gear (level 2), Cast (3), Artifacts (4), Jump & Slam (5, or as soon as you slay the final guardian), Enchantments (6), Hephaestus' Anvil (7), a second artifact slot (8), Wrath (10) and a third artifact slot (12).
 - **Talents.** Every level gives a point to spend at *Ascension* in the hub. There are 14 talents in five rows, and each row opens with a new rank tier. Resetting your talents is free.
 - **Weapon forging.** At the Armory, spend Ash to forge each weapon from Tier I up to Tier V (Mythic) for more damage. From Tier III (Awakened), every fourth Attack also unleashes an arcane wave. The waves grow at Tier IV, and at Tier V they split in three and the weapon blazes.
-- **Heroes.** Six heroes, each with their own look, perks and **Wrath** ultimate. You choose them in the Hall of Heroes. *Kael* (Inferno Nova), *Lyra* (Moonfall) and *Doran* (Titan's Quake) are available from the start. *Ione* (Tidal Surge) unlocks at level 8, *Erebos* (Eclipse) after slaying 2 guardians, and *Selene* (Starfall) after your first escape.
+- **Heroes are classes.** Eight heroes, each with their own signature weapon, guard style, perks and **Wrath** ultimate. Pick them in the Hall of Heroes (or pick a weapon at the Armory). From the start: *Kael* the Warrior (Nightblade sword, blade parry), *Lyra* the Ranger (Moonbow, evasive sidestep) and *Doran* the Vanguard (Thornspear and a tower shield). Then, as you rank up: *Gorran* the Brawler (Titan Gauntlets, level 5), *Ione* the Monk (Riptide Chains nunchaku, level 8), *Erebos* the Reaper (Reaper's Crescent, level 10 or 2 guardians), *Rook* the Gunner (Thunderbuss blunderbuss, level 12) and *Selene* the Duelist (Starsplitter katana, level 15 or your first escape). Ash spent unlocking weapons in earlier versions is refunded.
 - **Wrath.** A golden gauge that fills as you deal and take damage. When it's full, press `F` to unleash your hero's screen-clearing ultimate.
-- **Loot and gear** (level 10). Foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Gate Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Gear comes in seven tiers: Common, Uncommon, Rare, Epic, Legendary, Unique and the very rare Ghost. Unique and Ghost pieces carry a perk of their own (an extra dash, Death Defiance, healing on kills…). Star a piece up from 1 to 5 gold stars, then on to 10, as the stars turn purple one by one. Manage it in *Gear & Inventory* (at the Armory or in the pause menu): equip, star up with materials, salvage, or craft new pieces.
+- **Loot and gear.** From your very first escape, foes drop materials (Bone Dust, Ember Shards, Golden Ichor, Gate Pearls, Titan Scales), and foes, chests and guardians drop gear: helmets, armor, leggings and boots with random bonuses (health, damage, speed, critical chance, damage taken, dash recharge and more). Gear comes in seven tiers: Common, Uncommon, Rare, Epic, Legendary, Unique and the very rare Ghost. Unique and Ghost pieces carry a perk of their own (an extra dash, Death Defiance, healing on kills…). Star a piece up from 1 to 5 gold stars, then on to 10, as the stars turn purple one by one. Drops fly to you when you walk near them (and all of them when a chamber is cleared), a feed on the left lists what you picked up, and the end of each escape shows your **Spoils**. Manage it all in *Gear & Inventory* (level 2, at the Armory or in the pause menu): equip, star up with materials, salvage, or craft new pieces.
 - **Save slots.** Four independent journeys; switch on the title screen.
 - **Map.** The pause menu shows every region's chambers, where you are, the guardian ahead and your best run.
-- **Late-game weapons.** *Titan Gauntlets* (level 8): rapid punch combos and a rocketing Meteor Fist. *Reaper's Crescent* (level 14): wide sweeps and spectral scythes that orbit you. Each comes with its own anvil upgrades.
 
 ### The Hades-style core
-- **Combat.** Each weapon has a combo, a dash-strike and a special. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
-- **Five weapons.** *Nightblade* (sword: combo plus Nova Smash), *Thornspear* (thrusts, a charged spin, and a spear you throw and recall) and *Moonbow* (charged shots with a perfect-timing Power Shot, plus a volley), followed later by the *Titan Gauntlets* and *Reaper's Crescent*. Each weapon has its own anvil upgrades.
+- **Combat.** Each weapon has a chain, a powered attack, a dash-strike, a special and a slam. You get a cast shard that lodges in foes and has to be picked up again. The dash has invulnerability frames. Hits have hit-stop, screen shake and knockback, and every enemy attack is telegraphed on the ground.
+- **Eight weapons, one per class.** *Nightblade* (Crescent Cleave), *Moonbow* (quick shots, Power Shot, Rain of Arrows), *Thornspear* (Skewer Lance, a spin, a spear you throw and recall), *Titan Gauntlets* (Titan Uppercut, Meteor Fist), *Riptide Chains* (Whirlpool, Tidal Snap), *Reaper's Crescent* (Harvest, Soul Reap), *Thunderbuss* (Grapeshot Cannon, Powder Keg) and *Starsplitter* (Moonlit Iaido, Thousand Cuts). Each weapon has three or more anvil upgrades.
+- **Foes that fight fair.** Foes turn at their own speed (circle a Brute to get behind it), lock their aim when a windup starts, take turns (only a few attack at once while the rest circle), come at you from different sides, and pause a moment after appearing. Higher Torment makes them more aggressive and more accurate.
 - **Boons from eight Olympians plus Hermes.** Each god has Attack, Special, Cast and Dash boons, each with its own status effect: lightning, knockback and wall slams, deflection, Doom, Weak, critical hits, Hangover and Chill. Boons come in Common, Rare, Epic and Heroic rarity. There are six duo boons, a limit of four gods per run, and Pomegranates that level boons up.
-- **The run.** The Shackled Deep, then the Ember Fields, then the Gilded Groves, then the Last Gate: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
+- **The run.** The Shackled Deep, then the Ember Fields, then the Gilded Groves, then the Last Gate: 20+ procedurally laid-out chambers. Each exit door shows its reward ahead of time (boon, Pomegranate, obols, Titan Heart, Ash, anvil, Hermes, enchantment, artifact, shop or fountain), with a short description: on PC point at the door's icon (or walk up to it); on phones it's on the floor in front of the door. Reward choices have a *Your build* button for reviewing the boons you already have, and every one of them can be skipped for 25 obols. Shops never block the way: walk through any door. Charon sells wares; what each one does is blurred until you've bought that kind once. An antechamber with a shop and a fountain comes before each guardian.
 - **Four guardians.** *Vexa*, Warden of Chains. *The Many-Maw*, which grows extra heads. *Aurex, the Gilded Colossus*: break his armor and he overheats, leaving him open. *Threefang*, Hound of the Last Gate, who charges, breathes fire and leap-slams.
 - **Meta-progression.** Ash carries over when you die. In the Hall of Shades hub you can spend it on 11 permanent upgrades, unlock and forge weapons, unlock starting artifacts, pick your hero, spend talent points at Ascension, read your records, the **bestiary** (each foe stays a black silhouette until you slay it) and **achievements** in the Chronicle, customise your hero's colours and headwear, raise the difficulty with *Torment* levels at the Oath of Torment, and practice on a training dummy.
 

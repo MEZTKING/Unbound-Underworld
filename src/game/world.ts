@@ -163,6 +163,12 @@ export class World {
   banner: { title: string; sub: string; t: number } | null = null;
   /** Behind the title screen the camera drifts slowly around the hall. */
   titleDrift = false;
+  /** Extra attack tokens for foes (more at higher Torment). */
+  tokenBonus = 0;
+  /** Scales foes' aim error (smaller at higher Torment). */
+  foeAimError = 1;
+  /** Recent pickups listed on the HUD (newest last). */
+  lootFeed: { text: string; color: string; t: number }[] = [];
   hurtFlash = 0;
   /** Darkness from Erebos' Eclipse. */
   eclipseT = 0;
@@ -533,7 +539,7 @@ export class World {
     for (const pr of this.projectiles) if (pr.team === 'enemy') pr.dead = true;
     for (const t of this.telegraphs) t.cancelled = true;
     // Shards return to the player once the fight is over.
-    for (const pk of this.pickups) if (pk.kind === 'shard' || pk.kind === 'soul' || pk.kind === 'gold') pk.magnet = true;
+    for (const pk of this.pickups) if (pk.kind === 'shard' || pk.kind === 'soul' || pk.kind === 'gold' || pk.kind === 'loot') pk.magnet = true;
     this.host.onRoomCleared(this);
   }
 
@@ -561,6 +567,12 @@ export class World {
   }
 
   /** Drops loot that pops out and waits to be picked up. */
+  /** Adds a line to the HUD's loot feed. */
+  feed(text: string, color: string): void {
+    this.lootFeed.push({ text, color, t: 0 });
+    if (this.lootFeed.length > 6) this.lootFeed.shift();
+  }
+
   dropLoot(x: number, y: number, loot: Loot): void {
     const pk = new Pickup('loot', x, y);
     pk.loot = loot;
@@ -611,10 +623,16 @@ export class World {
 
   // ---------------------------------------------------------------- damage & death
 
-  hurtPlayer(dmg: number, src: Actor | { x: number; y: number } | null, environmental = false): void {
+  hurtPlayer(dmg: number, src: Actor | { x: number; y: number } | null, environmental = false, o: { proj?: Projectile; ground?: boolean } = {}): void {
     const p = this.player;
     const s = this.stats;
     if (p.state === 'dead' || p.state === 'falling') return;
+    // Guard, parry or Perfect Dodge first.
+    if (!environmental && src && s.canGuard) {
+      const share = p.defend(this, src, dmg, o);
+      if (share <= 0) return;
+      dmg *= share;
+    }
     if (!environmental && p.invuln) return;
     if (environmental && p.state === 'dash') return;
     if (!environmental && s.holyShield && p.holyShield) {
@@ -736,6 +754,8 @@ export class World {
       this.banner.t += rawDt;
       if (this.banner.t > 3.2) this.banner = null;
     }
+    for (const f of this.lootFeed) f.t += rawDt;
+    if (this.lootFeed.length && this.lootFeed[0].t > LOOT_FEED_TIME) this.lootFeed.shift();
     this.hurtFlash = Math.max(0, this.hurtFlash - rawDt);
     this.eclipseT = Math.max(0, this.eclipseT - rawDt);
     if (this.hitstopT > 0) {
@@ -912,11 +932,11 @@ export class World {
         }
       } else {
         const p = this.player;
-        if (hb.hit.has(p.id) || p.invuln) continue;
+        if (hb.hit.has(p.id) || (p.invuln && p.evadeT <= 0)) continue;
         if (hb.tag === 'ground' && p.airborne) continue;
         if (!shapeHits(hb.shape, p)) continue;
         hb.hit.add(p.id);
-        this.hurtPlayer(hb.damage, hb.owner ?? { x: (hb.shape as { x?: number }).x ?? p.x, y: (hb.shape as { y?: number }).y ?? p.y });
+        this.hurtPlayer(hb.damage, hb.owner ?? { x: (hb.shape as { x?: number }).x ?? p.x, y: (hb.shape as { y?: number }).y ?? p.y }, false, { ground: hb.tag === 'ground' });
       }
       hb.ttl -= dt;
     }
@@ -987,10 +1007,11 @@ export class World {
         if (!pr.dead) {
           for (const b of this.breakables) if (!b.dead && circleCircle(pr, b)) this.breakPot(b);
         }
-      } else if (!p.invuln && circleCircle(pr, p)) {
+      } else if ((!p.invuln || p.evadeT > 0) && circleCircle(pr, p)) {
         if (pr.onHit) pr.onHit(this, p);
-        else this.hurtPlayer(pr.damage, pr.owner ?? pr);
-        this.endProjectile(pr);
+        else this.hurtPlayer(pr.damage, pr.owner ?? pr, false, { proj: pr });
+        // A parried shot flies back instead of ending.
+        if ((pr.team as string) !== 'player') this.endProjectile(pr);
         continue;
       }
       if (!pr.dead && pr.ttl <= 0) this.endProjectile(pr);
@@ -1238,6 +1259,9 @@ export class World {
 }
 
 /** Solid size of each kind of interactable (its `r` is the reach to use it). */
+/** Seconds a loot-feed line stays on screen. */
+export const LOOT_FEED_TIME = 4;
+
 const PROP_RADIUS: Record<Interactable['kind'], number> = { station: 30, shop: 26, fountain: 40, chest: 24, npc: 16 };
 
 /** How much an enemy yields when crowding (0 = immovable). */

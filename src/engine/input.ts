@@ -16,6 +16,7 @@ export type Action =
   | 'artifact2'
   | 'artifact3'
   | 'wrath'
+  | 'guard'
   | 'pause'
   | 'mute'
   | 'menuUp'
@@ -45,6 +46,7 @@ const DEFAULT_KEYMAP: Record<string, Action[]> = {
   Digit3: ['artifact3'],
   Digit4: ['potion'],
   Digit5: ['wrath'],
+  KeyV: ['guard'],
   Numpad1: ['artifact1'],
   Numpad2: ['artifact2'],
   Numpad3: ['artifact3'],
@@ -54,7 +56,6 @@ const DEFAULT_KEYMAP: Record<string, Action[]> = {
   KeyL: ['cast'],
   KeyE: ['interact'],
   KeyF: ['wrath'],
-  KeyV: ['wrath'],
   Escape: ['pause', 'back'],
   KeyP: ['pause'],
   KeyM: ['mute'],
@@ -73,6 +74,7 @@ export const BINDABLE: { action: Action; label: string }[] = [
   { action: 'cast', label: 'Cast' },
   { action: 'dash', label: 'Dash' },
   { action: 'jump', label: 'Jump' },
+  { action: 'guard', label: 'Guard / parry' },
   { action: 'interact', label: 'Interact' },
   { action: 'potion', label: 'Potion' },
   { action: 'artifact1', label: 'Artifact 1' },
@@ -108,7 +110,7 @@ const PADMAP: Record<number, Action[]> = {
   3: ['special'], // Y / Triangle
   4: ['potion'], // LB
   5: ['cast'], // RB
-  6: ['artifact2'], // LT
+  6: ['guard'], // LT
   7: ['artifact1'], // RT
   8: ['interact'], // Back / Select
   9: ['pause'], // Start
@@ -116,7 +118,7 @@ const PADMAP: Record<number, Action[]> = {
   11: ['wrath'], // R3
   12: ['menuUp', 'interact'],
   13: ['menuDown'],
-  14: ['menuLeft'],
+  14: ['menuLeft', 'artifact2'],
   15: ['menuRight'],
 };
 

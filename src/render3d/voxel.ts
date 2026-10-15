@@ -438,6 +438,13 @@ function buildHeroRig(p: Player, b: RigBuilder, shadowMat: THREE.Material): Rig 
   b.box(cape, pal.trim, 17.5, 2.5, 3.5, 0, -25, 0);
   b.box(torso, pal.cloak, 18, 4, 11, 0, 17, -0.5);
   rig.arms.push(b.limb(torso, pal.skin, 5, 16, 5, -10.5, 17, 0), b.limb(torso, pal.skin, 5, 16, 5, 10.5, 17, 0));
+  // The Vanguard's tower shield rides on the off arm.
+  if (p.hero.guard === 'shield') {
+    const sh = b.box(rig.arms[1], '#6a4a24', 3, 26, 18, 3.5, -12, 3);
+    sh.castShadow = true;
+    b.box(rig.arms[1], pal.trim, 3.4, 4, 18.4, 3.6, -2, 3);
+    b.box(rig.arms[1], '#c8a050', 3.6, 6, 6, 4, -12, 3);
+  }
   const h = new THREE.Group();
   h.position.y = 19;
   torso.add(h);
@@ -540,6 +547,34 @@ function equipWeapon(rig: Rig, id: string, b: RigBuilder): void {
       b.box(w, '#c8c0d8', 2, 5, 26, 0, 44, 11).rotation.x = 0.25;
       b.glow(w, col, 1, 2, 22, 0, 41, 11, 0.85).rotation.x = 0.25;
       break;
+    case 'katana': {
+      // A long, slim blade with a round guard.
+      b.box(w, '#20202a', 2.2, 2.2, 10, 0, 0, 1);
+      b.box(w, '#c8a050', 6, 1.2, 6, 0, 0, 6.5);
+      const blade = new THREE.Group();
+      blade.position.set(0, 0, 7);
+      blade.rotation.x = -0.08;
+      w.add(blade);
+      b.box(blade, '#e8f0ff', 1.1, 3, 38, 0, 0.4, 19);
+      b.glow(blade, col, 0.6, 0.8, 34, 0, 2, 19, 0.8);
+      break;
+    }
+    case 'blunderbuss':
+      b.box(w, '#5a3a24', 3.4, 5, 11, 0, -1.5, -3);
+      b.box(w, '#b08a4a', 3.6, 3.6, 22, 0, 1, 12);
+      b.box(w, '#c8a050', 6.4, 6.4, 3, 0, 1, 24);
+      b.glow(w, col, 3, 3, 1, 0, 1, 25.6, 0.7);
+      break;
+    case 'nunchaku': {
+      b.box(w, '#3a2a20', 2.6, 2.6, 13, 0, 0, 5);
+      b.glow(w, col, 0.8, 0.8, 4, 0, 0, 13, 0.9);
+      const tail = new THREE.Group();
+      tail.position.set(0, 0, 15);
+      w.add(tail);
+      b.box(tail, '#3a2a20', 2.6, 2.6, 13, 0, 0, 6.5);
+      rig.bits.tailStick = tail;
+      break;
+    }
   }
 }
 
@@ -1228,6 +1263,7 @@ export class VoxelRenderer {
     const [armR, armL] = rig.arms;
     const wpn = rig.bits.weapon;
     if (wpn) wpn.rotation.set(0.35, 0, 0);
+    if (rig.bits.tailStick) rig.bits.tailStick.rotation.x = 0.9 + Math.sin(t * 3) * 0.1;
     if (rig.bits.flame) {
       rig.bits.flame.scale.y = 0.8 + Math.sin(t * 14) * 0.25;
       rig.bits.flame.rotation.y = t * 2;
@@ -1241,9 +1277,15 @@ export class VoxelRenderer {
       const swing = k < wk ? 0 : Math.min(1, (k - wk) / Math.max(0.05, d.active / total + 0.08));
       switch (weapon.id) {
         case 'bow':
+        case 'blunderbuss':
           armR.rotation.x = -Math.PI / 2;
           armL.rotation.x = -Math.PI / 2;
           armR.rotation.y = 0.3;
+          break;
+        case 'nunchaku':
+          armR.rotation.x = -1.4 + Math.sin(p.action.t * 40) * 0.8;
+          armR.rotation.z = -0.3;
+          if (rig.bits.tailStick) rig.bits.tailStick.rotation.x = Math.sin(p.action.t * 50) * 1.4;
           break;
         case 'spear':
           armR.rotation.x = -Math.PI / 2 + 0.2;
@@ -1263,6 +1305,12 @@ export class VoxelRenderer {
           if (wpn) wpn.rotation.x = 1.2;
       }
     } else if (wpn && weapon.id === 'spear') wpn.position.z = 0;
+    // Guarding: arms (and the shield) come up in front.
+    if (p.blocking || p.guardBreakT > 0) {
+      armL.rotation.set(-1.25, 0, 0.45);
+      armR.rotation.set(-1.0, 0, -0.3);
+      if (p.guardBreakT > 0) rig.body.rotation.x = -0.25;
+    }
     if (weapon.id === 'spear' && wpn) wpn.visible = !('thrown' in weapon && weapon.thrown);
     switch (p.state) {
       case 'dash':

@@ -5,9 +5,9 @@ import { BIOMES } from '../game/rooms';
 import { ACHIEVEMENTS, BESTIARY, foeRegions, type FoeEntry } from '../game/codex';
 import { ENCHANT_BY_ID } from '../game/enchants';
 import type { Game, RunSummary } from '../game/game';
-import { CHARACTERS, characterUnlocked, type CharacterId, type Palette } from '../game/characters';
+import { CHARACTERS, characterUnlocked, heroForWeapon, type CharacterId, type GuardStyle, type Palette } from '../game/characters';
 import { clearSave, currentSlot, eraseSlot, heatScale, loadSave, nextCost, peekSlot, rank, setSlot, slotHasRun, SLOTS, UPGRADES, WEAPON_IDS, writeSave } from '../game/meta';
-import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, WEAPON_LEVEL } from '../game/progression';
+import { canRaiseTalent, levelFromXp, nextForge, spentPoints, TALENTS, talentPoints, tierFor, TIERS, UNLOCKS } from '../game/progression';
 import type { WeaponId } from '../game/types';
 import { WEAPON_INFO } from '../game/weapons';
 import { CAN_EXIT, exitGame, getWindowMode, HAS_WINDOW_MODES, setWindowMode, type WindowMode } from '../platform';
@@ -15,6 +15,7 @@ import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type U
 import { BINDABLE, keyLabel, type Action } from '../engine/input';
 import { devMenu } from './dev';
 import { gearScreen } from './gear';
+import { GEAR_RARITY, MATERIAL_IDS, MATERIALS } from '../game/gear';
 import { mapScreen } from './map';
 import { esc, type Card } from './overlay';
 
@@ -30,13 +31,14 @@ function keyControls(g: Game): string {
     '<div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>',
     '<div><kbd>LMB</kbd>/<kbd>J</kbd> Attack</div><div><kbd>RMB</kbd>/<kbd>K</kbd> Special</div>',
     `<div><kbd>Space</kbd> Dash</div><div>${st.canCast ? '<kbd>Q</kbd> Cast shard' : '<kbd>E</kbd> Interact'}</div>`,
+    st.canGuard ? `<div>${k('guard')} Guard (hold) · tap to <b>Parry</b></div><div>Parry, then attack: <b>Riposte</b></div>` : '',
     st.canJump ? '<div><kbd>Shift</kbd>/<kbd>C</kbd> Jump</div><div>Attack mid-air: <b>Slam</b></div>' : '',
     st.canPotion || st.artifactSlots ? `<div>${st.artifactSlots ? `<kbd>1</kbd>${st.artifactSlots > 1 ? '<kbd>2</kbd>' : ''}${st.artifactSlots > 2 ? '<kbd>3</kbd>' : ''} Artifacts` : ''}</div><div>${st.canPotion ? `${k('potion')} Potion` : ''}</div>` : '',
     st.canWrath ? `<div>${k('wrath')} Wrath (when full)</div><div></div>` : '',
     `<div>${st.canCast ? '<kbd>E</kbd> Interact' : ''}</div><div><kbd>Esc</kbd> Pause · <kbd>M</kbd> Mute</div>`,
   ];
   return `<div class="controls">${rows.join('')}</div>
-  <p class="small">Gamepad: Left stick move · Right stick aim · X attack · Y special · A dash${st.canCast ? ' · RB cast' : ''}${st.canJump ? ' · B jump' : ''}${st.canPotion ? ' · LB potion' : ''}${st.artifactSlots ? ' · RT/LT/L3 artifacts' : ''}${st.canWrath ? ' · R3 wrath' : ''} · Select interact</p>`;
+  <p class="small">Gamepad: Left stick move · Right stick aim · X attack · Y special · A dash${st.canCast ? ' · RB cast' : ''}${st.canJump ? ' · B jump' : ''}${st.canGuard ? ' · LT guard' : ''}${st.canPotion ? ' · LB potion' : ''}${st.artifactSlots ? ' · RT/D-pad left/L3 artifacts' : ''}${st.canWrath ? ' · R3 wrath' : ''} · Select interact</p>`;
 }
 
 function touchControls(g: Game): string {
@@ -332,7 +334,10 @@ export function help(g: Game, intro = false): void {
     `<div class="panel wide">
       <h2 class="title">${intro ? 'Escape the Underworld' : 'How to Play'}</h2>
       <p>Clear each chamber of foes, claim its reward, then choose your next door — each shows what lies beyond.
-      The <b>gods of Olympus</b> grant <b>Boons</b> that empower your attacks.</p>
+      The <b>gods of Olympus</b> grant <b>Boons</b> that empower your attacks. Any reward can be skipped for a few obols.</p>
+      <p><b>Fighting:</b> tap Attack to chain hits; <b>hold</b> Attack after a hit for your weapon's <b>powered attack</b>
+      (let go on the flash for a Perfect). Use your Special right out of a chain for a stronger <b>combo special</b>.
+      Hits in a row build your <b>combo</b>. Each hero is a class with their own weapon.</p>
       <p>Every foe and chamber earns <b>experience</b>. Levelling up unlocks new skills one at a time — the Potion, Cast,
       Artifacts, Jump, Enchantments and finally your hero's <b>Wrath</b> — and gives a talent point to spend at <b>Ascension</b>.</p>
       <p>When you fall, you return to the Hall of Shades. <b>Ash</b> you gathered is kept — spend it at the Altar or the Armory.</p>
@@ -578,6 +583,14 @@ const EPITAPHS = [
   'Again. And again. Until the gate gives way.',
 ];
 
+/** The loot an escape gathered: materials as chips, gear names in their tier colour. */
+function spoilsHtml(sp: RunSummary['spoils']): string {
+  const mats = MATERIAL_IDS.filter((k) => sp.materials[k]).map((k) => `<span class="mat" style="--c:${MATERIALS[k].color}"><b>${MATERIALS[k].glyph}</b>${sp.materials[k]}<small>${esc(MATERIALS[k].name)}</small></span>`);
+  const gear = sp.gear.map((it) => `<span class="spoil-gear" style="color:${GEAR_RARITY[it.rarity].color}">${esc(it.name)}</span>`);
+  if (!mats.length && !gear.length) return '';
+  return `<h3 class="section">Spoils</h3><div class="mats">${mats.join('')}</div>${gear.length ? `<div class="spoils-gear">${gear.join('')}</div><p class="small">Equip new gear at the Armory or from the pause menu.</p>` : ''}`;
+}
+
 export function death(g: Game, s: RunSummary): void {
   const el = g.ui.push(
     'over',
@@ -591,6 +604,7 @@ export function death(g: Game, s: RunSummary): void {
         <div><span>Time</span><b>${fmtTime(s.time)}</b></div>
         <div><span>Ash gathered</span><b>${s.ash} ◆</b></div>
       </div>
+      ${spoilsHtml(s.spoils)}
       <button class="btn primary" data-nav data-a="hub">Return to the Hall</button>
     </div>`,
   );
@@ -613,6 +627,7 @@ export function victory(g: Game, s: RunSummary): void {
         <div><span>Ash gathered</span><b>${s.ash} ◆</b></div>
         <div><span>Escapes</span><b>${g.save.stats.escapes}</b></div>
       </div>
+      ${spoilsHtml(s.spoils)}
       <p class="small">A new Torment level is unlocked at the Oath of Torment.</p>
       <button class="btn primary" data-nav data-a="hub">Return to the Hall</button>
     </div>`,
@@ -625,17 +640,17 @@ export function victory(g: Game, s: RunSummary): void {
 
 // ---------------------------------------------------------------- hub stations
 
+/** The Armory: each class's signature weapon, forged stronger with Ash. Weapons come with their heroes. */
 export function weapons(g: Game): void {
   const render = () =>
     WEAPON_IDS.map((id) => {
       const info = WEAPON_INFO[id];
-      const owned = g.save.weapons.includes(id);
+      const hero = heroForWeapon(id);
+      const owned = characterUnlocked(hero, g.save, g.level);
       const sel = g.save.weapon === id;
-      const needLv = WEAPON_LEVEL[id];
-      const levelOk = g.level >= needLv;
       const tier = g.save.forge[id] ?? 1;
-      const note = sel ? 'Equipped' : owned ? 'Equip' : !levelOk ? `Requires Lv ${needLv}` : `Unlock: ${info.cost} ◆`;
-      const can = owned || (levelOk && g.save.ash >= info.cost);
+      const note = sel ? `Wielding · ${hero.name}` : owned ? `Take up as ${hero.name}` : `Locked: ${hero.unlock?.text ?? ''}`;
+      const can = owned;
       const next = owned ? nextForge(tier) : null;
       const forgeOk = next && g.level >= next.level && g.save.ash >= next.cost;
       const forge = owned
@@ -645,12 +660,13 @@ export function weapons(g: Game): void {
         : '';
       return `<div class="weapon-row"><button class="card${can ? '' : ' disabled'}" data-nav data-w="${id}" style="--c:${info.color}">
           <div class="card-body"><div class="card-head"><span class="card-title">${esc(info.name)}${owned ? ` <span class="tierpip">${'★'.repeat(tier)}</span>` : ''}</span><span class="card-tag" style="--t:${sel ? '#7dff8a' : info.color}">${esc(note)}</span></div>
+          <div class="card-sub">${esc(hero.role)}'s weapon</div>
           <div class="card-desc">${esc(info.blurb)}</div></div></button>${forge}</div>`;
     }).join('');
   const el = g.ui.push(
     'station',
-    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Choose your weapon, and forge it stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards list" data-list>${render()}</div>
-      ${g.has('gear') ? '<button class="btn primary" data-nav data-a="gear">Gear &amp; Inventory</button>' : '<p class="small">Gear (helmets, armor, leggings and boots) unlocks here at level 10.</p>'}
+    `<div class="panel wide"><h2 class="title">Armory</h2><div class="subtitle">Every class has its own weapon: pick a weapon to play its hero. Forge weapons stronger with Ash. Ash: <b data-ash>${g.save.ash}</b> ◆</div><div class="cards list" data-list>${render()}</div>
+      ${g.has('gear') ? '<button class="btn primary" data-nav data-a="gear">Gear &amp; Inventory</button>' : `<p class="small">Gear (helmets, armor, leggings and boots) unlocks here at level ${UNLOCKS.find((u) => u.feature === 'gear')?.level}.</p>`}
       <button class="btn" data-nav data-a="back">Back</button></div>`,
     { onBack: () => g.ui.pop() },
   );
@@ -662,18 +678,13 @@ export function weapons(g: Game): void {
   };
   const wire = () => {
     bind(el, '[data-w]', (b) => {
-      const id = b.dataset.w as WeaponId;
-      if (!g.save.weapons.includes(id)) {
-        const cost = WEAPON_INFO[id].cost;
-        if (g.save.ash < cost || g.level < WEAPON_LEVEL[id]) {
-          audio.play('deny');
-          return;
-        }
-        g.save.ash -= cost;
-        g.save.weapons.push(id);
-        audio.play('boon');
-      } else audio.play('select');
-      g.selectWeapon(id);
+      const hero = heroForWeapon(b.dataset.w as WeaponId);
+      if (!characterUnlocked(hero, g.save, g.level)) {
+        audio.play('deny');
+        return;
+      }
+      audio.play('boon');
+      g.selectCharacter(hero.id);
       refresh();
     });
     bind(el, '[data-f]', (b) => {
@@ -698,6 +709,14 @@ export function weapons(g: Game): void {
 
 // ---------------------------------------------------------------- heroes & talents
 
+const GUARD_LABEL: Record<GuardStyle, string> = {
+  parry: 'Guard: blade parry',
+  shield: 'Guard: tower shield (Attack while guarding to bash)',
+  evade: 'Guard: evasive sidestep',
+  catch: 'Guard: catch and counter',
+  mist: 'Guard: mist form (blocked hits become souls)',
+};
+
 export function heroes(g: Game): void {
   const render = () =>
     CHARACTERS.map((c) => {
@@ -706,15 +725,16 @@ export function heroes(g: Game): void {
       const tag = sel ? 'Selected' : open ? 'Choose' : `Locked: ${c.unlock?.text ?? ''}`;
       return `<button class="card hero${open ? '' : ' disabled'}" data-nav data-c="${c.id}" style="--c:${c.color}">
         <div class="card-body"><div class="card-head"><span class="card-title">${esc(c.name)}</span><span class="card-tag" style="--t:${sel ? '#7dff8a' : c.color}">${esc(tag)}</span></div>
-        <div class="card-sub">${esc(c.title)}</div>
+        <div class="card-sub">${esc(c.title)} · <b>${esc(c.role)}</b></div>
         <div class="card-desc">${esc(c.blurb)}</div>
+        <div class="hero-kit"><span style="color:${WEAPON_INFO[c.weapon].color}">${esc(WEAPON_INFO[c.weapon].name)}</span> · ${esc(GUARD_LABEL[c.guard])}</div>
         <ul class="perks">${c.perks.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
         <div class="card-note">Wrath — ${esc(c.wrath.name)}: ${esc(c.wrath.desc)}${g.stats.canWrath ? '' : ' (unlocks at level 10)'}</div></div></button>`;
     }).join('');
   const el = g.ui.push(
     'station',
     `<div class="panel wide"><h2 class="title" style="color:#ff8a6e">Hall of Heroes</h2>
-      <div class="subtitle">Each hero has their own strengths and Wrath ultimate.</div>
+      <div class="subtitle">Each hero is a class: their own weapon, guard style, strengths and Wrath ultimate. More classes open as you rank up.</div>
       <div class="cards grid" data-list>${render()}</div>
       <button class="btn" data-nav data-a="look">Customise appearance</button>
       <button class="btn" data-nav data-a="back">Back</button></div>`,

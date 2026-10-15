@@ -13,7 +13,7 @@ function stubWorld(stats: PlayerStats): World & { killed: Enemy[] } {
   const killed: Enemy[] = [];
   const w = {
     stats,
-    player: { x: 0, y: 0, hp: 50, maxHp: 50, rampageT: 0 },
+    player: { x: 0, y: 0, hp: 50, maxHp: 50, rampageT: 0, combo: 0, action: null, comboHit: noop },
     particles,
     killed,
     hitstop: noop,

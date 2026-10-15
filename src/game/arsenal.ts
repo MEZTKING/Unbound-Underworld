@@ -4,7 +4,7 @@ import { clamp, fromAngle, TAU } from '../engine/math';
 import { applyDoom, damageEnemy, playerBlast } from './combat';
 import type { Enemy } from './enemies/enemy';
 import type { Player } from './player';
-import { gravityPull, meleeHit, slamCommon, swirl, thrust, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
+import { gravityPull, meleeHit, poweredAttack, powerLevel, slamCommon, swirl, thrust, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
 import type { World } from './world';
 
 // ---------------------------------------------------------------- Titan Gauntlets
@@ -47,6 +47,7 @@ export class Gauntlets implements Weapon {
       moveMult: 0.35,
       lunge: c.lunge,
       combo: true,
+      chain: i,
       lockAim: true,
       fire: (pp, ww, aim) => {
         this.lastFire = ww.time;
@@ -67,6 +68,21 @@ export class Gauntlets implements Weapon {
 
   held(p: Player, w: World): ActionDef {
     return this.attack(p, w, false);
+  }
+
+  /** Titan Uppercut: launches what's in front, stuns it, and shakes the ground. */
+  powered(_p: Player, _w: World, step: number): ActionDef {
+    return poweredAttack('titanUppercut', '#c8ff5a', powerLevel(step, FIST_COMBO.length), (pp, ww, power, aim) => {
+      this.combo = -1;
+      this.punchT = 0.2;
+      this.punchAim = aim;
+      meleeHit(pp, ww, aim, { dmg: 55 * power, r: 110, half: 0.9, knock: 620, ttl: 0.1, source: 'attack', hitstop: 0.08 });
+      for (const e of ww.enemiesInRadius(pp.x + Math.cos(aim) * 60, pp.y + Math.sin(aim) * 60, 80)) if (!e.isBoss) e.status.stun = Math.max(e.status.stun ?? 0, 1);
+      playerBlast(ww, pp.x, pp.y, 140, 18 * power, { color: '#c8ff5a', knock: 300, source: 'attack' });
+      ww.addSwipe(pp.x, pp.y, 110, aim, 0.9, 0.2, '#f0ffb0', 22, false, 1);
+      ww.camera.shake(0.3);
+      audio.play('explode');
+    });
   }
 
   private uppercut(w: World): ActionDef {
@@ -215,6 +231,7 @@ export class Scythe implements Weapon {
       moveMult: 0.25,
       lunge: c.lunge,
       combo: true,
+      chain: i,
       lockAim: true,
       fire: (pp, ww, aim) => {
         this.lastFire = ww.time;
@@ -244,6 +261,7 @@ export class Scythe implements Weapon {
       recover: 0.32,
       moveMult: 0.2,
       combo: name === 'reap',
+      chain: name === 'reap' ? 2 : undefined,
       lockAim: true,
       fire: (pp, ww, aim) => {
         this.lastFire = ww.time;
@@ -258,6 +276,25 @@ export class Scythe implements Weapon {
         if (name === 'dashSpin') swirl(pp, ww);
       },
     };
+  }
+
+  /** Harvest: drags foes in, then one great reap. */
+  powered(_p: Player, _w: World, step: number): ActionDef {
+    return poweredAttack('harvest', '#b48cff', powerLevel(step, 3), (pp, ww, power, aim) => {
+      this.combo = -1;
+      gravityPull(ww, pp.x, pp.y, 260);
+      for (const e of ww.enemiesInRadius(pp.x, pp.y, 260)) if (!e.isBoss) e.knock(pp.x - e.x, pp.y - e.y, 420);
+      ww.particles.ring(pp.x, pp.y, '#b48cff', 260, 0.3, 4);
+      audio.play('cast');
+      ww.later(0.14, () => {
+        const r = 170 * this.reach(ww);
+        this.swing(aim, 1, 0.32, true);
+        ww.addHitbox({ team: 'player', shape: { type: 'circle', x: pp.x, y: pp.y, r }, damage: 55 * power, source: 'attack', knock: 500, ttl: 0.12, hit: new Set(), owner: pp, follow: true, hitstop: 0.07 });
+        ww.addSwipe(pp.x, pp.y, r, aim, Math.PI, 0.34, '#d8c0ff', 26, true);
+        ww.camera.shake(0.3);
+        audio.play('heavySwing');
+      });
+    });
   }
 
   private swing(aim: number, dir: number, dur: number, spin: boolean): void {
