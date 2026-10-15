@@ -1,6 +1,52 @@
 import type { MetaBonuses } from './boons';
+import { isCharacterId, type CharacterId } from './characters';
+import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { PlayerStats } from './stats';
 import type { WeaponId } from './types';
+
+export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'scythe'];
+
+const isWeaponId = (v: unknown): v is WeaponId => typeof v === 'string' && (WEAPON_IDS as string[]).includes(v);
+
+export interface Settings {
+  volume: number;
+  music: number;
+  muted: boolean;
+  shake: number;
+  damageNumbers: boolean;
+  hitstop: boolean;
+  /** 0..1 strength of flashes. */
+  flashes: number;
+  aimAssist: boolean;
+  vibration: boolean;
+  showFps: boolean;
+  hints: boolean;
+  assist: boolean;
+  /** Touch button scale (0.8..1.3). */
+  touchSize: number;
+  touchOpacity: number;
+  leftHanded: boolean;
+}
+
+export function defaultSettings(): Settings {
+  return {
+    volume: 0.7,
+    music: 0.5,
+    muted: false,
+    shake: 1,
+    damageNumbers: true,
+    hitstop: true,
+    flashes: 1,
+    aimAssist: true,
+    vibration: true,
+    showFps: false,
+    hints: true,
+    assist: false,
+    touchSize: 1,
+    touchOpacity: 0.9,
+    leftHanded: false,
+  };
+}
 
 /** Permanent upgrades bought with Ash at the Altar in the hub. */
 export interface UpgradeDef {
@@ -45,8 +91,16 @@ export interface SaveData {
     totalAsh: number;
     bossesSlain: number;
   };
-  settings: { volume: number; music: number; muted: boolean; shake: number };
+  settings: Settings;
   seenIntro: boolean;
+  /** Total experience; sets your level. */
+  xp: number;
+  /** Highest level whose unlocks were announced. */
+  seenLevel: number;
+  talents: Record<string, number>;
+  character: CharacterId;
+  /** Forge tier per weapon (1..5). */
+  forge: Partial<Record<WeaponId, number>>;
 }
 
 const KEY = 'unbound-underworld-save-v1';
@@ -63,9 +117,21 @@ export function defaultSave(): SaveData {
     heat: 0,
     maxHeat: 0,
     stats: { runs: 0, escapes: 0, deaths: 0, kills: 0, bestDepth: 0, bestTime: 0, totalAsh: 0, bossesSlain: 0 },
-    settings: { volume: 0.7, music: 0.5, muted: false, shake: 1 },
+    settings: defaultSettings(),
     seenIntro: false,
+    xp: 0,
+    seenLevel: 1,
+    talents: {},
+    character: 'kael',
+    forge: {},
   };
+}
+
+/** Experience for saves made before levels existed, so veterans keep their unlocks. */
+function legacyXp(stats: SaveData['stats']): number {
+  if (!stats.runs) return 0;
+  const xp = stats.kills * 3 + stats.bestDepth * 12 + stats.bossesSlain * 120 + stats.escapes * 250 + stats.runs * 20;
+  return Math.min(xp, xpForLevel(MAX_LEVEL));
 }
 
 /** Merges stored data over defaults so older saves keep working. */
@@ -74,19 +140,26 @@ export function normalizeSave(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object') return d;
   const r = raw as Partial<SaveData>;
   const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  const stats = { ...d.stats, ...(typeof r.stats === 'object' && r.stats ? r.stats : {}) };
+  const xp = typeof r.xp === 'number' ? Math.max(0, num(r.xp, 0)) : legacyXp(stats);
   return {
     version: 1,
     ash: Math.max(0, num(r.ash, 0)),
     upgrades: typeof r.upgrades === 'object' && r.upgrades ? { ...r.upgrades } : {},
-    weapons: Array.isArray(r.weapons) && r.weapons.length ? (r.weapons.filter((w) => w === 'sword' || w === 'spear' || w === 'bow') as WeaponId[]) : d.weapons,
-    weapon: r.weapon === 'spear' || r.weapon === 'bow' || r.weapon === 'sword' ? r.weapon : 'sword',
+    weapons: Array.isArray(r.weapons) && r.weapons.filter(isWeaponId).length ? r.weapons.filter(isWeaponId) : d.weapons,
+    weapon: isWeaponId(r.weapon) ? r.weapon : 'sword',
     artifacts: Array.isArray(r.artifacts) ? [...new Set([...d.artifacts, ...r.artifacts.filter((a) => typeof a === 'string')])] : d.artifacts,
     startArtifact: typeof r.startArtifact === 'string' || r.startArtifact === null ? r.startArtifact : d.startArtifact,
     heat: Math.max(0, num(r.heat, 0)),
     maxHeat: Math.max(0, num(r.maxHeat, 0)),
-    stats: { ...d.stats, ...(typeof r.stats === 'object' && r.stats ? r.stats : {}) },
+    stats,
     settings: { ...d.settings, ...(typeof r.settings === 'object' && r.settings ? r.settings : {}) },
     seenIntro: !!r.seenIntro,
+    xp,
+    seenLevel: Math.max(1, num(r.seenLevel, typeof r.xp === 'number' ? 1 : levelFromXp(xp).level)),
+    talents: typeof r.talents === 'object' && r.talents ? { ...r.talents } : {},
+    character: isCharacterId(r.character) ? r.character : 'kael',
+    forge: typeof r.forge === 'object' && r.forge ? { ...r.forge } : {},
   };
 }
 

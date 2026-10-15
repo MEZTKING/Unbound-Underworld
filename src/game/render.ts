@@ -5,6 +5,7 @@ import type { Projectile, Zone } from './entities';
 import { DOOR_W, TRAP_SIZE, WALL_H, type Obstacle } from './rooms';
 import type { RewardSpec, Shape } from './types';
 import type { Interactable, World } from './world';
+import { prefs } from './prefs';
 import { isSpear } from './weapons';
 
 const PAD = 90;
@@ -744,6 +745,57 @@ function drawStation(ctx: CanvasRenderingContext2D, it: Interactable, t: number)
     ctx.fillRect(2, -64, 24, 12);
     return;
   }
+  if (it.id === 'heroes') {
+    // A plinth with a ghostly hero silhouette.
+    ctx.fillStyle = '#3a2a30';
+    ctx.fillRect(-30, -22, 60, 22);
+    ctx.fillStyle = '#4a3840';
+    ctx.fillRect(-34, -28, 68, 8);
+    ctx.globalCompositeOperation = 'lighter';
+    const a = 0.45 + Math.sin(t * 2) * 0.12;
+    ctx.fillStyle = `rgba(255,140,110,${a})`;
+    ctx.beginPath();
+    ctx.moveTo(-14, -30);
+    ctx.quadraticCurveTo(-17, -56, -9, -70);
+    ctx.lineTo(9, -70);
+    ctx.quadraticCurveTo(17, -56, 14, -30);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -80, 9, 0, TAU);
+    ctx.fill();
+    return;
+  }
+  if (it.id === 'ascension') {
+    // A standing stone etched with a glowing constellation.
+    ctx.fillStyle = '#2a2630';
+    ctx.beginPath();
+    ctx.moveTo(-26, 0);
+    ctx.lineTo(-20, -84);
+    ctx.quadraticCurveTo(0, -100, 20, -84);
+    ctx.lineTo(26, 0);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    const stars = [
+      [-10, -70],
+      [6, -78],
+      [12, -56],
+      [-4, -46],
+      [-12, -28],
+      [8, -24],
+    ];
+    ctx.strokeStyle = `rgba(255,230,140,${0.35 + Math.sin(t * 1.5) * 0.15})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    stars.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.stroke();
+    stars.forEach(([x, y], i) => {
+      ctx.fillStyle = `rgba(255,236,160,${0.6 + Math.sin(t * 3 + i) * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, TAU);
+      ctx.fill();
+    });
+    return;
+  }
   if (it.id === 'pact') {
     ctx.fillStyle = '#2a0e14';
     ctx.fillRect(-30, -56, 60, 56);
@@ -825,6 +877,27 @@ function drawProjectile(ctx: CanvasRenderingContext2D, pr: Projectile, t: number
       ctx.beginPath();
       ctx.arc(0, 0, 4, 0, TAU);
       ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'crescent': {
+      // Awakened-weapon wave: a glowing arc facing its flight direction.
+      ctx.save();
+      ctx.translate(pr.x, y);
+      ctx.rotate(a);
+      ctx.globalCompositeOperation = 'lighter';
+      const fade = Math.min(1, pr.ttl * 5);
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = pr.color;
+      ctx.lineWidth = pr.r * 0.5;
+      ctx.beginPath();
+      ctx.arc(-pr.r * 0.6, 0, pr.r * 1.4, -1.1, 1.1);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = pr.r * 0.18;
+      ctx.beginPath();
+      ctx.arc(-pr.r * 0.6, 0, pr.r * 1.4, -0.9, 0.9);
+      ctx.stroke();
       ctx.restore();
       break;
     }
@@ -1012,7 +1085,7 @@ function renderLights(w: World, ctx: CanvasRenderingContext2D, dpr: number): voi
     light(cx, cy, r, 'rgba(255,110,40,0.55)');
   }
   for (const pr of w.projectiles) light(pr.x, pr.y - pr.z, 70, pr.color, 0.45);
-  for (const f of w.flashes) light(f.x, f.y, f.r, f.color, 1 - f.t / f.dur);
+  for (const f of w.flashes) light(f.x, f.y, f.r, f.color, (1 - f.t / f.dur) * (0.25 + 0.75 * prefs.flashes));
   for (const pk of w.pickups) if (pk.kind === 'reward') light(pk.x, pk.y - 30, 200, 'rgba(255,220,150,0.6)');
   for (const d of w.doors) if (d.open && d.reward) light(d.x, -40, 220, rewardColor(d.reward), 0.5);
   for (const z of w.zones) if (z.kind === 'heal' || z.kind === 'storm' || z.kind === 'fire') light(z.x, z.y, z.r * 1.4, z.kind === 'heal' ? 'rgba(125,255,138,0.5)' : 'rgba(255,200,90,0.5)');
@@ -1201,11 +1274,16 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   const p = w.player;
   const low = p.hp / p.maxHp;
   if (w.hurtFlash > 0 || (low < 0.3 && p.state !== 'dead')) {
-    const a = Math.max(w.hurtFlash * 1.2, low < 0.3 ? (0.3 - low) * 1.2 * (0.6 + Math.sin(w.time * 5) * 0.4) : 0);
+    const a = Math.max(w.hurtFlash * 1.2 * (0.3 + 0.7 * prefs.flashes), low < 0.3 ? (0.3 - low) * 1.2 * (0.6 + Math.sin(w.time * 5) * 0.4) : 0);
     const hg = ctx.createRadialGradient(cam.vw / 2, cam.vh / 2, Math.min(cam.vw, cam.vh) * 0.3, cam.vw / 2, cam.vh / 2, Math.max(cam.vw, cam.vh) * 0.7);
     hg.addColorStop(0, 'rgba(255,0,0,0)');
     hg.addColorStop(1, `rgba(200,0,20,${Math.min(0.6, a)})`);
     ctx.fillStyle = hg;
+    ctx.fillRect(0, 0, cam.vw, cam.vh);
+  }
+  if (w.eclipseT > 0) {
+    // Erebos' Eclipse: the room sinks into violet darkness.
+    ctx.fillStyle = `rgba(20,0,40,${Math.min(0.45, w.eclipseT * 0.3)})`;
     ctx.fillRect(0, 0, cam.vw, cam.vh);
   }
 }

@@ -44,6 +44,8 @@ canvas#game {
 #overlay {
   position: fixed;
   inset: 0;
+  /* --ui is set from the screen size: menus keep their proportions on big displays. */
+  zoom: var(--ui, 1);
   z-index: 10;
   pointer-events: none;
   display: flex;
@@ -95,7 +97,7 @@ canvas#game {
   padding: 28px 32px;
   border-radius: 6px;
   width: min(560px, 100%);
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh / var(--ui, 1) - 32px);
   overflow-y: auto;
   text-align: center;
 }
@@ -558,6 +560,7 @@ kbd {
 }
 
 .toast {
+  zoom: var(--ui, 1);
   position: fixed;
   left: 50%;
   bottom: 120px;
@@ -609,6 +612,17 @@ kbd {
   --sl: env(safe-area-inset-left, 0px);
   --sr: env(safe-area-inset-right, 0px);
   --sb: env(safe-area-inset-bottom, 0px);
+  --tscale: 1;
+  --topa: 0.9;
+}
+
+/* Left-handed: mirror the whole layer, then un-mirror the button glyphs. */
+#touch.lefty {
+  transform: scaleX(-1);
+}
+
+#touch.lefty .tb span {
+  transform: scaleX(-1);
 }
 
 #touch.on {
@@ -666,6 +680,8 @@ kbd {
   --size: 62px;
   --c: #ffd890;
   --cd: 0;
+  zoom: calc(var(--tscale) * var(--ui, 1));
+  opacity: var(--topa);
   position: absolute;
   width: var(--size);
   height: var(--size);
@@ -709,7 +725,7 @@ kbd {
 }
 
 .tb.dim {
-  opacity: 0.45;
+  opacity: calc(var(--topa) * 0.45);
 }
 
 .tb.gone {
@@ -772,6 +788,23 @@ kbd {
   --c: #7dff8a;
   right: calc(28px + var(--sr));
   bottom: calc(200px + var(--sb));
+}
+
+.tb.wrath {
+  --c: #ffd04a;
+  right: calc(272px + var(--sr));
+  bottom: calc(26px + var(--sb));
+}
+
+.tb.wrath.ready {
+  box-shadow: 0 0 24px rgba(255, 208, 74, 0.9);
+  animation: wrath-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes wrath-pulse {
+  50% {
+    transform: scale(1.12);
+  }
 }
 
 .tb.pause {
@@ -896,4 +929,99 @@ kbd {
   .stats div {
     font-size: 15px;
   }
+}
+
+/* ---------------------------------------------------------------- progression menus */
+
+h3.section {
+  font-family: var(--serif);
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 16px 0 6px;
+  border-bottom: 1px solid rgba(255, 216, 144, 0.2);
+  padding-bottom: 4px;
+}
+
+h3.section small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settings-panel {
+  max-width: 560px;
+  width: 100%;
+}
+
+.btn.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: none;
+  text-align: left;
+}
+
+.btn.toggle b {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.btn.toggle.on b {
+  color: #7dff8a;
+}
+
+.weapon-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.btn.forge {
+  width: 100%;
+  max-width: none;
+  font-size: 13px;
+  text-align: left;
+  border-style: dashed;
+}
+
+.btn.forge small {
+  display: block;
+  font-family: var(--body, inherit);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0;
+  text-transform: none;
+  margin-top: 2px;
+}
+
+.forge-max {
+  font-size: 13px;
+  color: #ffd04a;
+  text-align: center;
+  padding: 4px;
+}
+
+.tierpip {
+  color: #ffd04a;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.card .perks {
+  margin: 6px 0 4px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #d8c8c0;
+}
+
+.row-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
 }

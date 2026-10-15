@@ -797,6 +797,14 @@ export const HAMMERS: HammerDef[] = [
   { id: 'bow_power', weapon: 'bow', name: 'Bullseye', desc: 'Your Power Shots deal +150% damage.' },
   { id: 'bow_triple', weapon: 'bow', name: 'Fan of Arrows', desc: 'Your Special fires 4 additional arrows.' },
   { id: 'bow_draw', weapon: 'bow', name: 'Quick Draw', desc: 'Your Attack charges 35% faster.' },
+  { id: 'fists_heavy', weapon: 'fists', name: 'Crushing Blows', desc: 'Your Attack deals +40% damage.' },
+  { id: 'fists_meteor', weapon: 'fists', name: 'Meteor Crater', desc: 'Your Special shockwave is 60% larger and deals +100% damage.' },
+  { id: 'fists_vamp', weapon: 'fists', name: 'Life Tap', desc: 'The final blow of your Attack combo restores 3 Health.' },
+  { id: 'fists_quake', weapon: 'fists', name: 'Aftershock', desc: 'Your Dash-Strike also releases a 30-damage shockwave.' },
+  { id: 'scythe_wide', weapon: 'scythe', name: 'Wide Arc', desc: 'Your Attack reaches +30% farther.' },
+  { id: 'scythe_orbit', weapon: 'scythe', name: 'Twin Specters', desc: 'Your Special summons two spectral scythes.' },
+  { id: 'scythe_doom', weapon: 'scythe', name: 'Death Mark', desc: 'Your Attack inflicts Doom: 60 damage after a short delay.' },
+  { id: 'scythe_long', weapon: 'scythe', name: 'Lingering Shade', desc: 'Your Special lasts 80% longer.' },
 ];
 
 export const HAMMER_BY_ID: Record<string, HammerDef> = Object.fromEntries(HAMMERS.map((h) => [h.id, h]));
@@ -876,9 +884,15 @@ function isEligible(def: BoonDef, owned: readonly OwnedBoon[]): boolean {
  * Builds up to `count` boon choices from a god. Duo boons featuring the god
  * may be mixed in once their requirements are met.
  */
-export function rollBoonOffers(rng: Rng, god: GodId, owned: readonly OwnedBoon[], favor = 0, count = 3): BoonOffer[] {
-  const pool = BOONS.filter((d) => d.slot !== 'duo' && d.god === god && isEligible(d, owned));
-  const duos = god === 'hermes' ? [] : BOONS.filter((d) => d.duoOf && d.duoOf.includes(god) && isEligible(d, owned));
+/** Boons that only make sense once Cast is unlocked. */
+export function needsCast(def: BoonDef): boolean {
+  return def.slot === 'cast' || def.id === 'hermes_reload' || def.id === 'hermes_shard';
+}
+
+export function rollBoonOffers(rng: Rng, god: GodId, owned: readonly OwnedBoon[], favor = 0, count = 3, allow?: (def: BoonDef) => boolean): BoonOffer[] {
+  const ok = (d: BoonDef) => isEligible(d, owned) && (!allow || allow(d));
+  const pool = BOONS.filter((d) => d.slot !== 'duo' && d.god === god && ok(d));
+  const duos = god === 'hermes' ? [] : BOONS.filter((d) => d.duoOf && d.duoOf.includes(god) && ok(d));
   // Prefer slot boons for empty slots early on.
   const picks: BoonDef[] = [];
   const shuffled = rng.shuffle([...pool]);

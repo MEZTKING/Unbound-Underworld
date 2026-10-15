@@ -14,18 +14,23 @@ import {
   RARITY_COLOR,
   boonValue,
   computeStats,
+  needsCast,
   pomCandidates,
   rollBoonOffers,
   rollHammerOffers,
   takeBoon,
   type BoonOffer,
 } from './boons';
+import { CHARACTER_BY_ID, characterUnlocked, type CharacterId } from './characters';
 import { createBoss } from './enemies';
+import type { Enemy } from './enemies/enemy';
 import { ENCHANT_BY_ID, rollEnchantOffers, takeEnchant } from './enchants';
 import { Pickup } from './entities';
 import { drawHUD } from './hud';
 import { applyMetaExtras, loadSave, metaBonuses, writeSave, type SaveData } from './meta';
 import { Player } from './player';
+import { prefs } from './prefs';
+import { applyFeatures, applyForge, applyTalents, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
 import { REWARD_INFO, renderOpts } from './render';
 import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
 import { Run, type RoomPlan } from './run';
@@ -54,6 +59,8 @@ export class Game implements WorldHost {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
   dpr = 1;
+  /** HUD and menu scale: 1 at the 1280×760 design size, larger on bigger screens. */
+  uiScale = 1;
   readonly input: Input;
   readonly camera = new Camera();
   readonly particles = new Particles();
@@ -75,6 +82,8 @@ export class Game implements WorldHost {
   private last = 0;
   private params = new URLSearchParams(location.search);
   private lastHit = 'the Underworld';
+  private debugLevel = 0;
+  private fps = 60;
 
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement) {
     this.canvas = canvas;
@@ -86,12 +95,12 @@ export class Game implements WorldHost {
     this.godMode = this.params.has('god');
     // Debug: ?weapon=spear|bow tries a weapon for this session without unlocking it.
     const wp = this.params.get('weapon');
-    if (wp === 'sword' || wp === 'spear' || wp === 'bow') this.save.weapon = wp;
-    audio.volume = this.save.settings.volume;
-    audio.musicVolume = this.save.settings.music;
-    audio.muted = this.save.settings.muted;
-    this.camera.shakeScale = this.save.settings.shake;
-    this.player = new Player(this.save.weapon);
+    if (wp === 'sword' || wp === 'spear' || wp === 'bow' || wp === 'fists' || wp === 'scythe') this.save.weapon = wp;
+    // Debug: ?level=12 tries the game at that level for this session.
+    const lv = Number(this.params.get('level'));
+    if (lv > 0) this.debugLevel = Math.floor(lv);
+    this.applySettings();
+    this.player = new Player(this.save.weapon, this.save.character);
     this.stats = computeStats([], [], metaBonuses(this.save));
     const unlock = () => audio.unlock();
     // iOS only lets audio start inside touchend/click, so listen for those too.
@@ -123,6 +132,10 @@ export class Game implements WorldHost {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.camera.resize(w, h);
+    // Grow the HUD and menus with the screen so they keep their proportions on
+    // 1440p and 4K displays. Smaller screens keep the compact layouts.
+    this.uiScale = Math.max(1, Math.min(3, Math.min(w / 1280, h / 760)));
+    document.documentElement.style.setProperty('--ui', this.uiScale.toFixed(3));
   }
 
   /** Pause and go quiet when the tab or app is backgrounded. */
@@ -138,11 +151,79 @@ export class Game implements WorldHost {
     writeSave(this.save);
   }
 
+  /** Pushes saved settings into the audio, camera and gameplay systems. */
+  applySettings(): void {
+    const st = this.save.settings;
+    audio.volume = st.volume;
+    audio.musicVolume = st.music;
+    audio.muted = st.muted;
+    this.camera.shakeScale = st.shake;
+    prefs.damageNumbers = st.damageNumbers;
+    prefs.hitstop = st.hitstop;
+    prefs.flashes = st.flashes;
+    prefs.aimAssist = st.aimAssist;
+    prefs.vibration = st.vibration;
+    prefs.showFps = st.showFps;
+    prefs.hints = st.hints;
+    prefs.assist = st.assist;
+    this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
+  }
+
+  /** Your level (from total experience). */
+  get level(): number {
+    return this.debugLevel || levelFromXp(this.save.xp).level;
+  }
+
+  has(feature: Parameters<typeof hasFeature>[1]): boolean {
+    return hasFeature(this.level, feature);
+  }
+
+  /** Grants experience and announces any level-ups and what they unlock. */
+  gainXp(n: number): void {
+    if (n <= 0) return;
+    const before = this.level;
+    this.save.xp += n;
+    const after = this.level;
+    if (after <= before) return;
+    this.recomputeStats();
+    const p = this.player;
+    p.castAmmo = this.stats.castAmmo;
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.25);
+    this.persist();
+    this.announceLevels();
+  }
+
+  /** Shows the banner for levels reached but not yet announced. */
+  announceLevels(): void {
+    const level = this.level;
+    if (level <= this.save.seenLevel) return;
+    const unlocks = [];
+    for (let l = this.save.seenLevel + 1; l <= level; l++) unlocks.push(...unlocksAt(l));
+    this.save.seenLevel = level;
+    this.persist();
+    const w = this.world;
+    const tier = tierFor(level);
+    audio.play('boon');
+    if (w) {
+      w.particles.ring(this.player.x, this.player.y, tier.color, 160, 0.6, 8);
+      w.particles.text(this.player.x, this.player.y - 100, `LEVEL ${level}`, tier.color, 26);
+    }
+    if (unlocks.length) {
+      const u = unlocks[unlocks.length - 1];
+      const keys = u.keys ? ` (${this.touch.enabled ? u.keys.touch : u.keys.pc})` : '';
+      w?.showBanner(`Unlocked: ${u.title}`, `${u.desc}${keys}`);
+      if (unlocks.length > 1) this.ui.toast(`Also unlocked: ${unlocks.slice(0, -1).map((x) => x.title).join(', ')}`, 4000);
+    } else {
+      w?.showBanner(`Level ${level}`, `${tier.name} · +1 talent point`);
+    }
+    if (this.save.seenLevel > 1) this.ui.toast(`Level ${level}! A talent point awaits at Ascension in the Hall.`, 3000);
+  }
   // ---------------------------------------------------------------- loop
 
   private frame(t: number): void {
     const dt = Math.min(0.1, (t - this.last) / 1000 || 0);
     this.last = t;
+    if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     this.input.pollGamepads();
     if (!this.ui.open) {
       this.acc += dt;
@@ -211,10 +292,19 @@ export class Game implements WorldHost {
     if (w) {
       w.render(ctx, this.dpr);
       if (this.mode !== 'title') {
-        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        drawHUD(ctx, w, this.run, this.save, this.camera.vw, this.camera.vh, this.mode === 'hub', this.touch.enabled);
+        const k = this.dpr * this.uiScale;
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        drawHUD(ctx, w, this.run, this.save, this.camera.vw / this.uiScale, this.camera.vh / this.uiScale, this.mode === 'hub', this.touch.enabled, this.level, this.save.settings.leftHanded);
       }
       this.syncTouch(w);
+    }
+    if (prefs.showFps) {
+      const k = this.dpr * this.uiScale;
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      ctx.font = '600 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(200,255,200,0.8)';
+      ctx.fillText(`${Math.round(this.fps)} FPS`, this.camera.vw / this.uiScale / 2, this.camera.vh / this.uiScale - 8);
     }
     if (this.fade > 0) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -231,8 +321,12 @@ export class Game implements WorldHost {
     const s = this.stats;
     this.touch.update({
       active: !this.ui.open && (this.mode === 'hub' || this.mode === 'run') && p.state !== 'dead',
+      cast: s.canCast,
+      jump: s.canJump,
+      potion: s.canPotion,
+      wrath: s.canWrath ? Math.min(1, p.wrath / 100) : null,
       artifacts: this.artifacts.map((id, i) => {
-        if (!id) return null;
+        if (!id || i >= s.artifactSlots) return null;
         const def = ARTIFACT_BY_ID[id];
         return {
           glyph: def.glyph,
@@ -259,7 +353,7 @@ export class Game implements WorldHost {
   }
 
   onPlayerHurt(): void {
-    if (this.touch.enabled) navigator.vibrate?.(30);
+    if (this.touch.enabled && prefs.vibration) navigator.vibrate?.(30);
   }
 
   transition(fn: () => void): void {
@@ -271,11 +365,21 @@ export class Game implements WorldHost {
   // ---------------------------------------------------------------- stats
 
   recomputeStats(fullHeal = false): void {
-    if (this.run) this.stats = this.run.computeStats(this.save);
+    let s: PlayerStats;
+    if (this.run) s = this.run.computeStats(this.save);
     else {
-      this.stats = computeStats([], [], metaBonuses(this.save));
-      applyMetaExtras(this.save, this.stats);
+      s = computeStats([], [], metaBonuses(this.save));
+      applyMetaExtras(this.save, s);
     }
+    // Order matters: features decide what exists, then talents, hero and forge build on top.
+    applyFeatures(this.level, s);
+    applyTalents(this.save.talents, s);
+    this.player.hero.apply(s);
+    applyForge(this.save.forge[this.player.weapon.id] ?? 1, s);
+    if (prefs.assist) s.damageTaken *= 0.5;
+    s.maxHp = Math.max(20, s.maxHp);
+    this.stats = s;
+    if (this.run) this.run.level = this.level;
     this.player.applyStats(this.stats, fullHeal);
   }
 
@@ -285,8 +389,8 @@ export class Game implements WorldHost {
     this.mode = 'hub';
     this.run = null;
     this.particles.clear();
-    this.player = new Player(this.save.weapon);
-    this.hubArtifacts = [this.save.startArtifact, null, null];
+    this.player = new Player(this.save.weapon, this.save.character);
+    this.hubArtifacts = [this.has('artifacts') ? this.save.startArtifact : null, null, null];
     this.recomputeStats(true);
     this.player.castAmmo = this.stats.castAmmo;
     this.player.dashCharges = this.stats.dashCharges;
@@ -299,13 +403,16 @@ export class Game implements WorldHost {
     w.interactables.push(
       st('weapons', 230, 360, 'Armory', 'Choose weapon', 'rgba(255,120,120,0.5)'),
       st('mirror', layout.w - 230, 360, 'Altar of Ashes', 'Upgrade', 'rgba(200,140,255,0.6)'),
-      st('artifacts', 230, 650, 'Artifact Shelf', 'Equip artifact', 'rgba(127,232,255,0.5)'),
       st('chronicle', layout.w - 230, 650, 'Chronicle', 'Read', 'rgba(255,220,160,0.5)'),
+      st('heroes', 440, 470, 'Hall of Heroes', 'Choose hero', 'rgba(255,140,110,0.5)'),
+      st('ascension', layout.w - 440, 470, 'Ascension', this.unspentTalents() > 0 ? `Spend talents (${this.unspentTalents()})` : 'Talents', 'rgba(255,230,140,0.55)'),
     );
+    if (this.has('artifacts')) w.interactables.push(st('artifacts', 230, 650, 'Artifact Shelf', 'Equip artifact', 'rgba(127,232,255,0.5)'));
     if (this.save.stats.bossesSlain > 0 || this.save.maxHeat > 0) w.interactables.push(st('pact', layout.w / 2, 300, 'Oath of Torment', 'Swear', 'rgba(255,80,80,0.5)'));
-    w.spawn('dummy', layout.w / 2 + 200, 520);
+    w.spawn('dummy', layout.w / 2 + 230, 640);
     this.world = w;
     if (!silent) w.showBanner('The Hall of Shades', 'Rest, prepare, and try again.');
+    if (!silent) w.later(1.2, () => this.announceLevels());
     audio.setMood('hub');
   }
 
@@ -318,7 +425,10 @@ export class Game implements WorldHost {
     if (biomeParam > 0) this.run.biomeIndex = clamp(Math.floor(biomeParam), 0, BIOMES.length - 1);
     this.save.stats.runs++;
     this.persist();
-    this.player = new Player(this.save.weapon);
+    this.player = new Player(this.save.weapon, this.save.character);
+    this.run.level = this.level;
+    this.run.deathDefiance += this.save.talents.undying ?? 0;
+    if (!this.has('artifacts')) this.run.artifacts[0] = null;
     this.recomputeStats(true);
     this.player.castAmmo = this.stats.castAmmo;
     this.player.dashCharges = this.stats.dashCharges;
@@ -391,9 +501,9 @@ export class Game implements WorldHost {
     if (pomCandidates(run.boons).length) pool.push({ kind: 'pom', label: 'Pomegranate', price: 100 });
     pool.push({ kind: 'fountain', label: 'Life Essence', price: 70 });
     pool.push({ kind: 'heart', label: 'Titan Heart', price: 130 });
-    pool.push({ kind: 'enchant', label: 'Enchanting Tome', price: 120 });
-    if (ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) pool.push({ kind: 'artifact', label: 'Artifact Cache', price: 140 });
-    if (rollHammerOffers(rng, run.weapon, run.hammers).length && !run.isUsed('hammer')) pool.push({ kind: 'hammer', label: "Hephaestus' Anvil", price: 200 });
+    if (this.has('enchants')) pool.push({ kind: 'enchant', label: 'Enchanting Tome', price: 120 });
+    if (this.has('artifacts') && ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) pool.push({ kind: 'artifact', label: 'Artifact Cache', price: 140 });
+    if (this.has('anvil') && rollHammerOffers(rng, run.weapon, run.hammers).length && !run.isUsed('hammer')) pool.push({ kind: 'hammer', label: "Hephaestus' Anvil", price: 200 });
     pool.push({ kind: 'hermes', label: "Hermes' Boon", price: 120 });
     const picks = rng.shuffle(pool).slice(0, count);
     const spacing = 180;
@@ -434,6 +544,7 @@ export class Game implements WorldHost {
     run.roomsCleared++;
     if (run.current.kind === 'combat') run.depth++;
     audio.play('clear');
+    this.gainXp(run.current.kind === 'boss' ? XP.boss : XP.room);
     const s = this.stats;
     const p = this.player;
     if (s.afterParty > 0 && p.hp < p.maxHp * s.afterParty) {
@@ -513,6 +624,7 @@ export class Game implements WorldHost {
     const bonus = Math.round(60 * run.ashMult());
     this.addAsh(bonus);
     this.save.stats.escapes++;
+    this.gainXp(XP.escape);
     this.save.maxHeat = Math.max(this.save.maxHeat, run.heat + 1);
     if (!this.save.stats.bestTime || run.time < this.save.stats.bestTime) this.save.stats.bestTime = run.time;
     this.persist();
@@ -527,9 +639,11 @@ export class Game implements WorldHost {
     });
   }
 
-  onEnemyKilled(): void {
+  onEnemyKilled(w: World, e: Enemy): void {
     if (this.run) this.run.kills++;
     this.save.stats.kills++;
+    if (this.stats.lifeOnKill > 0) w.healPlayer(this.stats.lifeOnKill, false);
+    if (this.run && !e.isBoss) this.gainXp(e.isElite ? XP.eliteKill : XP.kill);
   }
 
   tryDeathDefiance(): boolean {
@@ -559,6 +673,8 @@ export class Game implements WorldHost {
         else if (it.id === 'artifacts') screens.artifactLoadout(this);
         else if (it.id === 'chronicle') screens.chronicle(this);
         else if (it.id === 'pact') screens.pact(this);
+        else if (it.id === 'heroes') screens.heroes(this);
+        else if (it.id === 'ascension') screens.talents(this);
         break;
       case 'npc':
         audio.play('select');
@@ -597,8 +713,9 @@ export class Game implements WorldHost {
     w.dropSouls(it.x, it.y, 6);
     w.particles.burst(it.x, it.y - 20, '#ffd890', 30, 320);
     const r = Math.random();
-    if (run && r < 0.35 && ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) w.spawnReward({ kind: 'artifact', bonus: true }, it.x, it.y + 60);
-    else if (run && r < 0.6) w.spawnReward({ kind: 'enchant', bonus: true }, it.x, it.y + 60);
+    if (run && r < 0.35 && this.has('artifacts') && ARTIFACTS.some((a) => !run.artifacts.includes(a.id))) w.spawnReward({ kind: 'artifact', bonus: true }, it.x, it.y + 60);
+    else if (run && r < 0.6 && this.has('enchants')) w.spawnReward({ kind: 'enchant', bonus: true }, it.x, it.y + 60);
+    else if (run && r < 0.6) w.dropGold(it.x, it.y, Math.round(fx.range(20, 40) * this.stats.goldMult));
   }
 
   private buy(w: World, it: Interactable): void {
@@ -699,7 +816,7 @@ export class Game implements WorldHost {
 
   private offerBoons(god: GodId, after: () => void): void {
     const run = this.run!;
-    const offers = rollBoonOffers(run.rng, god, run.boons, run.favor(this.save), 3);
+    const offers = rollBoonOffers(run.rng, god, run.boons, run.favor(this.save), 3, this.stats.canCast ? undefined : (d) => !needsCast(d));
     const g = GODS[god];
     if (offers.length === 0) {
       // Nothing left from this god: compensate with obols.
@@ -821,7 +938,7 @@ export class Game implements WorldHost {
       })),
       onPick: (i) => {
         const chosen = pool[i];
-        const free = run.artifacts.indexOf(null);
+        const free = run.artifacts.findIndex((a, i) => a === null && i < this.stats.artifactSlots);
         if (free >= 0) {
           run.artifacts[free] = chosen.id;
           after();
@@ -839,6 +956,29 @@ export class Game implements WorldHost {
     this.save.weapon = id;
     this.persist();
     this.player.weapon = createWeapon(id);
+    this.recomputeStats();
+  }
+
+  selectCharacter(id: CharacterId): void {
+    const def = CHARACTER_BY_ID[id];
+    if (!def || !characterUnlocked(def, this.save, this.level)) return;
+    this.save.character = id;
+    this.persist();
+    this.player.hero = def;
+    this.player.wrath = 0;
+    this.recomputeStats(true);
+    this.world?.particles.ring(this.player.x, this.player.y, def.color, 90, 0.4, 6);
+  }
+
+  unspentTalents(): number {
+    const spent = Object.values(this.save.talents).reduce((a, b) => a + b, 0);
+    return Math.max(0, this.level - 1 - spent);
+  }
+
+  /** Refreshes the Ascension station prompt after spending points. */
+  refreshHubPrompts(): void {
+    const it = this.world?.interactables.find((i) => i.id === 'ascension');
+    if (it) it.prompt = this.unspentTalents() > 0 ? `Spend talents (${this.unspentTalents()})` : 'Talents';
   }
 
   abandonRun(): void {

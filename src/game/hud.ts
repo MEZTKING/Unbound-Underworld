@@ -3,6 +3,8 @@ import { ARTIFACT_BY_ID } from './artifacts';
 import { BOON_BY_ID, GODS, RARITY_COLOR } from './boons';
 import { Boss } from './enemies';
 import { ENCHANT_BY_ID } from './enchants';
+import { prefs } from './prefs';
+import { levelFromXp, tierFor, WRATH_MAX } from './progression';
 import type { Run } from './run';
 import type { SaveData } from './meta';
 import type { World } from './world';
@@ -38,6 +40,8 @@ export function drawHUD(
   vh: number,
   hub: boolean,
   touch = false,
+  level = 1,
+  lefty = false,
 ): void {
   const p = w.player;
   const s = w.stats;
@@ -47,9 +51,13 @@ export function drawHUD(
   // ---------------------------------------------------------------- health & resources
   // Bottom-left on desktop; top-left on touch screens (the joystick lives bottom-left,
   // and the potion/artifacts are on-screen buttons there).
-  const hx = 24;
-  const hy = touch ? 44 : vh - 86;
-  panel(ctx, hx - 10, hy - 34, 330, touch ? 78 : 104);
+  // Left-handed touch layout: the buttons move left, so the panel moves right.
+  const mirror = touch && lefty;
+  const hx = mirror ? vw - 330 : 24;
+  // The panel grows as the potion and artifacts unlock; on desktop it hugs the bottom edge.
+  const ph = touch ? 86 : s.canPotion || s.artifactSlots ? 104 : s.canWrath ? 70 : 64;
+  const hy = touch ? 44 : vh + 18 - ph;
+  panel(ctx, hx - 10, hy - 34, 330, ph);
   const bw = 230;
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(hx, hy, bw, 18);
@@ -77,11 +85,24 @@ export function drawHUD(
     ctx.font = `700 16px ${FONT}`;
     ctx.fillText('✚', hx + bw + 10 + i * 18, hy + 15);
   }
+  // Wrath gauge (once unlocked)
+  if (s.canWrath) {
+    const k = Math.min(1, p.wrath / WRATH_MAX);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(hx, hy + 22, bw, 5);
+    ctx.fillStyle = k >= 1 ? `rgba(255,${200 + Math.floor(Math.sin(w.time * 8) * 40)},80,1)` : '#c89a30';
+    ctx.fillRect(hx, hy + 22, bw * k, 5);
+    if (k >= 1) {
+      ctx.font = `700 11px ${FONT}`;
+      ctx.fillStyle = '#ffd04a';
+      ctx.fillText(touch ? '☄' : '☄ F', hx + bw + 8, hy + 28);
+    }
+  }
   // Cast shards
   ctx.font = `700 12px ${FONT}`;
   ctx.fillStyle = '#c8b8c0';
-  ctx.fillText('CAST', hx, hy - 12);
-  for (let i = 0; i < s.castAmmo; i++) {
+  if (s.canCast) ctx.fillText('CAST', hx, hy - 12);
+  for (let i = 0; i < (s.canCast ? s.castAmmo : 0); i++) {
     const x = hx + 50 + i * 20;
     const y = hy - 17;
     ctx.fillStyle = i < p.castAmmo ? (s.castPower ? GODS[s.castPower.god].color : '#ff3050') : 'rgba(255,255,255,0.15)';
@@ -102,18 +123,20 @@ export function drawHUD(
     ctx.fill();
   }
   if (touch) {
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#7fe8ff';
-    ctx.font = `700 11px ${FONT}`;
-    ctx.fillText(`SOULS ${Math.floor(p.souls)}`, hx, hy + 36);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(hx + 80, hy + 29, 150, 8);
-    ctx.fillStyle = '#7fe8ff';
-    ctx.fillRect(hx + 80, hy + 29, 150 * (p.souls / s.soulMax), 8);
+    if (s.artifactSlots > 0) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#7fe8ff';
+      ctx.font = `700 11px ${FONT}`;
+      ctx.fillText(`SOULS ${Math.floor(p.souls)}`, hx, hy + 44);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(hx + 80, hy + 37, 150, 8);
+      ctx.fillStyle = '#7fe8ff';
+      ctx.fillRect(hx + 80, hy + 37, 150 * (p.souls / s.soulMax), 8);
+    }
   } else drawLoadout(ctx, w, hx, hy);
 
-  drawBuild(ctx, run, touch ? 96 : 0);
-  drawTopRight(ctx, w, run, save, vw - (touch ? 70 : 24), hub);
+  drawBuild(ctx, run, touch ? 104 : 0, s.canCast, mirror ? vw - 24 - 140 : 24);
+  drawTopRight(ctx, w, run, save, mirror ? 70 : vw - (touch ? 70 : 24), hub, level, mirror);
   drawOverlays(ctx, w, vw, vh, run, hub, touch);
   ctx.restore();
 }
@@ -122,24 +145,10 @@ export function drawHUD(
 function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: number): void {
   const p = w.player;
   const s = w.stats;
-  // Potion
   const px = hx + 22;
   const py = hy + 46;
-  ctx.fillStyle = p.potionCd > 0 ? '#3a5a3a' : '#5adf6a';
-  ctx.beginPath();
-  ctx.arc(px, py, 14, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = '#e8ffe8';
-  ctx.fillRect(px - 4, py - 22, 8, 8);
-  cooldownPie(ctx, px, py, 14, p.potionCd / s.potionCooldown);
-  ctx.fillStyle = '#fff';
-  ctx.font = `700 11px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.fillText('R', px, py + 30);
-  if (p.potionCd > 0) {
-    ctx.font = `700 12px ${FONT}`;
-    ctx.fillText(`${Math.ceil(p.potionCd)}`, px, py + 4);
-  }
+  if (s.canPotion) drawPotion(ctx, w, px, py);
+  if (s.artifactSlots <= 0) return;
   // Souls gauge
   const sx = hx + 54;
   const sy = py - 4;
@@ -152,7 +161,8 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
   ctx.fillStyle = '#7fe8ff';
   ctx.fillRect(sx, sy, 120 * (p.souls / s.soulMax), 8);
   // Artifacts
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < s.artifactSlots; i++) {
+
     const id = w.artifacts[i];
     const ax = sx + 152 + i * 46;
     const ay = py;
@@ -192,8 +202,28 @@ function drawLoadout(ctx: CanvasRenderingContext2D, w: World, hx: number, hy: nu
   }
 }
 
+function drawPotion(ctx: CanvasRenderingContext2D, w: World, px: number, py: number): void {
+  const p = w.player;
+  const s = w.stats;
+  ctx.fillStyle = p.potionCd > 0 ? '#3a5a3a' : '#5adf6a';
+  ctx.beginPath();
+  ctx.arc(px, py, 14, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#e8ffe8';
+  ctx.fillRect(px - 4, py - 22, 8, 8);
+  cooldownPie(ctx, px, py, 14, p.potionCd / s.potionCooldown);
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 11px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('R', px, py + 30);
+  if (p.potionCd > 0) {
+    ctx.font = `700 12px ${FONT}`;
+    ctx.fillText(`${Math.ceil(p.potionCd)}`, px, py + 4);
+  }
+}
+
 /** Boon slots, passives and enchantments (top-left). */
-function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number): void {
+function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number, canCast: boolean, x0: number): void {
   if (run) {
     const slots: ['attack' | 'special' | 'cast' | 'dash', string][] = [
       ['attack', 'A'],
@@ -201,10 +231,11 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number):
       ['cast', 'C'],
       ['dash', 'D'],
     ];
-    let bx = 24;
+    let bx = x0;
     const by = 30 + top;
     for (const [slot, letter] of slots) {
       const owned = run.boons.find((b) => BOON_BY_ID[b.id]?.slot === slot);
+      if (slot === 'cast' && !canCast && !owned) continue;
       const col = owned ? GODS[BOON_BY_ID[owned.id].god].color : 'rgba(255,255,255,0.12)';
       ctx.fillStyle = 'rgba(8,4,12,0.7)';
       ctx.beginPath();
@@ -230,7 +261,7 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number):
     for (const b of run.boons) {
       const def = BOON_BY_ID[b.id];
       if (!def || (def.slot !== 'passive' && def.slot !== 'duo')) continue;
-      const x = 24 + col * 26;
+      const x = x0 + col * 26;
       const y = 62 + top + row * 26;
       ctx.fillStyle = def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color;
       ctx.globalAlpha = 0.9;
@@ -248,7 +279,7 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number):
       }
     }
     // enchants
-    let ex = 24;
+    let ex = x0;
     const ey = 62 + top + (row + (col > 0 ? 1 : 0)) * 26 + 4;
     for (const e of run.enchants) {
       const def = ENCHANT_BY_ID[e.id];
@@ -271,8 +302,8 @@ function drawBuild(ctx: CanvasRenderingContext2D, run: Run | null, top: number):
 }
 
 /** Currencies, location and run timer, right-aligned at x = rx. */
-function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, rx: number, hub: boolean): void {
-  ctx.textAlign = 'right';
+function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, save: SaveData, rx: number, hub: boolean, level: number, left = false): void {
+  ctx.textAlign = left ? 'left' : 'right';
   ctx.font = `700 17px ${FONT}`;
   let ry = 34;
   if (run) {
@@ -282,7 +313,20 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
   }
   ctx.fillStyle = '#c8a8ff';
   ctx.fillText(`${save.ash} ◆`, rx, ry);
-  ry += 24;
+  ry += 22;
+  // Level, rank and experience toward the next level.
+  const tier = tierFor(level);
+  const prog = levelFromXp(save.xp);
+  ctx.font = `700 13px ${FONT}`;
+  ctx.fillStyle = tier.color;
+  ctx.fillText(`Lv ${level} · ${tier.name}`, rx, ry);
+  ry += 6;
+  const bx = left ? rx : rx - 110;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(bx, ry, 110, 4);
+  ctx.fillStyle = tier.color;
+  ctx.fillRect(bx, ry, prog.need ? (110 * prog.into) / prog.need : 110, 4);
+  ry += 22;
   ctx.font = `600 13px ${FONT}`;
   ctx.fillStyle = '#c8b8c0';
   if (run) {
@@ -356,15 +400,23 @@ function drawOverlays(ctx: CanvasRenderingContext2D, w: World, vw: number, vh: n
   }
 
   // ---------------------------------------------------------------- control hint
-  if (!touch && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
+  if (prefs.hints && !touch && (hub || (run && run.roomsCleared === 0 && run.biomeIndex === 0))) {
+    const s = w.stats;
     ctx.textAlign = 'right';
     ctx.font = `600 12px ${FONT}`;
     ctx.fillStyle = 'rgba(220,200,200,0.7)';
+    // Only what you've unlocked so far.
+    const extras = [
+      s.artifactSlots > 0 ? `${['1', '1 2', '1 2 3'][s.artifactSlots - 1]} Artifacts` : '',
+      s.canPotion ? 'R Potion' : '',
+      s.canWrath ? 'F Wrath' : '',
+      'E Interact · Esc Pause',
+    ].filter(Boolean);
     const lines = [
       'WASD move · Mouse aim',
-      'LMB / J Attack · RMB / K Special · Q Cast',
-      'Space Dash · Shift / C Jump (attack mid-air to Slam)',
-      '1 2 3 Artifacts · R Potion · E Interact · Esc Pause',
+      `LMB / J Attack · RMB / K Special${s.canCast ? ' · Q Cast' : ''}`,
+      `Space Dash${s.canJump ? ' · Shift / C Jump (attack mid-air to Slam)' : ''}`,
+      extras.join(' · '),
     ];
     lines.forEach((l, i) => ctx.fillText(l, vw - 20, vh - 80 + i * 17));
   }

@@ -3,6 +3,7 @@ import { ARTIFACTS } from './artifacts';
 import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
 import { applyEnchantStats, MAX_ENCHANT_TIER, type OwnedEnchant } from './enchants';
 import { applyMetaExtras, heatScale, metaBonuses, rank, type SaveData } from './meta';
+import { hasFeature } from './progression';
 import { BIOMES, type BiomeInfo } from './rooms';
 import type { PlayerStats } from './stats';
 import type { GodId, RewardKind, RewardSpec, RoomKind, WeaponId } from './types';
@@ -32,6 +33,8 @@ export class Run {
   deathDefiance: number;
   heat: number;
   time = 0;
+  /** Your level, which gates enchantments, artifacts and anvils behind doors. */
+  level = 99;
   current: RoomPlan = { kind: 'combat', reward: { kind: 'boon' } };
   /** Per-biome once-only rooms and rewards. */
   private used = new Set<string>();
@@ -124,15 +127,15 @@ export class Run {
   private rollOneDoor(usedKinds: Set<RewardKind>, usedGods: Set<GodId>): RoomPlan | null {
     const d = this.depth;
     const gods = availableGods(this.boons).filter((g) => !usedGods.has(g));
-    const freeArtifacts = ARTIFACTS.filter((a) => !this.artifacts.includes(a.id)).length > 0;
-    const enchantRoom = this.enchants.length < 13 || this.enchants.some((e) => e.tier < MAX_ENCHANT_TIER);
+    const freeArtifacts = hasFeature(this.level, 'artifacts') && ARTIFACTS.filter((a) => !this.artifacts.includes(a.id)).length > 0;
+    const enchantRoom = hasFeature(this.level, 'enchants') && (this.enchants.length < 13 || this.enchants.some((e) => e.tier < MAX_ENCHANT_TIER));
     const options: [RewardKind, number][] = [
       ['boon', gods.length ? 38 : 0],
       ['pom', pomCandidates(this.boons).length && !usedKinds.has('pom') ? 12 : 0],
       ['gold', usedKinds.has('gold') ? 0 : 9],
       ['heart', usedKinds.has('heart') ? 0 : 7],
       ['ash', usedKinds.has('ash') ? 0 : 9],
-      ['hammer', !this.isUsed('hammer') && rollHammerOffers(this.rng, this.weapon, this.hammers).length && d >= 1 && !usedKinds.has('hammer') ? 6 : 0],
+      ['hammer', hasFeature(this.level, 'anvil') && !this.isUsed('hammer') && rollHammerOffers(this.rng, this.weapon, this.hammers).length && d >= 1 && !usedKinds.has('hammer') ? 6 : 0],
       ['hermes', !this.isUsed('hermes') && d >= 1 && !usedKinds.has('hermes') ? 4 : 0],
       ['enchant', enchantRoom && !usedKinds.has('enchant') ? 9 : 0],
       ['artifact', freeArtifacts && !usedKinds.has('artifact') ? 6 : 0],

@@ -4,6 +4,8 @@ import type { Actor } from './actor';
 import { GODS } from './boons';
 import { committedBonus, onAbilityHit } from './enchants';
 import type { Enemy } from './enemies/enemy';
+import { prefs } from './prefs';
+import { WRATH_PER_DEALT } from './progression';
 import { Projectile, Zone } from './entities';
 import type { AbilitySlot, DamageSource, GodId, HitEffect, Team } from './types';
 import type { World } from './world';
@@ -48,6 +50,7 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   if (o.lightning) mult += s.lightningBonus;
   if (o.doom) mult += s.doomBonus;
   mult += committedBonus(s, e);
+  if (e.isBoss || e.isElite) mult += s.bigGameDmg;
   let dmg = base * mult;
 
   const guard = e.guard(o.from);
@@ -99,13 +102,14 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   e.onDamaged(w, dmg, o.source);
 
   const color = o.color ?? (crit ? '#ffd54a' : e.armor > 0 ? '#aab8d0' : '#ffffff');
-  w.particles.text(e.x, e.y - e.height - 8, crit ? `${shown}!` : `${shown}`, color, crit ? 26 : o.source === 'effect' ? 15 : 19);
+  if (prefs.damageNumbers) w.particles.text(e.x, e.y - e.height - 8, crit ? `${shown}!` : `${shown}`, color, crit ? 26 : o.source === 'effect' ? 15 : 19);
   if (!o.silent) audio.play(crit ? 'crit' : dmg >= 40 ? 'heavyHit' : 'hit');
   const from = o.from ?? p;
   const ang = angleTo(from, e);
   w.particles.directional(e.x, e.y - e.height * 0.45, ang, 0.7, crit ? '#ffd54a' : '#ffefe0', crit ? 14 : 7, crit ? 420 : 300);
   if (crit) w.particles.ring(e.x, e.y, '#ffd54a', 60, 0.3, 3);
-  if (o.knock) e.knock(e.x - from.x, e.y - from.y, o.knock);
+  if (o.knock) e.knock(e.x - from.x, e.y - from.y, o.knock * s.knockMult);
+  if (s.canWrath) p.gainWrath(dmg * WRATH_PER_DEALT * s.wrathGain);
   if (o.hitstop) w.hitstop(o.hitstop * (crit ? 1.5 : 1));
   if (o.lifesteal && !e.isDummy) w.healPlayer(o.lifesteal, false);
 
