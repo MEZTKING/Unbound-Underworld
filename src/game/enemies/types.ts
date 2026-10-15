@@ -709,8 +709,9 @@ export class Weaver extends Enemy {
               www.player.webT = 0.25;
             };
             ww.zones.push(z);
-            const pl = ww.player;
-            if (Math.hypot(pl.x - tx, pl.y - ty) < 75 && !pl.airborne) ww.hurtPlayer(dmg, null);
+            for (const pl of ww.players) {
+              if (pl.state !== 'dead' && Math.hypot(pl.x - tx, pl.y - ty) < 75 && !pl.airborne) ww.as(pl, () => ww.hurtPlayer(dmg, null));
+            }
             ww.particles.burst(tx, ty, '#e8e8f0', 12, 160);
           };
           w.projectiles.push(pr);

@@ -7,13 +7,14 @@
 ## Contents
 
 - [Progression: levels, ranks and unlocks](#progression-levels-ranks-and-unlocks)
-- [Talents (Ascension)](#talents-ascension)
+- [Hero skill trees (Ascension)](#hero-skill-trees-ascension)
 - [Heroes and Wrath](#heroes-and-wrath)
 - [Weapons, forging and anvil upgrades](#weapons-forging-and-anvil-upgrades)
 - [Gods and boons](#gods-and-boons)
 - [Enchantments](#enchantments)
 - [Artifacts](#artifacts)
-- [Altar of Ashes (permanent upgrades)](#altar-of-ashes-permanent-upgrades)
+- [Altar of Ashes (permanent upgrades for every hero)](#altar-of-ashes-permanent-upgrades-for-every-hero)
+- [The Blacksmith](#the-blacksmith)
 - [Regions and guardians](#regions-and-guardians)
 - [Enemies](#enemies)
 - [Torment (difficulty)](#torment-difficulty)
@@ -22,7 +23,7 @@
 
 ## Progression: levels, ranks and unlocks
 
-Experience carries over between runs. Max level: **30**. One talent point per level after the first.
+Experience carries over between runs. Max level: **50**. Every level gives every hero +1 max Health, and every fifth level +1% damage. Levels also open the Altar of Ashes' sections. The same experience raises the hero you play (see *Hero skill trees*).
 
 **Experience sources**
 
@@ -34,7 +35,7 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | Guardian slain | 120 |
 | Escape (final guardian) | 250 |
 
-**Rank tiers** — each opens a new row of talents.
+**Rank names**
 
 | Rank | From level |
 |---|---|
@@ -43,47 +44,73 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | Revenant | 10 |
 | Champion | 15 |
 | Unbound | 20 |
+| Ascendant | 25 |
+| Exarch | 30 |
+| Eternal | 35 |
+| Sovereign | 40 |
+| Paragon | 45 |
+| Deathless | 50 |
 
 **Levels**
 
-| Level | XP to next | Total XP | Rank | Talent points | Unlocks |
+| Level | XP to next | Total XP | Rank | Bonus for every hero | Unlocks |
 |---|---|---|---|---|---|
-| 1 | 60 | 0 | Shade | 0 |  |
-| 2 | 108 | 60 | Shade | 1 | Gear & Inventory, Guard & Parry, Healing Potion |
-| 3 | 162 | 168 | Shade | 2 | Cast, Forge: Tier II · Tempered |
-| 4 | 222 | 330 | Shade | 3 | Artifacts |
-| 5 | 288 | 552 | Wraith | 4 | Jump & Slam, Weapon: Titan Gauntlets |
-| 6 | 360 | 840 | Wraith | 5 | Enchantments |
-| 7 | 438 | 1200 | Wraith | 6 | Hephaestus' Anvil, Hero: Gorran |
-| 8 | 522 | 1638 | Wraith | 7 | Second Artifact Slot, Weapon: Riptide Chains |
-| 9 | 612 | 2160 | Wraith | 8 |  |
-| 10 | 708 | 2772 | Revenant | 9 | Wrath, Hero: Ione, Weapon: Reaper's Crescent |
-| 11 | 810 | 3480 | Revenant | 10 |  |
-| 12 | 918 | 4290 | Revenant | 11 | Third Artifact Slot, Weapon: Thunderbuss |
-| 13 | 1032 | 5208 | Revenant | 12 | Awakened Weapons, Forge: Tier III · Awakened |
-| 14 | 1152 | 6240 | Revenant | 13 | Hero: Erebos |
-| 15 | 1278 | 7392 | Champion | 14 | Weapon: Starsplitter |
-| 16 | 1410 | 8670 | Champion | 15 | Forge: Tier IV · Exalted |
-| 17 | 1548 | 10080 | Champion | 16 |  |
-| 18 | 1692 | 11628 | Champion | 17 | Hero: Rook |
-| 19 | 1842 | 13320 | Champion | 18 |  |
-| 20 | 1998 | 15162 | Unbound | 19 | Forge: Tier V · Mythic |
-| 21 | 2160 | 17160 | Unbound | 20 |  |
-| 22 | 2328 | 19320 | Unbound | 21 | Hero: Selene |
-| 23 | 2502 | 21648 | Unbound | 22 |  |
-| 24 | 2682 | 24150 | Unbound | 23 |  |
-| 25 | 2868 | 26832 | Unbound | 24 |  |
-| 26 | 3060 | 29700 | Unbound | 25 |  |
-| 27 | 3258 | 32760 | Unbound | 26 |  |
-| 28 | 3462 | 36018 | Unbound | 27 |  |
-| 29 | 3672 | 39480 | Unbound | 28 |  |
-| 30 | — | 43152 | Unbound | 29 |  |
+| 1 | 60 | 0 | Shade | +0 HP |  |
+| 2 | 108 | 60 | Shade | +1 HP | Gear & Inventory, Guard & Parry, Healing Potion |
+| 3 | 162 | 168 | Shade | +2 HP | Cast, Forge: Tier II · Tempered |
+| 4 | 222 | 330 | Shade | +3 HP | Artifacts, Altar: Cinders (with 120 Ash spent above) |
+| 5 | 288 | 552 | Wraith | +4 HP, +1% dmg | Jump & Slam, Weapon: Titan Gauntlets |
+| 6 | 360 | 840 | Wraith | +5 HP, +1% dmg | Enchantments |
+| 7 | 438 | 1200 | Wraith | +6 HP, +1% dmg | Hephaestus' Anvil, Hero: Gorran |
+| 8 | 522 | 1638 | Wraith | +7 HP, +1% dmg | Second Artifact Slot, Weapon: Riptide Chains |
+| 9 | 612 | 2160 | Wraith | +8 HP, +1% dmg |  |
+| 10 | 708 | 2772 | Revenant | +9 HP, +2% dmg | Wrath, Hero: Ione, Weapon: Reaper's Crescent, Altar: Flames (with 500 Ash spent above) |
+| 11 | 810 | 3480 | Revenant | +10 HP, +2% dmg |  |
+| 12 | 918 | 4290 | Revenant | +11 HP, +2% dmg | Third Artifact Slot, Weapon: Thunderbuss |
+| 13 | 1032 | 5208 | Revenant | +12 HP, +2% dmg | Awakened Weapons, Forge: Tier III · Awakened |
+| 14 | 1152 | 6240 | Revenant | +13 HP, +2% dmg | Hero: Erebos |
+| 15 | 1278 | 7392 | Champion | +14 HP, +3% dmg | Weapon: Starsplitter |
+| 16 | 1410 | 8670 | Champion | +15 HP, +3% dmg | Forge: Tier IV · Exalted |
+| 17 | 1548 | 10080 | Champion | +16 HP, +3% dmg |  |
+| 18 | 1692 | 11628 | Champion | +17 HP, +3% dmg | Hero: Rook, Altar: Blaze (with 1300 Ash spent above) |
+| 19 | 1842 | 13320 | Champion | +18 HP, +3% dmg |  |
+| 20 | 1998 | 15162 | Unbound | +19 HP, +4% dmg | Forge: Tier V · Mythic |
+| 21 | 2160 | 17160 | Unbound | +20 HP, +4% dmg |  |
+| 22 | 2328 | 19320 | Unbound | +21 HP, +4% dmg | Hero: Selene |
+| 23 | 2502 | 21648 | Unbound | +22 HP, +4% dmg |  |
+| 24 | 2682 | 24150 | Unbound | +23 HP, +4% dmg |  |
+| 25 | 2868 | 26832 | Ascendant | +24 HP, +5% dmg |  |
+| 26 | 3060 | 29700 | Ascendant | +25 HP, +5% dmg | Altar: Inferno (with 2600 Ash spent above) |
+| 27 | 3258 | 32760 | Ascendant | +26 HP, +5% dmg |  |
+| 28 | 3462 | 36018 | Ascendant | +27 HP, +5% dmg |  |
+| 29 | 3672 | 39480 | Ascendant | +28 HP, +5% dmg |  |
+| 30 | 3888 | 43152 | Exarch | +29 HP, +6% dmg | Altar: Smoulder (with 0 Ash spent above) |
+| 31 | 3988 | 47040 | Exarch | +30 HP, +6% dmg |  |
+| 32 | 4088 | 51028 | Exarch | +31 HP, +6% dmg |  |
+| 33 | 4188 | 55116 | Exarch | +32 HP, +6% dmg |  |
+| 34 | 4288 | 59304 | Exarch | +33 HP, +6% dmg |  |
+| 35 | 4388 | 63592 | Eternal | +34 HP, +7% dmg |  |
+| 36 | 4488 | 67980 | Eternal | +35 HP, +7% dmg | Altar: Pyre (with 3000 Ash spent above) |
+| 37 | 4588 | 72468 | Eternal | +36 HP, +7% dmg |  |
+| 38 | 4688 | 77056 | Eternal | +37 HP, +7% dmg |  |
+| 39 | 4788 | 81744 | Eternal | +38 HP, +7% dmg |  |
+| 40 | 4888 | 86532 | Sovereign | +39 HP, +8% dmg |  |
+| 41 | 4988 | 91420 | Sovereign | +40 HP, +8% dmg |  |
+| 42 | 5088 | 96408 | Sovereign | +41 HP, +8% dmg | Altar: Furnace (with 7000 Ash spent above) |
+| 43 | 5188 | 101496 | Sovereign | +42 HP, +8% dmg |  |
+| 44 | 5288 | 106684 | Sovereign | +43 HP, +8% dmg |  |
+| 45 | 5388 | 111972 | Paragon | +44 HP, +9% dmg |  |
+| 46 | 5488 | 117360 | Paragon | +45 HP, +9% dmg |  |
+| 47 | 5588 | 122848 | Paragon | +46 HP, +9% dmg |  |
+| 48 | 5688 | 128436 | Paragon | +47 HP, +9% dmg | Altar: Heart of the Pyre (with 12000 Ash spent above) |
+| 49 | 5788 | 134124 | Paragon | +48 HP, +9% dmg |  |
+| 50 | — | 139912 | Deathless | +49 HP, +10% dmg |  |
 
 **Mechanic unlocks** (hidden from the HUD, buttons and help until unlocked)
 
 | Level | Unlock | What it does | Keys (PC / touch) |
 |---|---|---|---|
-| 2 | Gear & Inventory | Equip the helmets, armor, leggings and boots foes drop, and craft or star them up with materials, at the Armory or from the pause menu. |  |
+| 2 | Gear & Inventory | Equip the helmets, armor, leggings and boots foes drop, in the Hall of Heroes or from the pause menu. The Blacksmith stars them up and salvages them. |  |
 | 2 | Guard & Parry | Hold Guard to block hits from the front. Tap it just before a hit lands to parry: the foe staggers and your next attack is a sure critical. Ground shockwaves can only be dodged or jumped. | F / ⛨ |
 | 2 | Healing Potion | Drink to restore health. It refills over time. | R / ⚗ |
 | 3 | Cast | Hurl a shard that lodges in foes. Walk over it to pick it up again. | Q / Middle mouse / ◆ |
@@ -94,28 +121,169 @@ Experience carries over between runs. Max level: **30**. One talent point per le
 | 8 | Second Artifact Slot | Carry two artifacts at once. | 2 / the artifact button |
 | 10 | Wrath | Fill the golden gauge by dealing and taking damage, then unleash your hero's ultimate. | V / ☄ |
 | 12 | Third Artifact Slot | Carry three artifacts at once. | 3 / the artifact button |
-| 13 | Awakened Weapons | Forge a weapon to Tier III at the Armory to awaken it. |  |
+| 13 | Awakened Weapons | Forge a weapon to Tier III at the Blacksmith to awaken it. |  |
 
-## Talents (Ascension)
+## Hero skill trees (Ascension)
 
-Spend one point per level at the *Ascension* stone in the Hall of Shades. Resetting is free.
+Each hero has their own tree at the *Ascension* stone. Experience earned while playing a hero raises their hero level (max 20); each level after the first gives one skill point for that hero only (19 at most, about 10070 experience). Rows cost 1, 1, 2 and 3 points per rank; a row opens once 2, 4, 7 points sit in the rows above it in that branch. Resetting is free.
 
-| Row (rank) | Talent | Max rank | Per rank | At max rank |
+| Hero level | XP to next |
+|---|---|
+| 1 | 80 |
+| 2 | 130 |
+| 3 | 180 |
+| 4 | 230 |
+| 5 | 280 |
+| 6 | 330 |
+| 7 | 380 |
+| 8 | 430 |
+| 9 | 480 |
+| 10 | 530 |
+| 11 | 580 |
+| 12 | 630 |
+| 13 | 680 |
+| 14 | 730 |
+| 15 | 780 |
+| 16 | 830 |
+| 17 | 880 |
+| 18 | 930 |
+| 19 | 980 |
+
+*Kael*: Blade · Resolve · Ember
+
+| Branch | Row | Skill | Ranks × points | At max rank |
 |---|---|---|---|---|
-| Shade (Lv 1) | ♥ Toughness | 5 | +6 max Health | +30 max Health |
-| Shade (Lv 1) | ⚔ Might | 5 | +3% damage | +15% damage |
-| Shade (Lv 1) | ➶ Swiftness | 3 | +4% move speed | +12% move speed |
-| Wraith (Lv 5) | ⚗ Second Wind | 3 | Potion heals +8% and recharges 10% faster | Potion heals +24% and recharges 30% faster |
-| Wraith (Lv 5) | ◆ Shardcraft | 3 | Cast deals +20% damage | Cast deals +60% damage |
-| Wraith (Lv 5) | ✚ Bloodlust | 3 | Restore 1 Health per foe slain | Restore 3 Health per foe slain |
-| Revenant (Lv 10) | ✦ Precision | 3 | +3% critical chance | +9% critical chance |
-| Revenant (Lv 10) | » Phantom Step | 2 | Dash recharges 15% faster; Dash-Strike +15% damage | Dash recharges 30% faster; Dash-Strike +30% damage |
-| Revenant (Lv 10) | ☄ Wrathful | 3 | Wrath fills 15% faster | Wrath fills 45% faster |
-| Champion (Lv 15) | ⛨ Titan's Blood | 3 | Take 4% less damage | Take 12% less damage |
-| Champion (Lv 15) | ☠ Giantslayer | 3 | +10% damage to guardians and enchanted foes | +30% damage to guardians and enchanted foes |
-| Champion (Lv 15) | ⚙ Relic Lore | 2 | Artifacts recharge 10% faster | Artifacts recharge 20% faster |
-| Unbound (Lv 20) | ✚ Undying | 1 | Cheat death one more time per run | Cheat death one more time per run |
-| Unbound (Lv 20) | ⚡ Godslayer | 2 | +8% damage and +10 max Health | +16% damage and +20 max Health |
+| Blade | 1 | ⚔ Keen Edge | 3 × 1 | +15% Attack damage |
+| Blade | 2 | ✦ Riposte Instinct | 3 × 1 | +9% critical chance with Attack |
+| Blade | 3 | ✺ Flame Arc | 2 × 2 | +24% Special damage |
+| Blade | 4 | ♛ Ember Lord | 1 × 3 | +8% damage; critical hits deal +15% damage |
+| Resolve | 1 | ♥ Hardened | 3 × 1 | +18 max Health |
+| Resolve | 2 | ⛨ Steel Skin | 3 × 1 | Take 9% less damage |
+| Resolve | 3 | ✚ Battle Hunger | 2 × 2 | Restore 2 Health per foe slain |
+| Resolve | 4 | ♜ Unyielding | 1 × 3 | +20 max Health; potion heals +15% and recharges 15% faster |
+| Ember | 1 | ☄ Kindling | 3 × 1 | Wrath fills 30% faster |
+| Ember | 2 | » Quickstep | 3 × 1 | Dash recharges 24% faster |
+| Ember | 3 | ◆ Ember Shard | 2 × 2 | +30% Cast damage |
+| Ember | 4 | ✹ Phoenix Heart | 1 × 3 | +1 Dash charge; wrath fills 15% faster |
+
+*Lyra*: Marksman · Wanderer · Moonlight
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Marksman | 1 | ➹ Steady Draw | 3 × 1 | +15% Attack damage |
+| Marksman | 2 | ✦ Eagle Eye | 3 × 1 | +9% critical chance |
+| Marksman | 3 | ✺ Volley | 2 × 2 | +24% Special damage |
+| Marksman | 4 | ☾ Moonpiercer | 1 × 3 | Critical hits deal +25% damage; +4% critical chance with Attack |
+| Wanderer | 1 | ➶ Light Feet | 3 × 1 | +12% move speed |
+| Wanderer | 2 | ✚ Hunter’s Instinct | 3 × 1 | Restore 3 Health per foe slain |
+| Wanderer | 3 | ♥ Thick Cloak | 2 × 2 | +16 max Health |
+| Wanderer | 4 | ❖ Untouchable | 1 × 3 | Dash recharges 15% faster; take 6% less damage |
+| Moonlight | 1 | ☄ Lunar Tide | 3 × 1 | Wrath fills 30% faster |
+| Moonlight | 2 | ◆ Silver Shard | 3 × 1 | +45% Cast damage |
+| Moonlight | 3 | ✧ Star Quiver | 2 × 2 | +2 Cast shards |
+| Moonlight | 4 | ✹ Moonfall Mastery | 1 × 3 | Wrath fills 20% faster; +6% damage |
+
+*Doran*: Phalanx · Bulwark · Aegis
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Phalanx | 1 | ↟ Long Reach | 3 × 1 | +15% Attack damage |
+| Phalanx | 2 | ⛨ Shield Bash | 3 × 1 | +24% Special damage |
+| Phalanx | 3 | ⚒ Breaker | 2 × 2 | +30% damage to armour |
+| Phalanx | 4 | ♛ Spearhead | 1 × 3 | +8% damage; +10% damage to guardians and enchanted foes |
+| Bulwark | 1 | ♥ Iron Hide | 3 × 1 | +24 max Health |
+| Bulwark | 2 | ⛨ Stalwart | 3 × 1 | Take 9% less damage |
+| Bulwark | 3 | ✚ Unbroken | 2 × 2 | Potion heals +24% and recharges 24% faster |
+| Bulwark | 4 | ♜ Living Fortress | 1 × 3 | +30 max Health; take 5% less damage |
+| Aegis | 1 | ☄ Rallying Cry | 3 × 1 | Wrath fills 30% faster |
+| Aegis | 2 | ✊ Heavy Blows | 3 × 1 | +30% knockback |
+| Aegis | 3 | ✚ Guardian’s Mend | 2 × 2 | All healing +20% |
+| Aegis | 4 | ✹ Aegis Eternal | 1 × 3 | Wrath fills 15% faster; restore 2 Health per foe slain |
+
+*Gorran*: Fury · Grit · Rhythm
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Fury | 1 | ✊ Hard Knuckles | 3 × 1 | +15% Attack damage |
+| Fury | 2 | ✺ Haymaker | 3 × 1 | +36% Special damage |
+| Fury | 3 | ✦ Pressure Points | 2 × 2 | +6% critical chance |
+| Fury | 4 | ♛ Unstoppable | 1 × 3 | Attack and Special 10% faster; +6% damage |
+| Grit | 1 | ♥ Brawler’s Hide | 3 × 1 | +24 max Health |
+| Grit | 2 | ⛨ Shrug It Off | 3 × 1 | Take 9% less damage |
+| Grit | 3 | ✚ Second Wind | 2 × 2 | Restore 2 Health per foe slain |
+| Grit | 4 | ♜ Last Man Standing | 1 × 3 | +25 max Health; all healing +15% |
+| Rhythm | 1 | ➶ Footwork | 3 × 1 | +12% move speed |
+| Rhythm | 2 | ☄ Rage | 3 × 1 | Wrath fills 30% faster |
+| Rhythm | 3 | » Rolling Punches | 2 × 2 | Dash recharges 20% faster |
+| Rhythm | 4 | ✹ Hundred Hands | 1 × 3 | Attack and Special 8% faster; wrath fills 15% faster |
+
+*Ione*: Flow · Stillness · Tide
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Flow | 1 | ⛓ Whirling Links | 3 × 1 | +15% Attack damage |
+| Flow | 2 | ✺ Crashing Wave | 3 × 1 | +30% Special damage |
+| Flow | 3 | ✦ Pinpoint | 2 × 2 | +8% critical chance with Special |
+| Flow | 4 | ♛ River’s Wrath | 1 × 3 | +20% Special damage; +15% knockback |
+| Stillness | 1 | ♥ Centred | 3 × 1 | +18 max Health |
+| Stillness | 2 | ⛨ Calm Mind | 3 × 1 | Take 9% less damage |
+| Stillness | 3 | ✚ Clear Water | 2 × 2 | Potion heals +24% and recharges 24% faster |
+| Stillness | 4 | ♜ Unmoved | 1 × 3 | Take 6% less damage; all healing +15% |
+| Tide | 1 | ☄ Undertow | 3 × 1 | Wrath fills 30% faster |
+| Tide | 2 | ◆ Tide Shard | 3 × 1 | +45% Cast damage |
+| Tide | 3 | ✧ Deep Current | 2 × 2 | +2 Cast shards |
+| Tide | 4 | ✹ Spring Tide | 1 × 3 | Wrath fills 15% faster; +25% Cast damage |
+
+*Erebos*: Reaping · Hunger · Night
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Reaping | 1 | ⚰ Wide Sweep | 3 × 1 | +15% Attack damage |
+| Reaping | 2 | ✺ Grim Harvest | 3 × 1 | +36% Special damage |
+| Reaping | 3 | ☠ Executioner | 2 × 2 | +16% damage to guardians and enchanted foes |
+| Reaping | 4 | ♛ Lord of the Dead | 1 × 3 | +8% damage; critical hits deal +15% damage |
+| Hunger | 1 | ✚ Feast | 3 × 1 | Restore 3 Health per foe slain |
+| Hunger | 2 | ♥ Grave Robes | 3 × 1 | +24 max Health |
+| Hunger | 3 | ⛨ Bloodied Mist | 2 × 2 | Take 6% less damage |
+| Hunger | 4 | ♜ Undying King | 1 × 3 | Restore 2 Health per foe slain; all healing +20% |
+| Night | 1 | ✧ Echo Hunger | 3 × 1 | +45% Echoes gathered |
+| Night | 2 | ⚙ Dark Relics | 3 × 1 | Artifacts recharge 24% faster |
+| Night | 3 | ☄ Night’s Embrace | 2 × 2 | Wrath fills 24% faster |
+| Night | 4 | ✹ Eclipse Eternal | 1 × 3 | Wrath fills 20% faster; +25% Echoes gathered |
+
+*Rook*: Firepower · Grit · Powder
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Firepower | 1 | ✹ Heavy Shot | 3 × 1 | +15% Attack damage |
+| Firepower | 2 | ✦ Point Blank | 3 × 1 | +9% critical chance with Attack |
+| Firepower | 3 | ✺ Big Bore | 2 × 2 | +24% Special damage |
+| Firepower | 4 | ♛ Broadside | 1 × 3 | +8% damage; +20% knockback |
+| Grit | 1 | ♥ Leather Coat | 3 × 1 | +18 max Health |
+| Grit | 2 | ⛨ Hard Cover | 3 × 1 | Take 9% less damage |
+| Grit | 3 | ✚ Field Rations | 2 × 2 | Potion heals +24% and recharges 24% faster |
+| Grit | 4 | ♜ Iron Nerve | 1 × 3 | +20 max Health; take 5% less damage |
+| Powder | 1 | » Quick Reload | 3 × 1 | Dash recharges 24% faster |
+| Powder | 2 | ☄ Powder Keg | 3 × 1 | Wrath fills 30% faster |
+| Powder | 3 | ◆ Shrapnel | 2 × 2 | +30% Cast damage |
+| Powder | 4 | ✹ Cannonade Mastery | 1 × 3 | Wrath fills 15% faster; +12% damage to guardians and enchanted foes |
+
+*Selene*: Edge · Poise · Starlight
+
+| Branch | Row | Skill | Ranks × points | At max rank |
+|---|---|---|---|---|
+| Edge | 1 | ⚔ Iaido | 3 × 1 | +15% Attack damage |
+| Edge | 2 | ✦ Clean Cut | 3 × 1 | +12% critical chance with Attack |
+| Edge | 3 | ✺ Crescent | 2 × 2 | +24% Special damage |
+| Edge | 4 | ♛ Thousand Cuts | 1 × 3 | Critical hits deal +25% damage; attack and Special 6% faster |
+| Poise | 1 | ➶ Grace | 3 × 1 | +12% move speed |
+| Poise | 2 | ⛨ Parry Master | 3 × 1 | Take 9% less damage |
+| Poise | 3 | ♥ Composure | 2 × 2 | +16 max Health |
+| Poise | 4 | ♜ Perfect Form | 1 × 3 | Dash recharges 15% faster; restore 2 Health per foe slain |
+| Starlight | 1 | ☄ Falling Star | 3 × 1 | Wrath fills 30% faster |
+| Starlight | 2 | » Comet Step | 3 × 1 | +45% Dash-Strike damage |
+| Starlight | 3 | ◆ Star Shard | 2 × 2 | +30% Cast damage |
+| Starlight | 4 | ✹ Starfall Mastery | 1 × 3 | Wrath fills 20% faster; +6% damage |
 
 ## Heroes and Wrath
 
@@ -128,11 +296,11 @@ Choose a hero in the *Hall of Heroes*. Wrath (unlocks at level 10) fills by 3.13
 | Doran, The Bronze Wall | Vanguard | Thornspear | shield | Start | +30 max Health; Take 12% less damage; −8% move speed | Titan's Quake | Three quakes roll out from you, stunning and crushing foes. |
 | Gorran, The Unchained Fist | Brawler | Titan Gauntlets | catch | Reach level 7 or slay a guardian | Combo meter builds twice as fast; +20 max Health | Hundred Fists | A storm of punches in front of you, ending in a crushing blast. |
 | Ione, Tidecaller | Monk | Riptide Chains | catch | Reach level 10 or slay 3 guardians | +1 Cast shard (once Cast is unlocked); +20% Special damage; +15% knockback | Tidal Surge | A tidal wave hurls every nearby foe away, chilling them to the bone. |
-| Erebos, The Hollow King | Reaper | Reaper's Crescent | mist | Reach level 14 or slay 6 guardians | +10% damage; Restore 2 Health per foe slain; +50% souls gathered; −15 max Health | Eclipse | Darkness falls: every foe in sight is stunned and Doomed, and you drink their life. |
+| Erebos, The Hollow King | Reaper | Reaper's Crescent | mist | Reach level 14 or slay 6 guardians | +10% damage; Restore 2 Health per foe slain; +50% Echoes gathered; −15 max Health | Eclipse | Darkness falls: every foe in sight is stunned and Doomed, and you drink their life. |
 | Rook, The Powder Ghost | Gunner | Thunderbuss | evade | Reach level 18 or escape once | Hits on foes close to you deal +30% damage; +15% knockback | Cannonade | Cannon shots rain down on the foes around you. |
 | Selene, Starbound | Duelist | Starsplitter | parry | Reach level 22 or escape 3 times | +1 Dash charge; +15% Attack damage; Dash recharges 20% faster | Starfall | A storm of falling stars pounds the area around you. |
 
-Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes souls).
+Guard styles: *parry* (widest parry window), *shield* (blocks all frontal damage; Attack while guarding bashes), *evade* (a sidestep; one right before a hit is a Perfect Dodge), *catch* (wide parry window), *mist* (blocked damage becomes Echoes).
 
 ## Weapons, forging and anvil upgrades
 
@@ -149,7 +317,7 @@ Each weapon belongs to one class (hero): picking the hero picks the weapon. Ever
 | Thunderbuss | blunderbuss | Gunner | Rook | Spread shots, then a piercing slug. Powered: Grapeshot Cannon. Special: a Powder Keg that blows up after a short fuse. |
 | Starsplitter | katana | Duelist | Selene | Three lightning-fast draw-cuts. Powered: Moonlit Iaido blinks you through foes. Special: Thousand Cuts. |
 
-**Forge tiers** (per weapon, at the Armory)
+**Forge tiers** (per weapon, at the Blacksmith once he has his Whetstone)
 
 | Tier | Ash | Level needed | Effect |
 |---|---|---|---|
@@ -372,7 +540,7 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 | ✦ Concussive | Hits have a 5% chance to stun foes for 1.5s. | Hits have a 9% chance to stun foes for 1.5s. | Hits have a 13% chance to stun foes for 1.5s. |
 | ☀ Bloom | Hits have a 6% chance to bloom a healing circle around you. | Hits have a 10% chance to bloom a healing circle around you. | Hits have a 14% chance to bloom a healing circle around you. |
 | ◆ Treasure Sense | Find +30% more obols and more treasure chests. | Find +60% more obols and more treasure chests. | Find +90% more obols and more treasure chests. |
-| ✧ Soul Harvest | Hits have a 12% chance to grant 3 souls for your artifacts. | Hits have a 12% chance to grant 4 souls for your artifacts. | Hits have a 12% chance to grant 5 souls for your artifacts. |
+| ✧ Echo Harvest | Hits have a 12% chance to grant 3 Echoes for your artifacts. | Hits have a 12% chance to grant 4 Echoes for your artifacts. | Hits have a 12% chance to grant 5 Echoes for your artifacts. |
 | ✺ Whirling | Your Dash-Strike and Jump Slam release a spinning strike dealing 25 damage around you. | Your Dash-Strike and Jump Slam release a spinning strike dealing 40 damage around you. | Your Dash-Strike and Jump Slam release a spinning strike dealing 55 damage around you. |
 | ♨ Searing | Hits set foes ablaze for 3 damage per second. | Hits set foes ablaze for 5 damage per second. | Hits set foes ablaze for 7 damage per second. |
 
@@ -389,25 +557,63 @@ Found in Enchanting Tomes. Finding one again raises its tier (max 3).
 | ✦ Thunder Dust | 16s cooldown | 30 | Stuns every nearby foe for 2.5 seconds. |
 | ◉ Bell of Ruin | 18s cooldown | 30 | A resounding gong deals 30 damage and Weakens every foe nearby. |
 | ⚗ Fury Draught | 26s cooldown | 25 | For 8 seconds you move and strike 40% faster. |
-| ♁ Spirit Lantern | 30 souls | 35 | Spend 30 souls: a lantern spirit fights at your side for 14 seconds. |
-| ☽ Soul Reaper | 40 souls | 35 | Spend 40 souls: unleash a soul burst dealing 120 damage around you. |
-| ⌖ Void Prism | 10 souls | 50 | Channel a searing soul beam toward your aim. Drains souls while active. |
+| ♁ Spirit Lantern | 30 Echoes | 35 | Spend 30 Echoes: a lantern spirit fights at your side for 14 seconds. |
+| ☽ Echo Reaper | 40 Echoes | 35 | Spend 40 Echoes: unleash a burst of echoes dealing 120 damage around you. |
+| ⌖ Void Prism | 10 Echoes | 50 | Channel a searing beam toward your aim. Drains Echoes while active. |
 
-## Altar of Ashes (permanent upgrades)
+## Altar of Ashes (permanent upgrades for every hero)
 
-| Upgrade | Ranks | Ash per rank | At max rank |
-|---|---|---|---|
-| ♥ Vitality | 4 | 10 / 20 / 35 / 55 | +40 max Health |
-| ✚ Death's Reprieve | 3 | 30 / 70 / 140 | Cheat death 3 times per run |
-| ⚔ Fury | 4 | 15 / 30 / 50 / 80 | +20% damage |
-| ➶ Fleet Shadow | 1 | 60 | +1 Dash charge |
-| ◆ Shard Keeper | 2 | 25 / 75 | +2 Cast shards |
-| ◎ Ferryman’s Purse | 3 | 10 / 25 / 45 | Begin each run with 120 obols |
-| ✦ Favor of the Gods | 3 | 20 / 45 / 90 | Boons are more often Rare or better: +9.75% (not the first boon of an escape) |
-| ⛨ Iron Will | 3 | 20 / 45 / 80 | Take 15% less damage |
-| ⚗ Alchemy | 2 | 25 / 60 | Potion recharges 40% faster and heals +20% |
-| ✧ Soulcraft | 2 | 20 / 50 | +50 max souls, +40% souls gathered |
-| ⚙ Tinkerer | 3 | 20 / 45 / 80 | Artifacts recharge 30% faster |
+Bought with Ash. Each table runs from its weakest upgrades (section I) to its strongest; a section opens at its level once enough Ash has been spent on the sections above it. The Deep Altar opens when every upgrade on the Altar of Ashes is complete. Everything costs 36128 Ash in all.
+
+**Altar of Ashes**
+
+| Section | Opens at | Upgrade | Ranks | Ash per rank | At max rank |
+|---|---|---|---|---|---|
+| I Embers | Lv 1 | ♥ Vitality | 4 | 13 / 26 / 45 / 70 | +32 max Health |
+| I Embers | Lv 1 | ◎ Ferryman’s Purse | 3 | 13 / 33 / 59 | Begin each escape with 120 obols |
+| I Embers | Lv 1 | ➶ Swiftness | 3 | 20 / 40 / 65 | +12% move speed |
+| II Cinders | Lv 4, 120 Ash spent above | ⚔ Fury | 4 | 20 / 39 / 65 / 104 | +16% damage |
+| II Cinders | Lv 4, 120 Ash spent above | ⚗ Alchemy | 2 | 33 / 78 | Potion recharges 40% faster and heals +20% |
+| II Cinders | Lv 4, 120 Ash spent above | ✧ Echocraft | 2 | 26 / 65 | +50 max Echoes, +40% Echoes gathered |
+| II Cinders | Lv 4, 120 Ash spent above | ✚ Bloodlust | 2 | 40 / 90 | Restore 2 Health per foe slain |
+| III Flames | Lv 10, 500 Ash spent above | ⛨ Iron Will | 3 | 26 / 59 / 104 | Take 12% less damage |
+| III Flames | Lv 10, 500 Ash spent above | ◆ Shard Keeper | 2 | 33 / 98 | +2 Cast shards |
+| III Flames | Lv 10, 500 Ash spent above | ⚙ Tinkerer | 3 | 26 / 59 / 104 | Artifacts recharge 30% faster |
+| III Flames | Lv 10, 500 Ash spent above | ✦ Precision | 3 | 45 / 90 / 150 | +9% critical chance |
+| IV Blaze | Lv 18, 1300 Ash spent above | » Fleet Shadow | 1 | 260 | +1 Dash charge |
+| IV Blaze | Lv 18, 1300 Ash spent above | ✧ Favor of the Gods | 3 | 60 / 120 / 230 | Boons are more often Rare or better: +9.75% (not an escape's first boon) |
+| IV Blaze | Lv 18, 1300 Ash spent above | ☄ Wrathful | 3 | 70 / 140 / 230 | Wrath fills 45% faster |
+| IV Blaze | Lv 18, 1300 Ash spent above | ☠ Giantslayer | 2 | 110 / 220 | +20% damage to guardians and enchanted foes |
+| V Inferno | Lv 26, 2600 Ash spent above | ⚡ Godslayer | 2 | 350 / 700 | +12% damage and +20 max Health |
+| V Inferno | Lv 26, 2600 Ash spent above | ✚ Death’s Reprieve | 2 | 900 / 2000 | Cheat death 2 times per escape |
+
+**The Deep Altar**
+
+| Section | Opens at | Upgrade | Ranks | Ash per rank | At max rank |
+|---|---|---|---|---|---|
+| I Smoulder | Lv 30 | ♥ Colossus | 3 | 400 / 600 / 850 | +36 max Health |
+| I Smoulder | Lv 30 | ⚔ Warlord | 3 | 450 / 700 / 1000 | +15% damage |
+| I Smoulder | Lv 30 | ◎ Ferryman’s Tithe | 2 | 300 / 600 | +40% obols found |
+| II Pyre | Lv 36, 3000 Ash spent above | ✧ Echo Well | 2 | 700 / 1200 | Begin each escape with 80% Echoes |
+| II Pyre | Lv 36, 3000 Ash spent above | » Phantom Step | 2 | 600 / 1000 | Dash recharges 30% faster; Dash-Strike +30% damage |
+| II Pyre | Lv 36, 3000 Ash spent above | ⛨ Titan’s Blood | 3 | 600 / 900 / 1300 | Take 12% less damage |
+| III Furnace | Lv 42, 7000 Ash spent above | ✦ Ruin | 2 | 1000 / 1600 | Critical hits deal +40% damage |
+| III Furnace | Lv 42, 7000 Ash spent above | ◆ Deep Quiver | 1 | 1400 | +1 Cast shard |
+| III Furnace | Lv 42, 7000 Ash spent above | ✧ Exalted Favor | 2 | 900 / 1400 | Boons are more often Rare or better: a further +6.5% |
+| IV Heart of the Pyre | Lv 48, 12000 Ash spent above | ⚡ Ascendant | 2 | 2500 / 4000 | +16% damage and +30 max Health |
+| IV Heart of the Pyre | Lv 48, 12000 Ash spent above | ✚ Undying | 1 | 5000 | Cheat death 1 more time per escape |
+
+## The Blacksmith
+
+He stars up, reforges and salvages gear in the Hall from the start of the game (starring up needs only materials). Each forge part he gets back lets him do more:
+
+| Part | Found | Unlocks |
+|---|---|---|
+| ◇ Whetstone | Slay Vexa, guardian of the Shackled Deep | Weapon forging: temper your hero’s weapon with Ash |
+| ⟟ Ember Tongs | Slay the Many-Maw | Reforging: roll a piece’s bonuses anew |
+| ◒ Crucible | Slay Aurex | Crafting: plain and Rare gear, of the slot you choose |
+| ♒ Great Bellows | Slay Threefang | Crafting: Epic gear |
+| ♦ Anvil Heart | Slay any guardian under the Oath of Torment | Crafting: Legendary gear |
 
 ## Loot and gear
 
@@ -458,7 +664,7 @@ A bonus is its base value × roll × tier strength × star bonus. Ghost bonuses 
 | −3% damage taken | 3% | Armor, Leggings, Helmet |
 | −6% dash recharge | 6% | Boots |
 | +6% obols found | 6% | Helmet, Armor, Leggings, Boots |
-| +8% souls gathered | 8% | Helmet, Armor |
+| +8% Echoes gathered | 8% | Helmet, Armor |
 | +6% Wrath gain | 6% | Helmet |
 | +6% potion healing | 6% | Armor |
 
@@ -479,9 +685,10 @@ Rare and better pieces are starred up from 1 to 10 stars. Stars 2–5 are gold a
 
 | Recipe | Makes | Cost |
 |---|---|---|
-| Craft a plain piece | Common 70%, Uncommon 30% | 25 ☗ · 6 ♦ |
-| Craft a fine piece (1★ Rare) | Rare 100% | 40 ☗ · 6 ✹ |
-| Craft a grand piece (1★ Epic) | Epic 100% | 60 ☗ · 6 ● · 3 ⬢ |
+| Plain piece | Common 70%, Uncommon 30% | 25 ☗ · 6 ♦ |
+| Fine piece (1★ Rare) | Rare 100% | 40 ☗ · 6 ✹ |
+| Grand piece (1★ Epic) | Epic 100% | 60 ☗ · 6 ● · 3 ⬢ |
+| Legendary piece (1★ Legendary) | Legendary 100% | 140 ☗ · 18 ● · 12 ⬢ |
 
 
 ## Regions and guardians
@@ -627,14 +834,14 @@ Chamber 1 of a region has 1 wave, chambers 2–3 have 2 and later chambers 3. Fo
 | Drop | Foe | Elite foe | Guardian |
 |---|---|---|---|
 | Obols (gold) | 55% | 55% | 55% |
-| Souls | 1, +1 at 40% | 4 | 25 |
+| Echoes | 1, +1 at 40% | 4 | 25 |
 | ☗ Bone Dust | 30% (×2 at 30%) | 48% (×2 at 30%) | 90% (×10) |
 | Region material (Ember Shard / Golden Ichor / Gate Pearl) | 14% | 22% | 42% (×6) |
 | ⬢ Titan Scale | — | 25% | 100% (×3–5) |
 | Gear | 12% | 35% | 100% (starred) |
 | Ghost gear | 0.1% | 0.1% | 0.1% |
 
-Breaking a pot: 35% obols (1–5), else 20% two souls: 13% overall, nothing 52%.
+Breaking a pot: 35% obols (1–5), else 20% two Echoes: 13% overall, nothing 52%.
 
 ### Treasure chests
 
@@ -642,7 +849,7 @@ Breaking a pot: 35% obols (1–5), else 20% two souls: 13% overall, nothing 52%.
 |---|---|
 | A combat chamber holds a chest | 25% (+10% per Treasure Sense tier) |
 | The chest is a Mimic (combat chambers); slaying it always drops a Unique piece | 3% |
-| Always inside | 15–35 obols, 6 souls, 3 Bone Dust |
+| Always inside | 15–35 obols, 6 Echoes, 3 Bone Dust |
 | Also a piece of gear | 30% |
 | An artifact pops out | 35% (artifacts unlocked, one left to find) |
 | Otherwise an enchantment | 25% (60% when no artifact is left) |
@@ -691,6 +898,6 @@ Plus, on any kill (guardians too): a Ghost piece, 0.1%. *Plain* and *Starred* ar
 | Concussive | Hit stuns for 1.5s | 5% | 9% | 13% |
 | Bloom | Hit blooms a healing circle | 6% | 10% | 14% |
 | Frenzy | Kill grants +50% attack speed | 10% | 15% | 20% |
-| Soul Harvest | Hit grants souls | 12% | 12% | 12% |
+| Echo Harvest | Hit grants Echoes | 12% | 12% | 12% |
 
 Critical hits come only from boons and riposte (a riposte is always critical).

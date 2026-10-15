@@ -2,7 +2,7 @@
   "name": "unbound-underworld",
   "productName": "Unbound Underworld",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "A Hades-inspired action roguelike with Minecraft Dungeons-style artifacts, enchantments and jump attacks.",
   "author": "MEZTKING",
   "homepage": "https://github.com/MEZTKING/Unbound-Underworld",
@@ -42,6 +42,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "server/relay-core.cjs",
+      "server/lan.cjs",
       "package.json",
       "!node_modules/@capacitor{,/**/*}"
     ],

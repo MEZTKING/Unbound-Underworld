@@ -1,3 +1,4 @@
+import type { Camera } from './camera';
 import { len, type Vec } from './math';
 
 export type Action =
@@ -133,10 +134,38 @@ const PADMAP: Record<number, Action[]> = {
 
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']);
 
-/** 'auto' = touch play without a drag: aim at the nearest foe. */
-export type AimSource = 'mouse' | 'stick' | 'move' | 'auto';
+/** 'auto' = touch play without a drag: aim at the nearest foe. 'angle' = a player over the network sends their aim. */
+export type AimSource = 'mouse' | 'stick' | 'move' | 'auto' | 'angle';
 
-export class Input {
+/**
+ * How a hero is driven: this device's keyboard, mouse, touch and gamepads, one
+ * gamepad of its own (local co-op), or a player over the network.
+ */
+export interface Control {
+  down(a: Action): boolean;
+  pressed(a: Action): boolean;
+  consume(a: Action): boolean;
+  /** Where to walk, in world space (length ≤ 1). */
+  worldMove(cam: Camera): Vec;
+  aimSource(): AimSource;
+  /** The aim angle for the 'mouse', 'stick' and 'angle' sources, for a hero standing at `p`. */
+  aimAngle(p: Vec, cam: Camera): number;
+  /** Playing by touch (aim assist leans in a little more). */
+  readonly touching: boolean;
+}
+
+/** One gamepad's state, read every frame. */
+interface PadState {
+  held: Set<Action>;
+  /** Pressed since the last game step. */
+  pressed: Set<Action>;
+  move: Vec;
+  aim: Vec;
+}
+
+const ZERO: Vec = { x: 0, y: 0 };
+
+export class Input implements Control {
   private held = new Map<Action, number>();
   private pressedSet = new Set<Action>();
   private releasedSet = new Set<Action>();
@@ -156,6 +185,14 @@ export class Input {
   onAction: ((a: Action) => void) | null = null;
   /** When set, the next key press goes here instead (rebinding a key). */
   captureKey: ((code: string) => void) | null = null;
+  /** Every gamepad by index. */
+  private pads = new Map<number, PadState>();
+  /** Gamepads that drive another hero (local co-op): left out of this device's own controls. */
+  readonly claimed = new Set<number>();
+  /** When set, the next gamepad button press anywhere goes here (claiming a pad for player 2). */
+  capturePad: ((index: number) => void) | null = null;
+  /** While a menu is open in an online game the world keeps running: the hero stands still. */
+  blocked = false;
   private keymap: Record<string, Action[]> = { ...DEFAULT_KEYMAP };
 
   /**
@@ -184,6 +221,12 @@ export class Input {
 
   constructor(private target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
+      // Typing in a text box (a name, an address) isn't playing.
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !['range', 'checkbox', 'button'].includes((el as HTMLInputElement).type)))) {
+        if (e.code === 'Escape') el.blur();
+        return;
+      }
       if (this.captureKey && !e.repeat) {
         e.preventDefault();
         const fn = this.captureKey;
@@ -251,10 +294,37 @@ export class Input {
   }
 
   down(a: Action): boolean {
-    return this.held.has(a) || this.padHeld.has(a);
+    return !this.blocked && (this.held.has(a) || this.padHeld.has(a));
   }
   pressed(a: Action): boolean {
-    return this.pressedSet.has(a);
+    return !this.blocked && this.pressedSet.has(a);
+  }
+
+  // ---- Control (this device's own hero)
+  get touching(): boolean {
+    return this.lastTouchUse > this.lastMouseUse;
+  }
+  worldMove(cam: Camera): Vec {
+    if (this.blocked) return ZERO;
+    return cam.screenDirToWorld(this.moveVector());
+  }
+  aimAngle(p: Vec, cam: Camera): number {
+    if (this.aimSource() === 'mouse') {
+      // Aim from the chest (24 up), where the cursor is naturally compared.
+      const m = cam.screenToWorld(this.mouse);
+      const up = cam.lift;
+      return Math.atan2(m.y - (p.y + up.y * 24), m.x - (p.x + up.x * 24));
+    }
+    const v = cam.screenDirToWorld(this.stickAim());
+    return Math.atan2(v.y, v.x);
+  }
+  /** A gamepad's state (for a pad that drives player 2). */
+  padState(index: number): PadState | undefined {
+    return this.pads.get(index);
+  }
+  /** Indices of the gamepads plugged in now. */
+  padIndices(): number[] {
+    return [...this.pads.keys()];
   }
   released(a: Action): boolean {
     return this.releasedSet.has(a);
@@ -270,6 +340,7 @@ export class Input {
   endStep(): void {
     this.pressedSet.clear();
     this.releasedSet.clear();
+    for (const p of this.pads.values()) p.pressed.clear();
   }
 
   moveVector(): Vec {
@@ -305,25 +376,52 @@ export class Input {
   }
 
   pollGamepads(): void {
-    const pads = navigator.getGamepads?.() ?? [];
+    const list = navigator.getGamepads?.() ?? [];
     const now = new Set<Action>();
     let move = { x: 0, y: 0 };
     let aim = { x: 0, y: 0 };
-    for (const p of pads) {
+    const seen = new Set<number>();
+    const dz = (v: number) => (Math.abs(v) < 0.18 ? 0 : v);
+    for (const p of list) {
       if (!p) continue;
-      const dz = (v: number) => (Math.abs(v) < 0.18 ? 0 : v);
-      move = { x: dz(p.axes[0] ?? 0), y: dz(p.axes[1] ?? 0) };
-      aim = { x: dz(p.axes[2] ?? 0), y: dz(p.axes[3] ?? 0) };
+      seen.add(p.index);
+      const st = this.pads.get(p.index) ?? { held: new Set<Action>(), pressed: new Set<Action>(), move: { x: 0, y: 0 }, aim: { x: 0, y: 0 } };
+      this.pads.set(p.index, st);
+      const pm = { x: dz(p.axes[0] ?? 0), y: dz(p.axes[1] ?? 0) };
+      const pa = { x: dz(p.axes[2] ?? 0), y: dz(p.axes[3] ?? 0) };
+      const held = new Set<Action>();
       p.buttons.forEach((b, i) => {
-        if (b.pressed) for (const a of PADMAP[i] ?? []) now.add(a);
+        if (b.pressed) for (const a of PADMAP[i] ?? []) held.add(a);
       });
       // Left stick doubles as menu navigation.
-      if (move.y < -0.6) now.add('menuUp');
-      if (move.y > 0.6) now.add('menuDown');
-      if (move.x < -0.6) now.add('menuLeft');
-      if (move.x > 0.6) now.add('menuRight');
-      break;
+      if (pm.y < -0.6) held.add('menuUp');
+      if (pm.y > 0.6) held.add('menuDown');
+      if (pm.x < -0.6) held.add('menuLeft');
+      if (pm.x > 0.6) held.add('menuRight');
+      const fresh = [...held].filter((a) => !st.held.has(a));
+      for (const a of fresh) st.pressed.add(a);
+      st.held = held;
+      st.move = pm;
+      st.aim = pa;
+      if (fresh.length && this.capturePad) {
+        const fn = this.capturePad;
+        this.capturePad = null;
+        // From now on this pad is the new player's: its presses no longer reach player 1.
+        this.claimed.add(p.index);
+        fn(p.index);
+        continue;
+      }
+      if (this.claimed.has(p.index)) {
+        // Player 2's pad still drives menus.
+        for (const a of fresh) if (a.startsWith('menu') || a === 'confirm' || a === 'back' || a === 'pause') this.onAction?.(a);
+        if (fresh.includes('pause')) this.pressedSet.add('pause');
+        continue;
+      }
+      for (const a of held) now.add(a);
+      if (Math.hypot(pm.x, pm.y) > Math.hypot(move.x, move.y)) move = pm;
+      if (Math.hypot(pa.x, pa.y) > Math.hypot(aim.x, aim.y)) aim = pa;
     }
+    for (const i of [...this.pads.keys()]) if (!seen.has(i)) this.pads.delete(i);
     if (now.size > 0 || len(move) > 0 || len(aim) > 0) this.lastPadUse = performance.now();
     for (const a of now) {
       if (!this.padHeld.has(a)) {
@@ -339,5 +437,47 @@ export class Input {
 
   get element(): HTMLElement {
     return this.target;
+  }
+}
+
+/** One gamepad driving its own hero (local co-op player 2). */
+export class PadControl implements Control {
+  readonly touching = false;
+  constructor(
+    private input: Input,
+    readonly index: number,
+  ) {}
+  private get st(): PadState | undefined {
+    return this.input.padState(this.index);
+  }
+  down(a: Action): boolean {
+    return this.st?.held.has(a) ?? false;
+  }
+  pressed(a: Action): boolean {
+    return this.st?.pressed.has(a) ?? false;
+  }
+  consume(a: Action): boolean {
+    const st = this.st;
+    if (!st?.pressed.has(a)) return false;
+    st.pressed.delete(a);
+    return true;
+  }
+  worldMove(cam: Camera): Vec {
+    const m = this.st?.move ?? ZERO;
+    const l = Math.hypot(m.x, m.y);
+    if (l < 0.2) return ZERO;
+    return cam.screenDirToWorld(l > 1 ? { x: m.x / l, y: m.y / l } : m);
+  }
+  aimSource(): AimSource {
+    const a = this.st?.aim ?? ZERO;
+    return Math.hypot(a.x, a.y) > 0.35 ? 'stick' : 'move';
+  }
+  aimAngle(_p: Vec, cam: Camera): number {
+    const v = cam.screenDirToWorld(this.st?.aim ?? ZERO);
+    return Math.atan2(v.y, v.x);
+  }
+  /** Still plugged in. */
+  get connected(): boolean {
+    return !!this.st;
   }
 }

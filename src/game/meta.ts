@@ -1,9 +1,10 @@
-import type { MetaBonuses } from './boons';
+import { migrateTalents } from './altar';
 import { MATERIAL_IDS, normalizeGear, type GearState, type MaterialId, type Materials } from './gear';
-import { CHARACTER_BY_ID, isCharacterId, type CharacterId, type Palette } from './characters';
+import { CHARACTER_BY_ID, CHARACTERS, isCharacterId, type CharacterId, type Palette } from './characters';
+import { HERO_MAX_LEVEL, heroXpForLevel } from './herotree';
 import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
-import type { PlayerStats } from './stats';
+import { partsFromHistory } from './smith';
 import type { WeaponId } from './types';
 
 export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'nunchaku', 'scythe', 'blunderbuss', 'katana'];
@@ -64,29 +65,6 @@ export function defaultSettings(): Settings {
   };
 }
 
-/** Permanent upgrades bought with Ash at the Altar in the hub. */
-export interface UpgradeDef {
-  id: string;
-  name: string;
-  glyph: string;
-  desc: (rank: number) => string;
-  costs: number[];
-}
-
-export const UPGRADES: UpgradeDef[] = [
-  { id: 'vitality', name: 'Vitality', glyph: '♥', desc: (r) => `+${r * 10} max Health`, costs: [10, 20, 35, 55] },
-  { id: 'defiance', name: 'Death\'s Reprieve', glyph: '✚', desc: (r) => `Cheat death ${r} time${r === 1 ? '' : 's'} per run`, costs: [30, 70, 140] },
-  { id: 'fury', name: 'Fury', glyph: '⚔', desc: (r) => `+${r * 5}% damage`, costs: [15, 30, 50, 80] },
-  { id: 'reflex', name: 'Fleet Shadow', glyph: '➶', desc: (r) => `+${r} Dash charge`, costs: [60] },
-  { id: 'shards', name: 'Shard Keeper', glyph: '◆', desc: (r) => `+${r} Cast shard${r === 1 ? '' : 's'}`, costs: [25, 75] },
-  { id: 'fortune', name: 'Ferryman’s Purse', glyph: '◎', desc: (r) => `Begin each run with ${r * 40} obols`, costs: [10, 25, 45] },
-  { id: 'favor', name: 'Favor of the Gods', glyph: '✦', desc: (r) => `Boons are more often Rare or better: +${+(r * 3.25).toFixed(2)}% (not the first boon of an escape)`, costs: [20, 45, 90] },
-  { id: 'resilience', name: 'Iron Will', glyph: '⛨', desc: (r) => `Take ${r * 5}% less damage`, costs: [20, 45, 80] },
-  { id: 'brewing', name: 'Alchemy', glyph: '⚗', desc: (r) => `Potion recharges ${r * 20}% faster and heals +${r * 10}%`, costs: [25, 60] },
-  { id: 'soulcraft', name: 'Soulcraft', glyph: '✧', desc: (r) => `+${r * 25} max souls, +${r * 20}% souls gathered`, costs: [20, 50] },
-  { id: 'tinkerer', name: 'Tinkerer', glyph: '⚙', desc: (r) => `Artifacts recharge ${r * 10}% faster`, costs: [20, 45, 80] },
-];
-
 export interface SaveData {
   version: 1;
   ash: number;
@@ -114,7 +92,16 @@ export interface SaveData {
   xp: number;
   /** Highest level whose unlocks were announced. */
   seenLevel: number;
+  /** Talents from before v0.9 (moved onto the Altar; kept empty). */
   talents: Record<string, number>;
+  /** Experience earned with each hero (their own level and skill points). */
+  heroXp: Partial<Record<CharacterId, number>>;
+  /** Each hero's skill tree ranks, by node id. */
+  skills: Partial<Record<CharacterId, Record<string, number>>>;
+  /** The Blacksmith's forge parts brought back. */
+  smith: { parts: string[] };
+  /** Save layout version: 2 once talents moved to the Altar and heroes got their own trees (v0.9). */
+  progress: number;
   character: CharacterId;
   /** Forge tier per weapon (1..5). */
   forge: Partial<Record<WeaponId, number>>;
@@ -231,6 +218,10 @@ export function defaultSave(): SaveData {
     gear: { items: [], equipped: {} },
     classes: 1,
     notice: '',
+    heroXp: {},
+    skills: {},
+    smith: { parts: [] },
+    progress: 2,
   };
 }
 
@@ -270,25 +261,45 @@ export function normalizeSave(raw: unknown): SaveData {
   // v0.7: each hero wields one weapon, so Ash spent unlocking weapons comes back.
   const oldWeapons = Array.isArray(r.weapons) ? r.weapons.filter(isWeaponId) : [];
   const refund = r.classes ? 0 : oldWeapons.reduce((n, w) => n + (OLD_WEAPON_COST[w] ?? 0), 0);
+  const bestiary = migrateBestiary(r.bestiary);
+  const maxHeat = Math.max(0, num(r.maxHeat, 0));
+  // v0.9: talents move onto the Altar, heroes get their own levels, and the Blacksmith counts guardians already slain.
+  let upgrades: Record<string, number> = typeof r.upgrades === 'object' && r.upgrades ? { ...r.upgrades } : {};
+  let altarRefund = 0;
+  let heroXp: SaveData['heroXp'] = typeof r.heroXp === 'object' && r.heroXp ? { ...r.heroXp } : {};
+  let parts = Array.isArray(r.smith?.parts) ? r.smith.parts.filter((x) => typeof x === 'string') : [];
+  const old = num(r.progress, 0) < 2;
+  if (old) {
+    const m = migrateTalents(upgrades, typeof r.talents === 'object' && r.talents ? r.talents : {});
+    upgrades = m.upgrades;
+    altarRefund = m.refund;
+    const seed = Math.min(Math.floor(xp * 0.2), heroXpForLevel(HERO_MAX_LEVEL));
+    heroXp = Object.fromEntries(CHARACTERS.map((c) => [c.id, Math.max(heroXp[c.id] ?? 0, seed)]));
+    parts = [...new Set([...parts, ...partsFromHistory(bestiary, maxHeat)])];
+  }
+  const notices = [
+    refund > 0 ? `Weapons now come with their heroes: ${refund} Ash spent unlocking weapons was refunded.` : '',
+    old && (xp > 0 || Object.keys(upgrades).length) ? `The Altar of Ashes now holds your talents, and each hero has a skill tree at Ascension.${altarRefund > 0 ? ` ${altarRefund} Ash was refunded for ranks that no longer fit.` : ''}` : '',
+  ].filter(Boolean);
   return {
     version: 1,
-    ash: Math.max(0, num(r.ash, 0)) + refund,
-    upgrades: typeof r.upgrades === 'object' && r.upgrades ? { ...r.upgrades } : {},
+    ash: Math.max(0, num(r.ash, 0)) + refund + altarRefund,
+    upgrades,
     weapons: oldWeapons.length ? oldWeapons : d.weapons,
     weapon: CHARACTER_BY_ID[character].weapon,
     artifacts: Array.isArray(r.artifacts) ? [...new Set([...d.artifacts, ...r.artifacts.filter((a) => typeof a === 'string')])] : d.artifacts,
     startArtifact: typeof r.startArtifact === 'string' || r.startArtifact === null ? r.startArtifact : d.startArtifact,
     heat: Math.max(0, num(r.heat, 0)),
-    maxHeat: Math.max(0, num(r.maxHeat, 0)),
+    maxHeat,
     stats,
     settings: { ...d.settings, ...(typeof r.settings === 'object' && r.settings ? r.settings : {}) },
     seenIntro: !!r.seenIntro,
     xp,
     seenLevel: Math.max(1, num(r.seenLevel, typeof r.xp === 'number' ? 1 : levelFromXp(xp).level)),
-    talents: typeof r.talents === 'object' && r.talents ? { ...r.talents } : {},
+    talents: {},
     character,
     forge: typeof r.forge === 'object' && r.forge ? { ...r.forge } : {},
-    bestiary: migrateBestiary(r.bestiary),
+    bestiary,
     achievements: Array.isArray(r.achievements) ? r.achievements.filter((a) => typeof a === 'string') : [],
     shopSeen: Array.isArray(r.shopSeen) ? r.shopSeen.filter((a) => typeof a === 'string') : [],
     looks: typeof r.looks === 'object' && r.looks ? { ...r.looks } : {},
@@ -296,7 +307,11 @@ export function normalizeSave(raw: unknown): SaveData {
     materials: typeof r.materials === 'object' && r.materials ? Object.fromEntries(Object.entries(r.materials).filter(([k, v]) => MATERIAL_IDS.includes(k as MaterialId) && typeof v === 'number' && v > 0)) : {},
     gear: normalizeGear(r.gear),
     classes: 1,
-    notice: refund > 0 ? `Weapons now come with their heroes: ${refund} Ash spent unlocking weapons was refunded.` : typeof r.notice === 'string' ? r.notice : '',
+    notice: notices.length ? notices.join(' ') : typeof r.notice === 'string' ? r.notice : '',
+    heroXp,
+    skills: typeof r.skills === 'object' && r.skills ? Object.fromEntries(Object.entries(r.skills).filter(([k, v]) => isCharacterId(k) && typeof v === 'object' && v)) : {},
+    smith: { parts },
+    progress: 2,
   };
 }
 
@@ -330,32 +345,8 @@ export function rank(s: SaveData, id: string): number {
   return s.upgrades[id] ?? 0;
 }
 
-export function nextCost(s: SaveData, def: UpgradeDef): number | null {
-  const r = rank(s, def.id);
-  return r < def.costs.length ? def.costs[r] : null;
-}
 
-export function metaBonuses(s: SaveData): MetaBonuses {
-  return {
-    maxHp: rank(s, 'vitality') * 10,
-    deathDefiance: rank(s, 'defiance'),
-    dmg: rank(s, 'fury') * 0.05,
-    dashCharges: rank(s, 'reflex'),
-    castAmmo: rank(s, 'shards'),
-    damageTaken: 1 - rank(s, 'resilience') * 0.05,
-  };
-}
 
-/** Meta upgrades that touch the dungeon-crawler systems. */
-export function applyMetaExtras(s: SaveData, st: PlayerStats): void {
-  const brew = rank(s, 'brewing');
-  st.potionCooldown *= 1 - brew * 0.2;
-  st.potionHeal += brew * 0.1;
-  const soul = rank(s, 'soulcraft');
-  st.soulMax += soul * 25;
-  st.soulGain += soul * 0.2;
-  st.artifactCdMult *= 1 - rank(s, 'tinkerer') * 0.1;
-}
 
 /** Torment level modifiers: tougher foes for more Ash. */
 export function heatScale(heat: number): { hp: number; dmg: number; ash: number } {

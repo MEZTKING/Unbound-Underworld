@@ -1,0 +1,10 @@
+{
+  "name": "unbound-underworld-server",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Game server for Unbound Underworld online play: room codes, rejoining and save sync. No dependencies.",
+  "main": "index.cjs",
+  "bin": { "unbound-underworld-server": "index.cjs" },
+  "scripts": { "start": "node index.cjs" },
+  "engines": { "node": ">=18" }
+}

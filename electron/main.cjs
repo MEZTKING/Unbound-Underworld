@@ -54,6 +54,9 @@ function createWindow(near) {
       nodeIntegration: false,
       sandbox: true,
       autoplayPolicy: 'no-user-gesture-required',
+      // Games on the same network are reached over plain ws:// (there's no
+      // certificate for a LAN address); the game page itself stays app://.
+      allowRunningInsecureContent: true,
       preload: path.join(__dirname, 'preload.cjs'),
     },
   });
@@ -117,6 +120,61 @@ function registerWindowMode() {
   });
 }
 
+// Hosting on this network: the game's relay (server/relay-core.cjs) runs in
+// this process on port 7777, announced to players nearby by UDP broadcast.
+const lan = { server: null, relay: null, beacon: null, port: 0 };
+
+function startLanHost(name) {
+  if (lan.server) return Promise.resolve({ port: lan.port, addresses: require('../server/lan.cjs').lanAddresses().map((a) => a.address) });
+  const http = require('node:http');
+  const { Relay, serve } = require('../server/relay-core.cjs');
+  const { startBeacon, lanAddresses } = require('../server/lan.cjs');
+  const relay = new Relay({ name, saves: false, lan: true, maxRooms: 4 });
+  const tryPort = (port) =>
+    new Promise((resolve, reject) => {
+      const server = http.createServer();
+      serve(server, relay);
+      server.once('error', reject);
+      server.listen(port, '0.0.0.0', () => resolve(server));
+    });
+  const attempt = async () => {
+    for (let port = 7777; port < 7787; port++) {
+      try {
+        const server = await tryPort(port);
+        return { server, port };
+      } catch (err) {
+        if (err.code !== 'EADDRINUSE') throw err;
+      }
+    }
+    throw new Error('No free port between 7777 and 7786.');
+  };
+  return attempt().then(({ server, port }) => {
+    lan.server = server;
+    lan.relay = relay;
+    lan.port = port;
+    lan.beacon = startBeacon(() => {
+      const list = relay.listing();
+      return { name, port, code: list.length === 1 ? list[0].code : '', players: list.reduce((n, r) => n + r.players, 0), version: list[0]?.version ?? '' };
+    });
+    return { port, addresses: lanAddresses().map((a) => a.address) };
+  });
+}
+
+function stopLanHost() {
+  lan.beacon?.stop();
+  lan.relay?.close();
+  lan.server?.close();
+  lan.server = lan.relay = lan.beacon = null;
+  lan.port = 0;
+}
+
+function registerNet() {
+  ipcMain.handle('net:host', (event, name) => startLanHost(String(name || 'A game').slice(0, 24)));
+  ipcMain.handle('net:stop', () => stopLanHost());
+  ipcMain.handle('net:discover', (event, ms) => require('../server/lan.cjs').discover(Math.min(8000, Math.max(500, Number(ms) || 2500))));
+  app.on('before-quit', stopLanHost);
+}
+
 function registerUpdates() {
   ipcMain.handle('updates:info', () => ({ platform: process.platform, canSelfUpdate: canSelfUpdate() }));
   ipcMain.handle('updates:install', async (event) => {
@@ -158,6 +216,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     registerUpdates();
     registerWindowMode();
+    registerNet();
     windowMode = loadMode();
     createWindow();
     app.on('activate', () => {

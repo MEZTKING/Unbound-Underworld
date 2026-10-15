@@ -76,6 +76,8 @@ export class Zone {
   onActor: ((w: World, a: Actor) => void) | null = null;
   crit = 0;
   age = 0;
+  /** The hero who made it (party play: their damage and kills). */
+  owner: Actor | null = null;
 
   constructor(kind: ZoneKind, x: number, y: number, r: number, ttl: number, team: Team, damage: number, source: DamageSource) {
     this.kind = kind;
@@ -119,6 +121,8 @@ export class Pickup {
   attached: Actor | null = null;
   /** Rides with the player toward them once in range. */
   magnet = false;
+  /** A cast shard goes back to the hero who threw it. */
+  owner: Actor | null = null;
 
   constructor(kind: PickupKind, x: number, y: number, value = 0) {
     this.kind = kind;

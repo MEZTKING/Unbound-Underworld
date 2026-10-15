@@ -1,4 +1,5 @@
 import { audio } from '../engine/audio';
+import type { Control } from '../engine/input';
 import { angleDiff, angleOf, clamp, damp, fromAngle, fx, len, TAU } from '../engine/math';
 import { Actor } from './actor';
 import { useArtifact } from './artifacts';
@@ -109,6 +110,15 @@ export class Player extends Actor {
   webT = 0;
   /** Ultimate gauge (0..WRATH_MAX). */
   wrath = 0;
+  /** Who drives this hero; null = this device's own controls (the world's input). */
+  control: Control | null = null;
+  /** A player online brings their own customised look (otherwise this save's). */
+  look: HeroLook | null = null;
+  /** Party play: the player's name (shown over their hero) and colour. */
+  tag = '';
+  tagColor = '#ffd890';
+  /** Party play: seconds a partner has spent reviving this downed hero. */
+  reviveT = 0;
   /** Attacks fired, for Awakened-weapon waves. */
   private attackCount = 0;
   hero: CharacterDef;
@@ -145,7 +155,7 @@ export class Player extends Actor {
 
   /** The hero's colours and headwear, with the player's customisation applied. */
   get palette(): Palette {
-    const look = heroLooks[this.hero.id];
+    const look = this.look ?? heroLooks[this.hero.id];
     return look ? { ...this.hero.palette, ...look } : this.hero.palette;
   }
 
@@ -199,9 +209,14 @@ export class Player extends Actor {
     return s.attackSpeed + (this.rampageT > 0 ? 0.5 : 0) + (this.hasteT > 0 ? 0.4 : 0);
   }
 
+  /** The controls driving this hero. */
+  ctl(w: World): Control {
+    return this.control ?? w.input;
+  }
+
   update(w: World, dt: number): void {
     const s = w.stats;
-    const inp = w.input;
+    const inp = this.ctl(w);
     this.t += dt;
     this.flash = Math.max(0, this.flash - dt);
     this.iframes = Math.max(0, this.iframes - dt);
@@ -263,7 +278,7 @@ export class Player extends Actor {
 
     // ---- input
     // Input directions are on screen; the 3D view turns the room, so turn them too.
-    const mv = w.camera.screenDirToWorld(inp.moveVector());
+    const mv = inp.worldMove(w.camera);
     this.moveDir = mv;
     this.updateAim(w);
     if (inp.pressed('attack')) {
@@ -502,21 +517,15 @@ export class Player extends Actor {
     }
 
     // Facing follows aim while acting, otherwise movement.
-    if (this.state === 'action' || this.state === 'slam' || w.input.aimSource() !== 'move') this.facing = this.action?.aim ?? this.aim;
+    if (this.state === 'action' || this.state === 'slam' || this.ctl(w).aimSource() !== 'move') this.facing = this.action?.aim ?? this.aim;
     else if (len(mv) > 0.1) this.facing = angleOf(mv);
   }
 
   private updateAim(w: World): void {
-    const inp = w.input;
+    const inp = this.ctl(w);
     const src = inp.aimSource();
-    if (src === 'mouse') {
-      // Aim from the chest (24 up), where the cursor is naturally compared.
-      const m = w.camera.screenToWorld(inp.mouse);
-      const up = w.camera.lift;
-      this.aim = Math.atan2(m.y - (this.y + up.y * 24), m.x - (this.x + up.x * 24));
-    } else if (src === 'stick') {
-      const v = w.camera.screenDirToWorld(inp.stickAim());
-      this.aim = Math.atan2(v.y, v.x);
+    if (src === 'mouse' || src === 'stick' || src === 'angle') {
+      this.aim = inp.aimAngle(this, w.camera);
     } else if (src === 'auto') {
       // Touch play. The joystick wins: while moving, aim where you move, only
       // nudged onto a foe roughly in that direction. Standing still, lock onto
@@ -562,7 +571,7 @@ export class Player extends Actor {
     } else if (this.buf.attack > 0) {
       this.buf.attack = 0;
       def = this.weapon.attack(this, w, this.sinceDash < 0.2);
-    } else if (w.input.down('attack') && this.state === 'free') {
+    } else if (this.ctl(w).down('attack') && this.state === 'free') {
       def = this.weapon.held(this, w);
     }
     if (!def) return;
@@ -590,7 +599,7 @@ export class Player extends Actor {
   // ---------------------------------------------------------------- guard
 
   private updateGuard(w: World, dt: number): void {
-    const inp = w.input;
+    const inp = this.ctl(w);
     const style = this.hero.guard;
     if (inp.pressed('guard') && this.guardBreakT <= 0) {
       if (style === 'evade') this.sidestep(w);
@@ -620,7 +629,7 @@ export class Player extends Actor {
   private parryWindow(w: World): number {
     const style = this.hero.guard;
     const base = style === 'catch' ? 0.2 : style === 'parry' ? 0.18 : PARRY_WINDOW;
-    return base + (w.input.lastTouchUse > w.input.lastMouseUse ? 0.03 : 0) + (prefs.assist ? 0.07 : 0);
+    return base + (this.ctl(w).touching ? 0.03 : 0) + (prefs.assist ? 0.07 : 0);
   }
 
   /** Ranged classes guard with a quick sidestep. */

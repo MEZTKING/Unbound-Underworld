@@ -50,7 +50,7 @@ export const ENCHANTS: EnchantDef[] = [
   { id: 'stunning', name: 'Concussive', glyph: '✦', color: '#ffe680', desc: (t) => `Hits have a ${pct(T(t, STUNNING))} chance to stun foes for 1.5s.` },
   { id: 'radiance', name: 'Bloom', glyph: '☀', color: '#9dff9a', desc: (t) => `Hits have a ${pct(T(t, RADIANCE))} chance to bloom a healing circle around you.` },
   { id: 'prospector', name: 'Treasure Sense', glyph: '◆', color: '#ffd76a', desc: (t) => `Find +${30 * t}% more obols and more treasure chests.` },
-  { id: 'siphon', name: 'Soul Harvest', glyph: '✧', color: '#7fe8ff', desc: (t) => `Hits have a ${pct(SIPHON)} chance to grant ${2 + t} souls for your artifacts.` },
+  { id: 'siphon', name: 'Echo Harvest', glyph: '✧', color: '#7fe8ff', desc: (t) => `Hits have a ${pct(SIPHON)} chance to grant ${2 + t} Echoes for your artifacts.` },
   { id: 'swirling', name: 'Whirling', glyph: '✺', color: '#d8c8ff', desc: (t) => `Your Dash-Strike and Jump Slam release a spinning strike dealing ${10 + 15 * t} damage around you.` },
   { id: 'burning', name: 'Searing', glyph: '♨', color: '#ff7a3a', desc: (t) => `Hits set foes ablaze for ${T(t, BURNING)} damage per second.` },
 ];

@@ -994,15 +994,17 @@ export class VoxelRenderer {
         b.glow(t, '#9a60e0', 60, 108, 2, 0, 66, 5.5, 0.9);
         b.box(t, '#3a2a24', 80, 6, 18, 0, 3, 0);
         break;
-      case 'weapons': {
-        b.box(t, '#3a2a24', 6, 80, 8, -44, 40, 0);
-        b.box(t, '#3a2a24', 6, 80, 8, 44, 40, 0);
-        b.box(t, '#3a2a24', 94, 8, 10, 0, 72, 0);
-        b.box(t, '#3a2a24', 94, 6, 10, 0, 16, 0);
-        ['#ff5a6a', '#ffb14a', '#8ad0ff'].forEach((c, i) => {
-          b.box(t, '#c8c8d8', 3, 66, 3, -26 + i * 26, 46, 4);
-          b.glow(t, c, 5, 8, 5, -26 + i * 26, 82, 4);
-        });
+      case 'smith': {
+        // Furnace, anvil and the Blacksmith himself.
+        b.box(t, '#2a1e1a', 44, 90, 34, -34, 45, -6);
+        b.box(t, '#3a2a24', 50, 8, 40, -34, 94, -6);
+        b.glow(t, '#ff8a3a', 24, 18, 2, -34, 30, 11.5, 0.95);
+        b.box(t, '#4a4a56', 40, 10, 18, 22, 26, 4);
+        b.box(t, '#4a4a56', 18, 16, 14, 22, 13, 4);
+        b.box(t, '#3e3e48', 34, 6, 22, 22, 3, 4);
+        b.box(t, '#5a3a2a', 18, 30, 14, 50, 22, -8);
+        b.box(t, '#d8a888', 12, 12, 12, 50, 44, -8);
+        b.box(t, '#8a8a96', 4, 4, 18, 40, 34, 2).rotation.x = -0.5;
         break;
       }
       case 'artifacts':
@@ -1095,9 +1097,10 @@ export class VoxelRenderer {
     let rig = this.rigs.get(a);
     if (rig) return rig;
     const b = new RigBuilder(this.quality === 'high');
-    if (a === w.player) {
-      rig = buildHeroRig(w.player, b, this.shadowMat);
-      rig.look = JSON.stringify(w.player.palette);
+    const hero = w.players.find((p) => p === a);
+    if (hero) {
+      rig = buildHeroRig(hero, b, this.shadowMat);
+      rig.look = JSON.stringify(hero.palette);
     } else if ((a as Ally).kind === 'wolf' || (a as Ally).kind === 'lantern') {
       rig = buildAllyRig(a as Ally, b, this.shadowMat);
     } else {
@@ -1441,7 +1444,7 @@ export class VoxelRenderer {
     const key = `${w.room.seed}:${w.room.w}:${w.room.h}:${w.doors.map((d) => d.x).join(',')}`;
     if (w !== this.world || key !== this.roomKey) {
       if (w !== this.world) {
-        for (const [a, r] of this.rigs) if (a !== w.player) this.dropRig(r), this.rigs.delete(a);
+        for (const [a, r] of this.rigs) if (!w.players.some((p) => p === a)) this.dropRig(r), this.rigs.delete(a);
       }
       this.world = w;
       this.roomKey = key;
@@ -1539,15 +1542,16 @@ export class VoxelRenderer {
     // Actors
     this.frame++;
     const seen = this.frame;
-    const p = w.player;
-    const old = this.rigs.get(p);
-    if (old && old.look !== JSON.stringify(p.palette)) {
-      this.dropRig(old);
-      this.rigs.delete(p);
+    for (const h of w.players) {
+      const old = this.rigs.get(h);
+      if (old && old.look !== JSON.stringify(h.palette)) {
+        this.dropRig(old);
+        this.rigs.delete(h);
+      }
+      const pr = this.rigFor(h, w);
+      pr.seen = seen;
+      w.as(h, () => this.posePlayer(pr, h, w, dt));
     }
-    const pr = this.rigFor(p, w);
-    pr.seen = seen;
-    this.posePlayer(pr, p, w, dt);
     for (const e of w.enemies) {
       const r = this.rigFor(e, w);
       r.seen = seen;
@@ -1576,7 +1580,7 @@ export class VoxelRenderer {
       l.distance = r;
       l.intensity = k;
     };
-    put(p.x, p.y, 70 + p.z, '#ffc8a0', high ? 480 : 520, high ? 1.6 : 1.9);
+    for (const h of w.players) put(h.x, h.y, 70 + h.z, '#ffc8a0', high ? 480 : 520, (high ? 1.6 : 1.9) * (h.state === 'dead' ? 0.5 : 1));
     if (high) {
       // Doors keep their own slots right after the hero, so flashes and
       // braziers never take their light away.

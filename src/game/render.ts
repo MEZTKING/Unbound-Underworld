@@ -4,7 +4,7 @@ import { GODS } from './boons';
 import type { Projectile, Zone } from './entities';
 import { DOOR_W, TRAP_SIZE, WALL_H, type Obstacle } from './rooms';
 import type { RewardSpec, Shape } from './types';
-import type { Interactable, World } from './world';
+import { REVIVE_RANGE, REVIVE_TIME, type Interactable, type World } from './world';
 import { prefs } from './prefs';
 import { GEAR_RARITY, MATERIALS, SLOT_GLYPH } from './gear';
 import { isSpear, WEAPON_INFO } from './weapons';
@@ -515,7 +515,7 @@ function lifted(w: World, x: number, y: number, z: number): { x: number; y: numb
 }
 
 function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
-  const p = w.player;
+  const view = w.viewers;
   const mouse = renderOpts.mouse;
   for (const d of w.doors) {
     if (!d.reward) continue;
@@ -526,14 +526,15 @@ function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
     if (!d.open) continue;
     const info = REWARD_INFO[reward.kind];
     const title = reward.kind === 'boon' && reward.god ? `${GODS[reward.god].name}'s Boon` : info.label;
-    const near = Math.hypot(p.x - d.x, p.y) < 460;
+    const dist = Math.min(...view.map((p) => Math.hypot(p.x - d.x, p.y)));
+    const near = dist < 460;
     if (!renderOpts.touch) {
       // Mouse play: the description pops up beside the icon when you point at it
       // (or walk right up to the door).
       const up = w.camera.lift;
       const at = w.camera.worldToScreen({ x: d.x + up.x * iconZ, y: up.y * iconZ });
       const hover = !!mouse && Math.hypot(mouse.x - at.x, mouse.y - at.y) < 26 * renderOpts.textScale;
-      if (hover || Math.hypot(p.x - d.x, p.y) < 170) upright(ctx, w, d.x, 0, iconZ, () => doorCard(ctx, w, reward, title, info.desc, d.x, -iconZ + 52, 1));
+      if (hover || dist < 170) upright(ctx, w, d.x, 0, iconZ, () => doorCard(ctx, w, reward, title, info.desc, d.x, -iconZ + 52, 1));
       continue;
     }
     // Touch: on the floor just in front of the door, so it's on screen even on
@@ -541,7 +542,7 @@ function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
     // when you walk up to it; fades when you stand on it.
     if (!(prefs.doorInfo || near)) continue;
     const y = 84;
-    const onIt = Math.abs(p.x - d.x) < 110 && Math.abs(p.y - y) < 50;
+    const onIt = view.some((p) => Math.abs(p.x - d.x) < 110 && Math.abs(p.y - y) < 50);
     upright(ctx, w, d.x, y, 0, () => doorCard(ctx, w, reward, title, info.desc, d.x, y, onIt ? 0.35 : near ? 1 : 0.85));
   }
 }
@@ -637,8 +638,8 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       const hover = y - 10 + Math.sin(w.time * 4 + pk.x) * 3;
       // A soft beam marks gear so it isn't missed.
       if (l.gear) {
-        // Unique and Ghost pieces throw up a taller, pulsing beam.
-        const top = l.gear.rarity === 'ghost' || l.gear.rarity === 'unique';
+        // Legendary, Unique and Ghost pieces throw up a taller, pulsing beam.
+        const top = l.gear.rarity === 'ghost' || l.gear.rarity === 'unique' || l.gear.rarity === 'legendary';
         const bh = top ? 140 : 60;
         const bw = top ? 10 : 6;
         ctx.save();
@@ -658,6 +659,28 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.stroke();
+      // Special frames: a gilded double ring for Legendary, a circling spectral ring for Ghost.
+      if (l.gear?.rarity === 'legendary') {
+        ctx.strokeStyle = '#fff2c0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(pk.x, hover, size + 4, 0, TAU);
+        ctx.stroke();
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * TAU + w.time * 0.6;
+          ctx.fillStyle = '#ffe08a';
+          ctx.fillRect(pk.x + Math.cos(a) * (size + 4) - 2, hover + Math.sin(a) * (size + 4) - 2, 4, 4);
+        }
+      } else if (l.gear?.rarity === 'ghost') {
+        ctx.save();
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.5 + Math.sin(w.time * 6) * 0.3;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(pk.x, hover, size + 5, w.time * 2, w.time * 2 + TAU * 0.6);
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.fillStyle = color;
       ctx.font = `700 ${Math.round(size * 1.1)}px Georgia, serif`;
       ctx.textAlign = 'center';
@@ -825,21 +848,43 @@ function drawStation(ctx: CanvasRenderingContext2D, it: Interactable, t: number)
     ctx.fill();
     return;
   }
-  if (it.id === 'weapons') {
+  if (it.id === 'smith') {
+    // The Blacksmith's corner: a furnace glowing behind, an anvil, and the smith.
+    ctx.fillStyle = '#2a1e1a';
+    ctx.fillRect(-58, -92, 48, 92);
     ctx.fillStyle = '#3a2a24';
-    ctx.fillRect(-46, -70, 92, 10);
-    ctx.fillRect(-46, -20, 92, 8);
-    ctx.fillRect(-46, -76, 6, 76);
-    ctx.fillRect(40, -76, 6, 76);
-    const colors = ['#ff5a6a', '#ffb14a', '#8ad0ff'];
-    colors.forEach((c, i) => {
-      ctx.strokeStyle = c;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(-26 + i * 26, -12);
-      ctx.lineTo(-26 + i * 26, -90);
-      ctx.stroke();
-    });
+    ctx.fillRect(-62, -98, 56, 10);
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = ctx.createRadialGradient(-34, -30, 2, -34, -30, 34);
+    glow.addColorStop(0, `rgba(255,160,70,${0.75 + Math.sin(t * 6) * 0.15})`);
+    glow.addColorStop(1, 'rgba(255,80,20,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-70, -66, 72, 72);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#ff9a4a';
+    ctx.fillRect(-46, -40, 24, 18);
+    // Anvil
+    ctx.fillStyle = '#4a4a56';
+    ctx.fillRect(4, -30, 44, 10);
+    ctx.fillRect(16, -20, 20, 14);
+    ctx.fillRect(8, -6, 36, 6);
+    ctx.beginPath();
+    ctx.moveTo(48, -30);
+    ctx.lineTo(60, -26);
+    ctx.lineTo(48, -22);
+    ctx.fill();
+    // The smith
+    ctx.fillStyle = '#5a3a2a';
+    ctx.fillRect(48, -62, 22, 34);
+    ctx.fillStyle = '#d8a888';
+    ctx.fillRect(52, -78, 14, 14);
+    ctx.fillStyle = '#8a8a96';
+    ctx.save();
+    ctx.translate(46, -56);
+    ctx.rotate(-0.6 + Math.max(0, Math.sin(t * 3)) * 0.9);
+    ctx.fillRect(-2, -16, 4, 18);
+    ctx.fillRect(-6, -20, 12, 6);
+    ctx.restore();
     return;
   }
   if (it.id === 'artifacts') {
@@ -1203,8 +1248,7 @@ function renderLights(w: World, ctx: CanvasRenderingContext2D, dpr: number): voi
     g.fillStyle = grad;
     g.fillRect(x - r, y - r, r * 2, r * 2);
   };
-  const p = w.player;
-  light(p.x, p.y - 30, 420, 'rgba(255,190,150,0.55)');
+  for (const p of w.players) light(p.x, p.y - 30, p.state === 'dead' ? 260 : 420, 'rgba(255,190,150,0.55)');
   for (const b of w.room.braziers) light(b.x, b.y, 300 + Math.sin(w.time * 7 + b.x) * 15, 'rgba(255,140,70,0.6)');
   for (const h of w.room.hazards) {
     if (h.kind !== 'lava') continue;
@@ -1222,7 +1266,7 @@ function renderLights(w: World, ctx: CanvasRenderingContext2D, dpr: number): voi
   for (const it of w.interactables) {
     if (it.kind === 'station' || it.kind === 'fountain') light(it.x, it.y - 40, 220, it.color ?? 'rgba(200,160,255,0.5)', 0.5);
   }
-  if (p.beamT > 0) light(p.x + Math.cos(p.aim) * 200, p.y + Math.sin(p.aim) * 200, 360, 'rgba(200,107,255,0.7)');
+  for (const p of w.players) if (p.beamT > 0) light(p.x + Math.cos(p.aim) * 200, p.y + Math.sin(p.aim) * 200, 360, 'rgba(200,107,255,0.7)');
   for (const e of w.enemies) if (e.isBoss && !e.dead) light(e.x, e.y - e.height / 2, 260, 'rgba(255,90,90,0.3)');
   g.globalAlpha = 1;
   ctx.save();
@@ -1282,9 +1326,11 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
     });
   }
   for (const a of w.allies) items.push({ y: a.y, draw: () => a.draw(ctx) });
-  items.push({ y: w.player.y, draw: () => w.player.draw(ctx, w) });
-  const weapon = w.player.weapon;
-  if (isSpear(weapon)) items.push({ y: (weapon.thrown?.y ?? w.player.y) - 1, draw: () => weapon.drawWorld(ctx, w) });
+  for (const p of w.players) {
+    items.push({ y: p.y, draw: () => w.as(p, () => p.draw(ctx, w)) });
+    const weapon = p.weapon;
+    if (isSpear(weapon)) items.push({ y: (weapon.thrown?.y ?? p.y) - 1, draw: () => w.as(p, () => weapon.drawWorld(ctx, w)) });
+  }
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
 
@@ -1295,7 +1341,8 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
   for (const e of w.enemies) if (!e.dead && !e.spawning) e.drawStatus(ctx);
-  drawChargeMeter(ctx, w, false);
+  w.eachHero(() => drawChargeMeter(ctx, w, false), w.viewers);
+  drawPartyMarks(ctx, w);
   drawDoorIcons(ctx, w);
 
   drawPrompt(ctx, w);
@@ -1353,9 +1400,9 @@ function drawScreenOverlays(ctx: CanvasRenderingContext2D, w: World, dpr: number
   vg.addColorStop(1, 'rgba(0,0,0,0.65)');
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, cam.vw, cam.vh);
-  const p = w.player;
-  const low = p.hp / p.maxHp;
-  if (w.hurtFlash > 0 || (low < 0.3 && p.state !== 'dead')) {
+  const mine = w.viewers.filter((p) => p.state !== 'dead');
+  const low = mine.length ? Math.min(...mine.map((p) => p.hp / p.maxHp)) : 1;
+  if (w.hurtFlash > 0 || low < 0.3) {
     const a = Math.max(w.hurtFlash * 1.2 * (0.3 + 0.7 * prefs.flashes), low < 0.3 ? (0.3 - low) * 1.2 * (0.6 + Math.sin(w.time * 5) * 0.4) : 0);
     const hg = ctx.createRadialGradient(cam.vw / 2, cam.vh / 2, Math.min(cam.vw, cam.vh) * 0.3, cam.vw / 2, cam.vh / 2, Math.max(cam.vw, cam.vh) * 0.7);
     hg.addColorStop(0, 'rgba(255,0,0,0)');
@@ -1485,7 +1532,7 @@ function drawChargeMeter(ctx: CanvasRenderingContext2D, w: World, view3d: boolea
 }
 
 function drawEffects(ctx: CanvasRenderingContext2D, w: World): void {
-  drawAttackPreview(ctx, w);
+  w.eachHero(() => drawAttackPreview(ctx, w), w.viewers);
   for (const tg of w.telegraphs) {
     const k = clamp(tg.t / tg.dur, 0, 1);
     const fade = tg.cancelled ? Math.max(0, 1 - (tg.t - tg.dur) / 0.15) : 1;
@@ -1549,7 +1596,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World): void {
   }
 
   for (const pr of w.projectiles) drawProjectile(ctx, pr, w.time, w.camera.lift);
-  drawBeam(ctx, w);
+  w.eachHero(() => drawBeam(ctx, w));
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -1601,7 +1648,7 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
     ctx.fill();
   }
   ctx.restore();
-  drawPlayerRings(ctx, w);
+  w.eachHero(() => drawPlayerRings(ctx, w));
   for (const it of w.interactables) {
     if (it.kind !== 'shop') continue;
     const y = it.y - 68 + Math.sin(w.time * 2 + it.x) * 4;
@@ -1621,8 +1668,9 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
     });
   }
   for (const pk of w.pickups) upright(ctx, w, pk.x, pk.y, 0, () => drawPickup(ctx, w, pk));
-  const weapon = w.player.weapon;
-  if (isSpear(weapon)) weapon.drawWorld(ctx, w);
+  w.eachHero((p) => {
+    if (isSpear(p.weapon)) p.weapon.drawWorld(ctx, w);
+  });
   for (const e of w.enemies) {
     if (e.dead || e.spawning) continue;
     ctx.save();
@@ -1633,7 +1681,8 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
   drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
   for (const e of w.enemies) if (!e.dead && !e.spawning) upright(ctx, w, e.x, e.y, e.height, () => e.drawStatus(ctx));
-  drawChargeMeter(ctx, w, true);
+  w.eachHero(() => drawChargeMeter(ctx, w, true), w.viewers);
+  drawPartyMarks(ctx, w);
   drawDoorIcons(ctx, w);
   drawPrompt(ctx, w);
   drawScreenOverlays(ctx, w, dpr);
@@ -1670,6 +1719,66 @@ function drawPlayerRings(ctx: CanvasRenderingContext2D, w: World): void {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/**
+ * Party play: each hero's name over their head in their party colour, and
+ * a ring filling around a downed hero while a partner stands by them.
+ */
+function drawPartyMarks(ctx: CanvasRenderingContext2D, w: World): void {
+  if (w.players.length < 2) return;
+  // Heroes standing together: stack their names instead of overprinting them.
+  const placed: { x: number; y: number }[] = [];
+  for (const p of w.players) {
+    const color = p.tagColor;
+    if (p.state === 'dead') {
+      const k = clamp(p.reviveT / REVIVE_TIME, 0, 1);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, REVIVE_RANGE, REVIVE_RANGE * 0.9, 0, 0, TAU);
+      ctx.stroke();
+      ctx.globalAlpha = 0.35 + Math.sin(w.time * 4) * 0.15;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (k > 0) {
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, REVIVE_RANGE, REVIVE_RANGE * 0.9, 0, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (!p.tag) continue;
+    let lift = p.height + 24 + p.z;
+    while (placed.some((q) => Math.abs(q.x - p.x) < 80 && Math.abs(q.y - (p.y - lift)) < 15)) lift += 16;
+    placed.push({ x: p.x, y: p.y - lift });
+    upright(ctx, w, p.x, p.y, lift, () => {
+      const y = p.y - lift;
+      ctx.font = '700 13px "Cinzel", Georgia, serif';
+      ctx.textAlign = 'center';
+      const label = p.state === 'dead' ? `${p.tag} — DOWN` : p.tag;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.strokeText(label, p.x, y);
+      ctx.fillStyle = p.state === 'dead' ? '#ff8a8a' : color;
+      ctx.fillText(label, p.x, y);
+      // A small health bar under the name for partners (yours is on the HUD).
+      if (p.state !== 'dead' && !w.viewers.includes(p)) {
+        const W = 44;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(p.x - W / 2 - 1, y + 5, W + 2, 5);
+        ctx.fillStyle = color;
+        ctx.fillRect(p.x - W / 2, y + 6, W * clamp(p.hp / p.maxHp, 0, 1), 3);
+      }
+    });
+  }
 }
 
 export function invalidateRoomCache(w: World): void {

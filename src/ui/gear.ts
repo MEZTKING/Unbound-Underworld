@@ -1,14 +1,13 @@
-// Gear & Inventory: equip helmets, armor, leggings and boots; star up (Rare
-// and better), salvage and craft them with materials. Opens from the Armory
-// and the pause menu.
+// Gear & Inventory: equip helmets, armor, leggings and boots (from the Hall
+// of Heroes and the pause menu). At the Blacksmith the same screen also stars
+// pieces up, reforges and salvages them.
 
 import { audio } from '../engine/audio';
 import { Rng } from '../engine/math';
 import type { Game } from '../game/game';
+import { hasPart } from '../game/smith';
 import {
   canStarUp,
-  craftGear,
-  CRAFTS,
   costText,
   describeAffix,
   GEAR_RARITY,
@@ -22,6 +21,8 @@ import {
   MAX_GEAR_LEVEL,
   PERKS,
   rarityRank,
+  reforgeCost,
+  reforgeGear,
   salvageValue,
   SLOT_GLYPH,
   SLOT_NAME,
@@ -52,9 +53,11 @@ function itemCard(item: GearItem, opts: { equipped?: boolean; selected?: boolean
       ${perk ? `<em>${esc(perk.name)}: ${esc(perk.desc)}</em>` : ''}</span></button>`;
 }
 
-export function gearScreen(g: Game): void {
+/** `smith`: the Blacksmith's version, with starring up, reforging and salvaging. */
+export function gearScreen(g: Game, smith = false): void {
   const gear = g.save.gear;
   let selected: string | null = null;
+  const tongs = hasPart(g.save.smith.parts, 'tongs');
   const render = () => {
     const mats = MATERIAL_IDS.map((k) => {
       const m = MATERIALS[k];
@@ -76,26 +79,29 @@ export function gearScreen(g: Game): void {
     const up = sel && canStarUp(sel) ? upgradeCost(sel) : null;
     const upLabel = !sel ? '' : !isStarredTier(sel.rarity) ? 'Plain pieces can\'t be starred' : up ? `${sel.level >= 5 ? 'Empower' : 'Star up'} (${costText(up)})` : 'All stars purple';
     const plain = gear.items.filter((i) => !isStarredTier(i.rarity) && !Object.values(gear.equipped).includes(i.uid));
+    const re = sel ? reforgeCost(sel) : null;
     const actions = sel
       ? `<div class="row-btns">
           <button class="btn" data-nav data-act="equip">${isWorn ? 'Unequip' : 'Equip'}</button>
-          <button class="btn${up && hasMaterials(g.save.materials, up) ? '' : ' disabled'}" data-nav data-act="upgrade">${upLabel}</button>
-          <button class="btn danger" data-nav data-act="salvage">Salvage (+${costText(salvageValue(sel))})</button></div>`
-      : '<p class="small">Select a piece to equip, upgrade or salvage it.</p>';
+          ${
+            smith
+              ? `<button class="btn${up && hasMaterials(g.save.materials, up) ? '' : ' disabled'}" data-nav data-act="upgrade">${upLabel}</button>
+          ${tongs && re ? `<button class="btn${hasMaterials(g.save.materials, re) ? '' : ' disabled'}" data-nav data-act="reforge">Reforge bonuses (${costText(re)})</button>` : ''}
+          <button class="btn danger" data-nav data-act="salvage">Salvage (+${costText(salvageValue(sel))})</button>`
+              : ''
+          }</div>`
+      : `<p class="small">${smith ? 'Select a piece to star it up, reforge or salvage it.' : 'Select a piece to equip it. Starring up, reforging and salvaging happen at the Blacksmith in the Hall.'}</p>`;
     return `<div class="mats">${mats}</div>
       <h3 class="section">Equipped</h3><div class="gear-grid">${worn}</div>
       ${actions}
       <h3 class="section">Inventory <small>${gear.items.length}/${INVENTORY_SIZE}</small></h3>
       <div class="gear-grid">${bag || '<p class="small">Nothing yet. Foes, chests and guardians drop gear.</p>'}</div>
-      ${plain.length ? `<div class="row-btns"><button class="btn danger" data-nav data-act="salvagePlain">Salvage all plain pieces (${plain.length})</button></div>` : ''}
-      <div class="row-btns">${CRAFTS.map(
-        (c, i) => `<button class="btn${hasMaterials(g.save.materials, c.cost) && gear.items.length < INVENTORY_SIZE ? '' : ' disabled'}" data-nav data-act="craft" data-recipe="${i}">${c.name} (${costText(c.cost)})</button>`,
-      ).join('')}</div>`;
+      ${smith && plain.length ? `<div class="row-btns"><button class="btn danger" data-nav data-act="salvagePlain">Salvage all plain pieces (${plain.length})</button></div>` : ''}`;
   };
   const el = g.ui.push(
     'station',
-    `<div class="panel wide gear-panel"><h2 class="title">Gear &amp; Inventory</h2>
-      <div class="subtitle">Bonuses from equipped gear apply on every escape.</div>
+    `<div class="panel wide gear-panel"><h2 class="title">${smith ? 'The Forge: Gear' : 'Gear &amp; Inventory'}</h2>
+      <div class="subtitle">${smith ? 'Star up Rare and better pieces with materials, reforge their bonuses, or melt down what you don\'t need.' : 'Bonuses from equipped gear apply on every escape.'}</div>
       <div data-body>${render()}</div>
       <button class="btn primary" data-nav data-a="back">Back</button></div>`,
     { onBack: () => g.ui.pop(), cols: 2 },
@@ -122,20 +128,6 @@ export function gearScreen(g: Game): void {
       b.onclick = () => {
         const act = b.dataset.act;
         const sel = gear.items.find((i) => i.uid === selected);
-        if (act === 'craft') {
-          const recipe = CRAFTS[Number(b.dataset.recipe) || 0];
-          if (gear.items.length >= INVENTORY_SIZE || !spendMaterials(g.save.materials, recipe.cost)) {
-            audio.play('deny');
-            return;
-          }
-          const item = craftGear(new Rng(Date.now() & 0x7fffffff), recipe);
-          gear.items.push(item);
-          selected = item.uid;
-          audio.play('boon');
-          g.ui.toast(`Crafted ${GEAR_RARITY[item.rarity].name}: ${item.name}`);
-          changed();
-          return;
-        }
         if (act === 'salvagePlain') {
           if (!b.dataset.armed) {
             b.dataset.armed = '1';
@@ -166,6 +158,15 @@ export function gearScreen(g: Game): void {
           sel.level++;
           audio.play('boon');
           g.ui.toast(sel.level > 5 ? `${sel.name}: a star turns purple (${sel.level - 5}/5)` : `${sel.name}: ${sel.level} gold stars`);
+        } else if (act === 'reforge') {
+          const cost = reforgeCost(sel);
+          if (!tongs || !spendMaterials(g.save.materials, cost)) {
+            audio.play('deny');
+            return;
+          }
+          reforgeGear(new Rng(Date.now() & 0x7fffffff), sel);
+          audio.play('boon');
+          g.ui.toast(`${sel.name}: bonuses reforged`);
         } else if (act === 'salvage') {
           if (!b.dataset.armed) {
             b.dataset.armed = '1';

@@ -7,7 +7,7 @@ export interface PlayerStats {
   moveSpeed: number;
   attackSpeed: number;
   dashCharges: number;
-  /** Seconds to get a dash charge back: the dash cooldown. Only boons, talents, gear and perks shorten it. */
+  /** Seconds to get a dash charge back: the dash cooldown. Only boons, the Altar, skills, gear and perks shorten it. */
   dashRecharge: number;
   castAmmo: number;
   /** Seconds per automatic shard regeneration; 0 disables it. */
@@ -47,11 +47,13 @@ export interface PlayerStats {
   ench: Record<string, number>;
   soulMax: number;
   soulGain: number;
+  /** Share of the Echoes gauge filled at the start of an escape. */
+  soulStart: number;
   potionCooldown: number;
   potionHeal: number;
   artifactCdMult: number;
   chestChance: number;
-  // --- progression (level-gated mechanics, talents, heroes, forge)
+  // --- progression (level-gated mechanics, Altar, heroes, skills, forge)
   canGuard: boolean;
   canPotion: boolean;
   canCast: boolean;
@@ -105,6 +107,7 @@ export function baseStats(): PlayerStats {
     ench: {},
     soulMax: 100,
     soulGain: 1,
+    soulStart: 0,
     potionCooldown: 40,
     potionHeal: 0.35,
     artifactCdMult: 1,

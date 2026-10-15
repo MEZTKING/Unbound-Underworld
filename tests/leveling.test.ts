@@ -6,19 +6,21 @@ import { defaultSave, normalizeSave, WEAPON_IDS } from '../src/game/meta';
 import {
   applyFeatures,
   applyForge,
-  applyTalents,
+  applyLevel,
   artifactSlots,
-  canRaiseTalent,
   hasFeature,
+  levelBonus,
   levelFromXp,
   MAX_LEVEL,
-  TALENTS,
-  talentPoints,
   TIERS,
   tierFor,
   UNLOCKS,
   xpForLevel,
+  xpToNext,
 } from '../src/game/progression';
+import { ALTAR, ALTAR_UPGRADES, altarDefiance, applyAltar, canBuyAltar, migrateTalents, nextAltarCost, sectionState, tableOpen } from '../src/game/altar';
+import { applySkills, canRaiseSkill, HERO_MAX_LEVEL, HERO_TREES, heroLevelFromXp, heroPoints, heroXpForLevel, rowOpen } from '../src/game/herotree';
+import { partFor, partsFromHistory } from '../src/game/smith';
 import { baseStats } from '../src/game/stats';
 
 describe('levels', () => {
@@ -75,27 +77,117 @@ describe('feature unlocks', () => {
   });
 });
 
-describe('talents', () => {
-  it('earns one point per level and respects tiers and caps', () => {
-    expect(talentPoints(1)).toBe(0);
-    expect(canRaiseTalent(1, {}, 'might')).toBe(false);
-    expect(canRaiseTalent(2, {}, 'might')).toBe(true);
-    // A Wraith talent needs level 5.
-    expect(canRaiseTalent(4, {}, 'bloodlust')).toBe(false);
-    expect(canRaiseTalent(5, {}, 'bloodlust')).toBe(true);
-    // Out of points.
-    expect(canRaiseTalent(3, { might: 2 }, 'toughness')).toBe(false);
-    // At the cap.
-    expect(canRaiseTalent(MAX_LEVEL, { swiftness: 3 }, 'swiftness')).toBe(false);
+describe('levels to 50', () => {
+  it('reaches level 50 with a gentler climb after 30', () => {
+    expect(MAX_LEVEL).toBe(50);
+    expect(levelFromXp(xpForLevel(50) + 1e6).level).toBe(50);
+    expect(xpToNext(31) - xpToNext(30)).toBe(100);
+    expect(tierFor(50).name).toBe('Deathless');
+    expect(TIERS.every((t, i) => i === 0 || t.level > TIERS[i - 1].level)).toBe(true);
   });
 
-  it('applies talent ranks to stats', () => {
+  it('makes every hero sturdier with each level', () => {
+    expect(levelBonus(1)).toEqual({ hp: 0, dmg: 0 });
+    expect(levelBonus(50).hp).toBe(49);
+    expect(levelBonus(50).dmg).toBeCloseTo(0.1);
     const s = baseStats();
-    applyTalents({ toughness: 2, might: 1, undying: 1 }, s);
-    expect(s.maxHp).toBe(50 + 12);
-    expect(s.globalDmg).toBeCloseTo(0.03);
-    expect(s.deathDefiance).toBe(1);
-    expect(TALENTS.every((t) => t.tier < TIERS.length)).toBe(true);
+    applyLevel(12, s);
+    expect(s.maxHp).toBe(50 + 11);
+    expect(s.globalDmg).toBeCloseTo(0.02);
+  });
+});
+
+describe('Altar of Ashes', () => {
+  it('runs from weak to strong, with sections sealed by level and Ash spent', () => {
+    const t = ALTAR[0];
+    expect(t.sections.map((x) => x.level)).toEqual([...t.sections.map((x) => x.level)].sort((a, b) => a - b));
+    expect(sectionState({}, 1, 0, 0).open).toBe(true);
+    expect(sectionState({}, 50, 0, 1).open).toBe(false);
+    // Spend enough in Embers and Cinders opens at level 4.
+    const ranks = { vitality: 4, fortune: 1 };
+    expect(sectionState(ranks, 3, 0, 1).needLevel).toBe(1);
+    expect(sectionState(ranks, 4, 0, 1).open).toBe(true);
+    expect(canBuyAltar(ranks, 4, 1000, 'fury')).toBe(true);
+    expect(canBuyAltar(ranks, 4, 5, 'fury')).toBe(false);
+  });
+
+  it("keeps Death's Reprieve in the last section, and very dear", () => {
+    const last = ALTAR[0].sections.at(-1)!;
+    const reprieve = last.ups.find((u) => u.id === 'defiance')!;
+    expect(reprieve.costs[0]).toBeGreaterThanOrEqual(900);
+    expect(altarDefiance({ defiance: 2, undying: 1 })).toBe(3);
+  });
+
+  it('opens the Deep Altar only when the first table is complete', () => {
+    const all = Object.fromEntries(ALTAR[0].sections.flatMap((s) => s.ups.map((u) => [u.id, u.costs.length])));
+    expect(tableOpen({}, 1)).toBe(false);
+    expect(tableOpen(all, 1)).toBe(true);
+    expect(nextAltarCost(all, 'vitality')).toBeNull();
+  });
+
+  it('prices both tables to finish around level 50', () => {
+    const total = ALTAR_UPGRADES.reduce((n, u) => n + u.costs.reduce((a, b) => a + b, 0), 0);
+    expect(total).toBeGreaterThan(30000);
+    expect(total).toBeLessThan(50000);
+    expect(Math.max(...ALTAR[1].sections.map((s) => s.level))).toBeLessThanOrEqual(MAX_LEVEL);
+  });
+
+  it('moves old talents onto the Altar and refunds what no longer fits', () => {
+    const { upgrades, refund } = migrateTalents({ vitality: 4, defiance: 3 }, { toughness: 2, might: 1, shardcraft: 2 });
+    expect(upgrades.vitality).toBe(4);
+    expect(upgrades.fury).toBe(1);
+    expect(upgrades.defiance).toBe(2);
+    // Two Toughness ranks had no room, Shardcraft has no home, and the third Reprieve rank is refunded.
+    expect(refund).toBe(40 * 4 + 140);
+    const s = baseStats();
+    applyAltar({ vitality: 2, fury: 1 }, s);
+    expect(s.maxHp).toBe(50 + 16);
+    expect(s.globalDmg).toBeCloseTo(0.04);
+  });
+
+  it('migrates an old save once', () => {
+    const s = normalizeSave({ xp: 5000, stats: { runs: 10 }, talents: { might: 2 }, upgrades: { fury: 1 }, bestiary: { Vexa: 1 } });
+    expect(s.talents).toEqual({});
+    expect(s.upgrades.fury).toBe(3);
+    expect(s.progress).toBe(2);
+    expect(s.smith.parts).toEqual(['whetstone']);
+    expect(heroLevelFromXp(s.heroXp.kael ?? 0).level).toBeGreaterThan(1);
+    const again = normalizeSave(JSON.parse(JSON.stringify(s)));
+    expect(again.upgrades).toEqual(s.upgrades);
+  });
+});
+
+describe('hero skill trees', () => {
+  it('gives each hero their own three-branch tree', () => {
+    for (const c of CHARACTERS) {
+      const t = HERO_TREES[c.id];
+      expect(t.nodes).toHaveLength(12);
+      expect(new Set(t.nodes.map((n) => n.id)).size).toBe(12);
+    }
+  });
+
+  it('levels heroes to 20 with a point per level, and gates rows by points in the branch', () => {
+    expect(heroLevelFromXp(heroXpForLevel(HERO_MAX_LEVEL)).level).toBe(HERO_MAX_LEVEL);
+    expect(heroPoints(HERO_MAX_LEVEL)).toBe(19);
+    expect(canRaiseSkill('kael', 1, {}, 'kael.00')).toBe(false);
+    expect(canRaiseSkill('kael', 2, {}, 'kael.00')).toBe(true);
+    expect(canRaiseSkill('kael', 2, {}, 'lyra.00')).toBe(false);
+    expect(rowOpen('kael', {}, 0, 1)).toBe(false);
+    expect(rowOpen('kael', { 'kael.00': 2 }, 0, 1)).toBe(true);
+    const s = baseStats();
+    applySkills('kael', { 'kael.00': 2, 'kael.10': 1 }, s);
+    expect(s.dmgBonus.attack).toBeCloseTo(0.1);
+    expect(s.maxHp).toBe(56);
+  });
+});
+
+describe('the Blacksmith', () => {
+  it('gets a forge part from each guardian, and the Anvil Heart under Torment', () => {
+    expect(partFor('Vexa', 0, [])).toBe('whetstone');
+    expect(partFor('Vexa', 0, ['whetstone'])).toBeNull();
+    expect(partFor('Vexa', 1, ['whetstone'])).toBe('heart');
+    expect(partFor('Grunt', 2, [])).toBeNull();
+    expect(partsFromHistory({ Vexa: 2, Aurex: 1 }, 2)).toEqual(['whetstone', 'crucible', 'heart']);
   });
 });
 
@@ -148,7 +240,9 @@ describe('save migration', () => {
     const kept = normalizeSave({ xp: 500, talents: { might: 2 }, character: 'lyra', forge: { sword: 3 }, weapons: ['sword', 'fists', 'bogus'] });
     expect(kept.xp).toBe(500);
     expect(kept.character).toBe('lyra');
-    expect(kept.talents.might).toBe(2);
+    // Talents moved onto the Altar (v0.9).
+    expect(kept.talents).toEqual({});
+    expect(kept.upgrades.fury).toBe(2);
     expect(kept.weapons).toEqual(['sword', 'fists']);
     expect(normalizeSave({ character: 'nobody' }).character).toBe('kael');
   });

@@ -177,7 +177,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: package.json
+          sparse-checkout: |
+            package.json
+            server/
           sparse-checkout-cone-mode: false
       - name: Check the version matches package.json
         run: |
@@ -192,6 +194,12 @@ jobs:
           # The Play Store bundle is for uploading to Google Play, not for players.
           pattern: Unbound-Underworld-*
           merge-multiple: true
+      # The multiplayer server: run it anywhere with Node 18+ (see the README).
+      - name: Zip the game server
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p artifacts
+          (cd server && zip -qr "../artifacts/Unbound-Underworld-Server-$VERSION.zip" . -x 'saves/*')
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
