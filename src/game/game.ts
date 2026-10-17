@@ -1020,7 +1020,7 @@ export class Game implements WorldHost {
     if (!restore) this.saveRun();
     this.particles.clear();
     const biome = run.biome;
-    const layout = generateLayout(run.rng, biome, plan.kind, this.stats.chestChance);
+    const layout = generateLayout(run.rng, biome, plan.kind, { chestChance: this.stats.chestChance, depth: run.depth, heights: this.heightsFor(run) });
     for (const m of this.members) m.player.castAmmo = m.stats.castAmmo;
     const w = new World(this, layout, biome, this.camera, this.particles, this.members.map((m) => m.player));
     this.world = w;
@@ -1107,6 +1107,17 @@ export class Game implements WorldHost {
   dropSavedRun(): void {
     writeRun(null);
     this.runSaveOff = true;
+  }
+
+  /**
+   * How much raised ground the next chamber gets (0 = none): only once every
+   * hero can jump, more often in later regions and under Torment.
+   */
+  private heightsFor(run: Run): number {
+    if (!this.members.every((m) => m.stats.canJump)) return 0;
+    const chance = run.biomeIndex === 0 && run.heat === 0 ? 0 : Math.min(0.85, 0.25 + run.biomeIndex * 0.2 + run.heat * 0.08);
+    if (!run.rng.chance(chance)) return 0;
+    return Math.min(1, 0.2 + run.biomeIndex * 0.25 + run.heat * 0.1 + run.depth * 0.03);
   }
 
   /** Saves the escape at the start of the current chamber (solo play only). */

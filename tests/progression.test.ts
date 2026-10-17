@@ -22,7 +22,7 @@ describe('room generation', () => {
 
   it('places doors inside the room', () => {
     for (const n of [1, 2, 3]) {
-      for (const x of doorPositions(1300, n)) {
+      for (const x of doorPositions({ w: 1300 }, n)) {
         expect(x).toBeGreaterThan(100);
         expect(x).toBeLessThan(1200);
       }

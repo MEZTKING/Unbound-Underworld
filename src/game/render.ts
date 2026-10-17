@@ -2,7 +2,7 @@ import { clamp, TAU } from '../engine/math';
 import { drawBeam } from './artifacts';
 import { GODS } from './boons';
 import type { Projectile, Zone } from './entities';
-import { DOOR_W, TRAP_SIZE, WALL_H, type Obstacle } from './rooms';
+import { DOOR_W, LEDGE_H, levelAt, TRAP_SIZE, WALL_H, type Obstacle, type RoomLayout } from './rooms';
 import type { RewardSpec, Shape } from './types';
 import { REVIVE_RANGE, REVIVE_TIME, type Interactable, type World } from './world';
 import { prefs } from './prefs';
@@ -45,6 +45,54 @@ function hash(x: number, y: number, seed: number): number {
   let h = (x * 374761393 + y * 668265263 + seed * 2246822519) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Raised ground: a lit top a level up, a stone face along its south edge, and a glowing rim. */
+function drawLedges(g: CanvasRenderingContext2D, l: RoomLayout, b: World['biome']): void {
+  const ledges = [...(l.ledges ?? [])].sort((a, c) => a.lv - c.lv || a.y + a.h - (c.y + c.h));
+  for (const e of ledges) {
+    const top = e.lv * LEDGE_H;
+    const base = (e.lv - 1) * LEDGE_H;
+    // Shadow cast to the south.
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.fillRect(e.x + 6, e.y + e.h - base, e.w, 16);
+    // Face along the south edge.
+    const face = g.createLinearGradient(0, e.y + e.h - top, 0, e.y + e.h - base);
+    face.addColorStop(0, b.wallTop);
+    face.addColorStop(1, b.wall);
+    g.fillStyle = face;
+    g.fillRect(e.x, e.y + e.h - top, e.w, LEDGE_H);
+    for (let x = e.x + 20; x < e.x + e.w; x += 40) {
+      g.fillStyle = 'rgba(0,0,0,0.22)';
+      g.fillRect(x, e.y + e.h - top, 2, LEDGE_H);
+    }
+    // Top: the floor tiles, a shade brighter.
+    for (let ty = e.y; ty < e.y + e.h; ty += 80) {
+      for (let tx = e.x; tx < e.x + e.w; tx += 80) {
+        const r = hash(tx, ty, l.seed + e.lv);
+        g.fillStyle = r < 0.5 ? b.floorA : b.floorB;
+        g.fillRect(tx, ty - top, Math.min(80, e.x + e.w - tx), Math.min(80, e.y + e.h - ty));
+      }
+    }
+    g.fillStyle = `rgba(255,255,255,${0.05 + e.lv * 0.03})`;
+    g.fillRect(e.x, e.y - top, e.w, e.h);
+    g.strokeStyle = b.grout;
+    g.lineWidth = 2;
+    for (let tx = e.x + 80; tx < e.x + e.w; tx += 80) {
+      g.beginPath();
+      g.moveTo(tx, e.y - top);
+      g.lineTo(tx, e.y + e.h - top);
+      g.stroke();
+    }
+    // Rim: a lit lip and a glowing edge so the drop is easy to read.
+    g.strokeStyle = b.wallTop;
+    g.lineWidth = 5;
+    g.strokeRect(e.x + 2.5, e.y - top + 2.5, e.w - 5, e.h - 5);
+    g.fillStyle = b.trim;
+    g.fillRect(e.x, e.y + e.h - top - 3, e.w, 3);
+    g.fillStyle = `${b.trim}88`;
+    g.fillRect(e.x, e.y - top, e.w, 2);
+  }
 }
 
 function buildRoomCanvas(w: World, dpr: number): RoomCache {
@@ -191,6 +239,8 @@ function buildRoomCanvas(w: World, dpr: number): RoomCache {
     else g.arc(s.x, s.y, s.r, 0, TAU);
     g.stroke();
   }
+
+  drawLedges(g, l, b);
 
   // Walls: tall back wall, side walls and a low front ledge.
   g.fillStyle = b.wall;
@@ -367,6 +417,42 @@ function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, w: World): voi
     ctx.fillStyle = b.trim;
     ctx.fillRect(o.x - o.r, o.y - tall + 10, o.r * 2, 3);
     ctx.fillRect(o.x - o.r, o.y - 14, o.r * 2, 3);
+  } else if (o.style === 'rock') {
+    // Solid rock the chamber is cut from: a tall face along its south edge, a dark top.
+    const H = 76;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(o.x - 6, o.y + o.h, o.w + 12, 18);
+    ctx.fillStyle = '#07050a';
+    ctx.fillRect(o.x, o.y - H, o.w, o.h);
+    // Rough stone top: the dark void of solid rock with faint cracks.
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let y = o.y - H + 30; y < o.y + o.h - H - 10; y += 46) {
+      for (let x = o.x + ((y / 46) % 2 ? 20 : 50); x < o.x + o.w - 30; x += 90) {
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 26, y + 8);
+        ctx.lineTo(x + 40, y - 4);
+      }
+    }
+    ctx.stroke();
+    const face = ctx.createLinearGradient(0, o.y + o.h - H, 0, o.y + o.h);
+    face.addColorStop(0, b.wallTop);
+    face.addColorStop(1, b.wall);
+    ctx.fillStyle = face;
+    ctx.fillRect(o.x, o.y + o.h - H, o.w, H);
+    for (let x = o.x + 40; x < o.x + o.w - 20; x += 160) {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(x - 12, o.y + o.h - H, 24, H);
+    }
+    ctx.strokeStyle = b.wallTop;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(o.x + 4, o.y - H + 4, o.w - 8, o.h - 8);
+    ctx.strokeStyle = `${b.trim}66`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(o.x + 9, o.y - H + 9, o.w - 18, o.h - 18);
+    ctx.fillStyle = b.trim;
+    ctx.fillRect(o.x, o.y + o.h - 5, o.w, 3);
   } else {
     const H = o.style === 'block' ? 80 : 56;
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -1305,13 +1391,22 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   type Item = { y: number; draw: () => void };
   const items: Item[] = [];
   for (const o of w.room.obstacles) items.push({ y: o.type === 'rect' ? o.y + o.h : o.y, draw: () => drawObstacle(ctx, o, w) });
-  for (const b of w.breakables) if (!b.dead) items.push({ y: b.y, draw: () => drawBreakable(ctx, b) });
-  for (const it of w.interactables) items.push({ y: it.y, draw: () => drawInteractable(ctx, w, it) });
-  for (const pk of w.pickups) items.push({ y: pk.y, draw: () => drawPickup(ctx, w, pk) });
+  // Anything standing on a ledge is drawn raised with it.
+  const raised = (lift: number, fn: () => void) => () => {
+    if (!lift) return fn();
+    ctx.save();
+    ctx.translate(0, -lift);
+    fn();
+    ctx.restore();
+  };
+  const groundLift = (x: number, y: number) => (w.room.ledges ? levelAt(w.room, x, y) * LEDGE_H : 0);
+  for (const b of w.breakables) if (!b.dead) items.push({ y: b.y, draw: raised(groundLift(b.x, b.y), () => drawBreakable(ctx, b)) });
+  for (const it of w.interactables) items.push({ y: it.y, draw: raised(groundLift(it.x, it.y), () => drawInteractable(ctx, w, it)) });
+  for (const pk of w.pickups) items.push({ y: pk.y, draw: raised(groundLift(pk.x, pk.y), () => drawPickup(ctx, w, pk)) });
   for (const e of w.enemies) {
     items.push({
       y: e.y,
-      draw: () => {
+      draw: raised(e.lift, () => {
         if (e.dead) {
           ctx.globalAlpha = Math.max(0, 1 - e.deathT / 0.6);
           ctx.save();
@@ -1322,12 +1417,12 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
           ctx.restore();
           ctx.globalAlpha = 1;
         } else e.draw(ctx, w);
-      },
+      }),
     });
   }
-  for (const a of w.allies) items.push({ y: a.y, draw: () => a.draw(ctx) });
+  for (const a of w.allies) items.push({ y: a.y, draw: raised(a.lift, () => a.draw(ctx)) });
   for (const p of w.players) {
-    items.push({ y: p.y, draw: () => w.as(p, () => p.draw(ctx, w)) });
+    items.push({ y: p.y, draw: raised(p.lift, () => w.as(p, () => p.draw(ctx, w))) });
     const weapon = p.weapon;
     if (isSpear(weapon)) items.push({ y: (weapon.thrown?.y ?? p.y) - 1, draw: () => w.as(p, () => weapon.drawWorld(ctx, w)) });
   }
@@ -1340,7 +1435,13 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   cam.apply(ctx, dpr);
   drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
-  for (const e of w.enemies) if (!e.dead && !e.spawning) e.drawStatus(ctx);
+  for (const e of w.enemies) {
+    if (e.dead || e.spawning) continue;
+    ctx.save();
+    ctx.translate(0, -e.lift);
+    e.drawStatus(ctx);
+    ctx.restore();
+  }
   w.eachHero(() => drawChargeMeter(ctx, w, false), w.viewers);
   drawPartyMarks(ctx, w);
   drawDoorIcons(ctx, w);
@@ -1667,7 +1768,7 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
       ctx.fillText(`${it.price ?? 0} ◎`, it.x, y + 40);
     });
   }
-  for (const pk of w.pickups) upright(ctx, w, pk.x, pk.y, 0, () => drawPickup(ctx, w, pk));
+  for (const pk of w.pickups) upright(ctx, w, pk.x, pk.y, levelAt(w.room, pk.x, pk.y) * LEDGE_H, () => drawPickup(ctx, w, pk));
   w.eachHero((p) => {
     if (isSpear(p.weapon)) p.weapon.drawWorld(ctx, w);
   });
@@ -1680,7 +1781,7 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
   }
   drawEffects(ctx, w);
   w.particles.draw(ctx, 'air');
-  for (const e of w.enemies) if (!e.dead && !e.spawning) upright(ctx, w, e.x, e.y, e.height, () => e.drawStatus(ctx));
+  for (const e of w.enemies) if (!e.dead && !e.spawning) upright(ctx, w, e.x, e.y, e.height + e.lift, () => e.drawStatus(ctx));
   w.eachHero(() => drawChargeMeter(ctx, w, true), w.viewers);
   drawPartyMarks(ctx, w);
   drawDoorIcons(ctx, w);
@@ -1694,6 +1795,8 @@ function drawPlayerRings(ctx: CanvasRenderingContext2D, w: World): void {
   if (p.state === 'dead') return;
   ctx.save();
   ctx.translate(p.x, p.y);
+  const up0 = w.camera.lift;
+  ctx.translate(up0.x * p.lift, up0.y * p.lift);
   p.drawGuard(ctx, false);
   if (p.wrathReady && w.stats.canWrath) {
     ctx.strokeStyle = `rgba(255,208,74,${0.45 + Math.sin(p.t * 8) * 0.25})`;

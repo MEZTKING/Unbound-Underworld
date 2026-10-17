@@ -15,6 +15,7 @@ import type { PlayerStats } from './stats';
 import type { World } from './world';
 import { createWeapon, WEAPON_INFO, type ActionDef, type Weapon } from './weapons';
 import type { WeaponId } from './types';
+import { LEDGE_H } from './rooms';
 
 export const MOVE_SPEED = 290;
 const DASH_SPEED = 1080;
@@ -91,6 +92,8 @@ export class Player extends Actor {
   slamFromZ = 0;
   fallT = 0;
   safe = { x: 0, y: 0 };
+  /** The ledge level the hero stands on (0 = the floor); `z` is height above it. */
+  lv = 0;
   safeT = 0;
   lavaT = 0;
   walk = 0;
@@ -200,6 +203,20 @@ export class Player extends Actor {
     this.castAmmo = Math.min(this.castAmmo, s.castAmmo);
   }
 
+  /** Falls from the current ledge to a lower level (continuing as the back half of a jump). */
+  dropTo(level: number): void {
+    const h = (this.lv - level) * LEDGE_H + Math.max(0, this.z);
+    this.lv = level;
+    this.lift = level * LEDGE_H;
+    this.z = Math.min(h, JUMP_HEIGHT);
+    this.jumpT = (0.5 + 0.5 * Math.sqrt(Math.max(0, 1 - this.z / JUMP_HEIGHT))) * JUMP_TIME;
+  }
+
+  /** The highest ledge level the hero's feet are above right now. */
+  get reach(): number {
+    return Math.floor((this.lv * LEDGE_H + this.z + 4) / LEDGE_H);
+  }
+
   get airborne(): boolean {
     return this.z > 6;
   }
@@ -264,6 +281,8 @@ export class Player extends Actor {
         this.x = this.safe.x;
         this.y = this.safe.y;
         this.z = 0;
+        this.lv = w.levelAt(this.x, this.y);
+        this.lift = this.lv * LEDGE_H;
         this.iframes = 1;
         w.hurtPlayer(Math.max(5, Math.round(this.maxHp * 0.08)), null, true);
       }
@@ -457,8 +476,13 @@ export class Player extends Actor {
       this.jumpT += dt;
       const k = this.jumpT / JUMP_TIME;
       this.z = 4 * JUMP_HEIGHT * k * (1 - k);
-      if (k >= 1) {
+      const g = w.levelAt(this.x, this.y);
+      // Coming down over higher ground lands on it; past an edge, the fall goes on.
+      const onto = k > 0.5 && g > this.lv && this.z <= (g - this.lv) * LEDGE_H;
+      if (k >= 1 && g < this.lv) this.dropTo(g);
+      else if (onto || k >= 1) {
         this.z = 0;
+        this.lv = g;
         this.jumpT = -1;
         this.jumpCd = 0.12;
         w.particles.burst(this.x, this.y, '#8a7a90', 6, 100, { kind: 'smoke', size: 7, gravity: 0, life: 0.4, additive: false });
@@ -499,6 +523,14 @@ export class Player extends Actor {
       }
     } else this.stride = 40;
     w.moveActor(this, dt);
+
+    // ---- ledges: walking off one drops you to the ground below.
+    if (this.jumpT < 0 && this.state !== 'slam') {
+      const g = w.levelAt(this.x, this.y);
+      if (g < this.lv) this.dropTo(g);
+      else if (g > this.lv) this.lv = g;
+    }
+    this.lift = this.lv * LEDGE_H;
 
     // ---- ground hazards
     if (this.z <= 0 && this.state !== 'dash' && this.state !== 'slam') {

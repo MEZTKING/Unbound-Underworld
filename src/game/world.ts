@@ -16,7 +16,7 @@ import { Player } from './player';
 import { FOE_DROP, POT } from './odds';
 import { prefs } from './prefs';
 import { WRATH_PER_TAKEN } from './progression';
-import { buildGrid, CELL, DOOR_W, hazardContains, TRAP_SIZE, type BiomeInfo, type RoomLayout, type Wave } from './rooms';
+import { buildGrid, CELL, DOOR_W, doorPositions, hazardContains, LEDGE_H, levelAt, TRAP_SIZE, type BiomeInfo, type RoomLayout, type Wave } from './rooms';
 import { renderWorld } from './render';
 import type { PlayerStats } from './stats';
 import type { EliteMod, EnemyKind, RewardSpec, Shape } from './types';
@@ -214,6 +214,8 @@ export class World {
       player.vx = player.vy = player.kx = player.ky = 0;
       player.safe = { x: player.x, y: player.y };
       player.z = 0;
+      player.lv = levelAt(room, player.x, player.y);
+      player.lift = player.lv * LEDGE_H;
       player.jumpT = -1;
       player.beamT = 0;
       if (player.state !== 'dead') player.state = 'free';
@@ -406,6 +408,11 @@ export class World {
     this.banner = { title, sub, t: 0 };
   }
 
+  /** The ground level at a point (0 = floor, 1–2 = ledges). */
+  levelAt(x: number, y: number): number {
+    return levelAt(this.room, x, y);
+  }
+
   groundAt(x: number, y: number): 'floor' | 'pit' | 'lava' {
     for (const h of this.room.hazards) if (hazardContains(h, x, y)) return h.kind;
     return 'floor';
@@ -565,6 +572,16 @@ export class World {
           if (n) hit = n;
         }
       }
+      // Heroes need to jump to get up a ledge (foes clamber).
+      if (a instanceof Player && this.room.ledges) {
+        const reach = a.reach;
+        for (const g of this.room.ledges) {
+          if (g.lv > reach) {
+            const n = resolveCircleRect(c, g);
+            if (n) hit = n;
+          }
+        }
+      }
       // Walking foes treat pits and lava as walls unless they are knocked in.
       if (isEnemy && !a.flying && !knocked) {
         for (const h of this.room.hazards) {
@@ -716,7 +733,8 @@ export class World {
   }
 
   openDoors(rewards: (RewardSpec | null)[]): void {
-    this.doors = rewards.map((reward, i) => ({ x: doorX(this.room.w, rewards.length, i), reward, open: true }));
+    const xs = doorPositions(this.room, rewards.length);
+    this.doors = rewards.map((reward, i) => ({ x: xs[i], reward, open: true }));
     audio.play('door');
   }
 
@@ -1005,6 +1023,11 @@ export class World {
     }
     for (const e of this.enemies) if (!e.dead) this.as(this.targetFor(e, dt), () => e.update(this, dt));
     for (const a of this.allies) this.acting(this.ownerOf(a), () => a.update(this, dt));
+    if (this.room.ledges) {
+      // Foes and allies clamber up and down ledges (drawn raised).
+      const k = Math.min(1, dt * 12);
+      for (const a of [...this.enemies, ...this.allies]) a.lift += (this.levelAt(a.x, a.y) * LEDGE_H - a.lift) * k;
+    }
     this.updateRevives(dt);
     this.separate();
     this.updateEncounter(dt);
@@ -1491,7 +1514,8 @@ export class World {
         pk.x += ((p.x - pk.x) / (d || 1)) * Math.min(d, sp * dt);
         pk.y += ((p.y - pk.y) / (d || 1)) * Math.min(d, sp * dt);
       }
-      if (d < pk.r + p.r + 4) {
+      // A reward up on a ledge has to be reached there.
+      if (d < pk.r + p.r + 4 && (pk.kind !== 'reward' || this.levelAt(pk.x, pk.y) === p.lv)) {
         switch (pk.kind) {
           case 'gold':
             pk.collected = true;
@@ -1602,12 +1626,6 @@ const PROP_RADIUS: Record<Interactable['kind'], number> = { station: 30, shop: 2
 function pushWeight(e: Enemy): number {
   if (e.knockResist >= 1 && !e.isBoss) return 0;
   return e.isBoss ? 0.1 : 1;
-}
-
-export function doorX(w: number, n: number, i: number): number {
-  if (n <= 1) return w / 2;
-  const spacing = Math.min(360, (w - 300) / (n - 1));
-  return w / 2 - (spacing * (n - 1)) / 2 + spacing * i;
 }
 
 export function applyEliteMod(e: Enemy, mod: EliteMod): void {

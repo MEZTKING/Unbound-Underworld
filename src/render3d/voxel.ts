@@ -11,7 +11,7 @@ import type { Ally } from '../game/artifacts';
 import type { Enemy } from '../game/enemies/enemy';
 import type { Player } from '../game/player';
 import { rewardColor } from '../game/render';
-import { DOOR_W, TRAP_SIZE } from '../game/rooms';
+import { DOOR_W, LEDGE_H, levelAt, TRAP_SIZE } from '../game/rooms';
 import { WEAPON_INFO } from '../game/weapons';
 import type { Breakable, Interactable, Trap, World } from '../game/world';
 
@@ -768,14 +768,16 @@ export class VoxelRenderer {
           continue;
         }
         const raised = hash(i, j, seed + 3) > 0.96 ? 3 : 0;
-        floor.add(x, -20 + raised / 2, z, B, 40 + raised, B, shade(r < 0.5 ? bio.floorA : bio.floorB, jitter * 1.3));
+        // Ledges: the floor block rises to the ledge's top.
+        const up = levelAt(l, x, z) * LEDGE_H;
+        floor.add(x, (up - 40 + raised) / 2, z, B, 40 + up + raised, B, shade(r < 0.5 ? bio.floorA : bio.floorB, jitter * (1.3 + up / 120)));
       }
     }
     // Biome scatter: tufts, bones, crystals or motes.
     for (let i = 0; i < 46; i++) {
       const x = 30 + hash(i, 1, seed) * (l.w - 60);
       const z = 30 + hash(i, 2, seed) * (l.h - 60);
-      if (w.groundAt(x, z) !== 'floor') continue;
+      if (w.groundAt(x, z) !== 'floor' || levelAt(l, x, z) > 0) continue;
       const s = 4 + hash(i, 3, seed) * 4;
       if (bio.id === 'elysium') {
         deco.add(x, s / 2, z, 3, s, 3, '#5aa86a');
@@ -831,11 +833,23 @@ export class VoxelRenderer {
     }
     trim.add(1.2, 3.5, l.h / 2, 2, 6, l.h, bio.trim);
     trim.add(l.w - 1.2, 3.5, l.h / 2, 2, 6, l.h, bio.trim);
+    // Glowing lips round each ledge so its edge reads at a glance.
+    for (const e of l.ledges ?? []) {
+      const y = e.lv * LEDGE_H + 1;
+      trim.add(e.x + e.w / 2, y, e.y + e.h + 0.6, e.w, 2, 1.2, bio.trim);
+      trim.add(e.x + e.w / 2, y, e.y - 0.6, e.w, 2, 1.2, bio.trim);
+      trim.add(e.x - 0.6, y, e.y + e.h / 2, 1.2, 2, e.h, bio.trim);
+      trim.add(e.x + e.w + 0.6, y, e.y + e.h / 2, 1.2, 2, e.h, bio.trim);
+    }
 
     // Obstacles: stacked blocks, pillars and urns.
     const obst = new Blocks();
     for (const o of l.obstacles) {
-      if (o.type === 'rect') {
+      if (o.type === 'rect' && o.style === 'rock') {
+        // The rock a chamber is cut from: wall-high, capped, with trim along its foot.
+        for (let x = o.x + B / 2; x < o.x + o.w; x += B) for (let z = o.y + B / 2; z < o.y + o.h; z += B) wallCol(x, z, WALL_ROWS, true);
+        trim.add(o.x + o.w / 2, 3.5, o.y + o.h + 1.2, o.w, 6, 2, bio.trim);
+      } else if (o.type === 'rect') {
         const H = o.style === 'block' ? 2 : 1;
         for (let x = o.x + B / 2; x < o.x + o.w; x += B) {
           for (let z = o.y + B / 2; z < o.y + o.h; z += B) {
@@ -1123,7 +1137,7 @@ export class VoxelRenderer {
   /** Common pose: position, facing, walk cycle and hit flash. */
   private pose(rig: Rig, a: Actor, dt: number, sizeH: number): void {
     const s = (sizeH / rig.unit) * FIGURE_SCALE;
-    rig.root.position.set(a.x, 0, a.y);
+    rig.root.position.set(a.x, a.lift, a.y);
     rig.root.rotation.set(0, Math.PI / 2 - a.facing, 0);
     rig.body.scale.setScalar(s);
     rig.body.position.set(0, 0, 0);
@@ -1153,7 +1167,7 @@ export class VoxelRenderer {
       else if (m.userData.elite) m.emissive.set('#2a0a40');
       else m.emissive.setRGB(0, 0, 0);
     }
-    rig.shadow.position.set(a.x, 0.6, a.y);
+    rig.shadow.position.set(a.x, 0.6 + a.lift, a.y);
     rig.shadow.scale.setScalar(a.r * 1.15);
   }
 
@@ -1255,7 +1269,7 @@ export class VoxelRenderer {
     if (rig.weapon !== weapon.id) equipWeapon(rig, weapon.id, (rig as Rig & { builder: RigBuilder }).builder);
     this.pose(rig, p, dt, 56);
     const t = w.time;
-    rig.root.position.y = p.z;
+    rig.root.position.y = p.lift + p.z;
     rig.root.visible = !(p.iframes > 0 && p.state !== 'dash' && Math.floor(p.t * 20) % 2 === 0);
     const [armR, armL] = rig.arms;
     const wpn = rig.bits.weapon;
@@ -1501,7 +1515,7 @@ export class VoxelRenderer {
         g = this.interactableModel(it);
         this.interactables.set(it, g);
       }
-      g.position.set(it.x, 0, it.y);
+      g.position.set(it.x, levelAt(w.room, it.x, it.y) * LEDGE_H, it.y);
       const u = g.userData;
       if (u.lid) (u.lid as THREE.Object3D).rotation.x = it.used ? -1.2 : 0;
       if (u.sparkle) (u.sparkle as THREE.Object3D).visible = !it.used;
@@ -1521,6 +1535,7 @@ export class VoxelRenderer {
       if (!g) {
         g = this.breakableModel(br);
         this.breakables.set(br, g);
+        g.position.y = levelAt(w.room, br.x, br.y) * LEDGE_H;
       }
       g.visible = !br.dead;
     }
