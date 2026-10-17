@@ -43,6 +43,8 @@ export abstract class Actor {
   solid = true;
   /** Flying actors ignore lava and pits. */
   flying = false;
+  /** How high the ground under it is raised (ledges), for drawing. */
+  lift = 0;
 
   get alive(): boolean {
     return !this.dead;
