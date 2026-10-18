@@ -2714,3 +2714,19 @@ ul.worn .stars {
   color: #7fe8ff;
   font-style: italic;
 }
+
+/* After the first time in a session the title skips its intro: the emblem,
+   broken chain and letters are already in place and the menu fades in fast. */
+.title-screen.quick .emblem,
+.title-screen.quick .emb-link-l,
+.title-screen.quick .emb-link-r,
+.title-screen.quick .logo i {
+  animation-duration: 0.001s !important;
+  animation-delay: 0s !important;
+}
+.title-screen.quick .title-wrap .menu,
+.title-screen.quick .title-wrap .tagline,
+.title-screen.quick .title-wrap .credits {
+  animation-duration: 0.25s;
+  animation-delay: 0s;
+}

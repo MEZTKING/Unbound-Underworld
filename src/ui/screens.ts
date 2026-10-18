@@ -165,6 +165,33 @@ function embers(n = 26): string {
 
 const letters = (word: string, from = 0) => [...word].map((ch, i) => `<i style="--i:${from + i}">${ch}</i>`).join('');
 
+/**
+ * Shrinks the title page to the window's height when it doesn't fit (big UI
+ * scales, short windows, extra buttons such as Resume Escape and Exit Game).
+ */
+function fitTitle(el: HTMLElement): void {
+  const wrap = el.querySelector<HTMLElement>('.title-wrap');
+  if (!wrap) return;
+  const fit = () => {
+    if (!el.isConnected) {
+      ro.disconnect();
+      return;
+    }
+    wrap.style.zoom = '';
+    const cs = getComputedStyle(el);
+    const room = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8;
+    const need = wrap.offsetHeight;
+    if (need > room && room > 0) wrap.style.zoom = `${Math.max(0.45, room / need)}`;
+  };
+  const ro = new ResizeObserver(fit);
+  ro.observe(el);
+  ro.observe(wrap);
+  fit();
+}
+
+/** The title's intro animation plays once per session; after that it appears quickly. */
+let titleSeen = false;
+
 export function title(g: Game): void {
   const saved = savedRunLabel(g);
   const el = g.ui.push(
@@ -190,6 +217,9 @@ export function title(g: Game): void {
     <div class="version">v${APP_VERSION}</div>`,
   );
   updateBox(g, el, el.querySelector<HTMLElement>('[data-box]')!, false);
+  if (titleSeen) el.classList.add('quick');
+  titleSeen = true;
+  fitTitle(el);
   bind(el, '[data-a]', (b) => {
     audio.unlock();
     audio.play('select');
