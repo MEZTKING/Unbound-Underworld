@@ -35,6 +35,12 @@ A top-down action roguelike. You are a shade escaping the Underworld one chamber
 
 ## 2. A run
 
+### Campaign (`campaign.ts`, `ui/campaign.ts`)
+- **Chapters and missions.** Chapter I, *Chains of the Deep*, has six missions: Awakening, The Hounds Below, Cinder Cells, The Chain Gang, The Long Stair and Vexa, Warden of Chains. Chapter II is listed as coming soon. Missions open in order (`missionOpen`).
+- **A mission** is an escape run with `run.mission` set: no Torment, the first region, set chambers (`MissionRoom`: a fixed `seed`, a set `shape`, raised ground only when every hero can jump) and set waves (`WaveSpec`; +35% foes per extra party member). Goals: *clear*, *survive* (a countdown; waves repeat until it runs out) and *boss*. A won chamber drops its set reward (a named god's boon, a Pomegranate, a Titan Heart), then one door leads to the next. The goal shows on the HUD.
+- **Story scenes** (`story`): lines from Ysolde (the guide), Vexa, a narrator and your hero, before and after each mission; *Skip* jumps to the end.
+- **Results:** three stars (finish, par time, health lost ≤ 50%), Ash and experience in full on the first clear (a quarter of the Ash and a third of the XP on replays). Best stars and time are kept in `save.campaign`. Dying offers *Try again*. Missions are never saved part-way and never write or clear the escape save.
+
 | Region | Chambers | Hazard | Guardian |
 |---|---|---|---|
 | The Shackled Deep | 5 combat chambers, then the antechamber | Spike traps | Vexa |

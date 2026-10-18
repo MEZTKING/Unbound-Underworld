@@ -43,7 +43,8 @@ import { prefs } from './prefs';
 import { applyFeatures, applyForge, applyLevel, hasFeature, levelFromXp, tierFor, unlocksAt, XP } from './progression';
 import { REWARD_INFO, renderOpts, renderOverlay } from './render';
 import type { VoxelQuality, VoxelRenderer } from '../render3d/voxel';
-import { BIOMES, generateEncounter, generateLayout, hubLayout } from './rooms';
+import { BIOMES, generateEncounter, generateLayout, hubLayout, type Wave } from './rooms';
+import { MISSION_BY_ID, missionReward, missionStars, recordMission, type Mission, type MissionRoom } from './campaign';
 import { Run, type LeftBehind, type RoomPlan, type RunSnapshot, type Spoils } from './run';
 import type { PlayerStats } from './stats';
 import type { GodId, RewardSpec } from './types';
@@ -775,6 +776,7 @@ export class Game implements WorldHost {
       return;
     }
     if (this.run && this.mode === 'run') this.run.time += dt;
+    this.updateMission(dt);
     net?.beginStep?.();
     w.update(dt);
     net?.afterStep?.(dt);
@@ -971,13 +973,19 @@ export class Game implements WorldHost {
   // ---------------------------------------------------------------- run flow
 
   /** Starts an escape. `dev` (developer options) picks the region and first chamber. */
-  startRun(dev?: { biome: number; kind: RoomPlan['kind'] }): void {
-    if (loadRun()) this.ui.toast('A new escape begins. The saved one was set aside.', 3000);
+  startRun(dev?: { biome: number; kind: RoomPlan['kind'] }, missionId?: string): void {
+    const mission = missionId ? MISSION_BY_ID[missionId] : undefined;
+    if (!mission && loadRun()) this.ui.toast('A new escape begins. The saved one was set aside.', 3000);
     const seedParam = this.params.get('seed');
-    this.run = new Run(this.save, seedParam ? Number(seedParam) : undefined);
+    this.run = new Run(this.save, mission ? mission.rooms[0].seed : seedParam ? Number(seedParam) : undefined);
     const biomeParam = dev ? dev.biome : Number(this.params.get('biome'));
     if (biomeParam > 0) this.run.biomeIndex = clamp(Math.floor(biomeParam), 0, BIOMES.length - 1);
-    this.save.stats.runs++;
+    if (mission) {
+      // A campaign mission: its own region, no Torment, and nothing saved mid-way.
+      this.run.biomeIndex = 0;
+      this.run.heat = 0;
+      this.run.mission = { id: mission.id, step: 0, next: 0, damage: 0, lastHp: 0, maxHp: 1, surviveLeft: 0, goal: '' };
+    } else this.save.stats.runs++;
     this.persist();
     for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { run: 'start' });
     this.respawnMembers();
@@ -1000,8 +1008,106 @@ export class Game implements WorldHost {
       });
     }
     this.mode = 'run';
+    if (mission && this.run.mission) {
+      this.run.mission.lastHp = this.player.hp;
+      this.run.mission.maxHp = this.player.maxHp;
+      this.goToRoom(missionPlan(mission, 0));
+      return;
+    }
     const plan = dev ? { kind: dev.kind, reward: dev.kind === 'combat' ? { kind: 'boon' as const } : null } : this.params.get('room') === 'boss' ? { kind: 'boss' as const, reward: null } : this.run.startPlan();
     this.goToRoom(plan);
+  }
+
+  /** The mission being played, and the chamber of it you're in. */
+  get mission(): { m: Mission; room: MissionRoom; last: boolean } | null {
+    const mr = this.run?.mission;
+    const m = mr ? MISSION_BY_ID[mr.id] : undefined;
+    if (!mr || !m) return null;
+    const room = m.rooms[Math.min(mr.step, m.rooms.length - 1)];
+    return { m, room, last: mr.step >= m.rooms.length - 1 };
+  }
+
+  /** Starts a campaign mission (from the campaign menu or after the last one). */
+  startMission(id: string): void {
+    if (!MISSION_BY_ID[id]) return;
+    this.ui.closeAll();
+    this.transition(() => this.startRun(undefined, id), true);
+  }
+
+  /** A mission chamber was won: its reward drops, then a single door leads on (or the mission ends). */
+  private missionRoomCleared(w: World): void {
+    const ms = this.mission;
+    const mr = this.run?.mission;
+    if (!ms || !mr) return;
+    if (ms.room.kind === 'boss') {
+      this.save.stats.bossesSlain++;
+      this.persist();
+    }
+    if (ms.last) {
+      w.showBanner('Mission complete', ms.m.title);
+      w.later(2, () => this.completeMission());
+      return;
+    }
+    const p = this.me.player;
+    if (ms.room.reward) w.spawnReward({ ...ms.room.reward }, clamp(p.x, 200, w.room.w - 200), clamp(p.y - 140, 220, w.room.h - 160));
+    else this.openExitDoors(w);
+  }
+
+  /** Every chamber of the mission is won: stars, rewards, the story's next beat. */
+  private completeMission(): void {
+    const run = this.run;
+    const ms = this.mission;
+    if (!run?.mission || !ms || this.mode !== 'run') return;
+    const share = run.mission.damage / Math.max(1, run.mission.maxHp);
+    const result = missionStars(ms.m, run.time, share);
+    const first = recordMission(this.save.campaign, ms.m.id, result.stars, run.time);
+    const reward = missionReward(ms.m, first);
+    this.addAsh(reward.ash);
+    this.gainXpAll(reward.xp);
+    this.persist();
+    this.mode = 'over';
+    this.ui.closeAll();
+    screens.missionComplete(this, { mission: ms.m, time: run.time, ...result, first, ...reward, kills: run.kills, spoils: run.spoils });
+  }
+
+  /** Leaves a mission (nothing is saved) for the campaign menu on the title screen. */
+  toCampaign(): void {
+    this.ui.closeAll();
+    this.transition(() => {
+      this.enterHub(true);
+      this.mode = 'title';
+      screens.title(this);
+      screens.campaign(this);
+    }, true);
+  }
+
+  /** Mission goals tick: the "survive" countdown, the HUD goal line and the damage tally. */
+  private updateMission(dt: number): void {
+    const run = this.run;
+    const mr = run?.mission;
+    const ms = this.mission;
+    const w = this.world;
+    if (!mr || !ms || !w || this.mode !== 'run') return;
+    const p = this.me.player;
+    if (p.hp < mr.lastHp) mr.damage += mr.lastHp - p.hp;
+    mr.lastHp = p.hp;
+    if (w.cleared) {
+      mr.goal = w.doors.some((d) => d.open) ? 'Go through the door' : ms.last ? 'Mission complete' : 'Take your reward';
+      return;
+    }
+    if (ms.room.goal === 'survive') {
+      mr.surviveLeft -= dt;
+      // Foes keep coming until the time is up.
+      const enc = w.encounter;
+      if (enc && enc.next >= enc.waves.length) enc.next = 0;
+      if (mr.surviveLeft <= 0) {
+        for (const e of [...w.enemies]) if (!e.dead && !e.isDummy) w.killEnemy(e);
+        w.clearRoom();
+        return;
+      }
+      const t = Math.ceil(mr.surviveLeft);
+      mr.goal = `Hold out: ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    } else mr.goal = ms.room.goal === 'boss' ? 'Defeat the guardian' : 'Slay every foe';
   }
 
   /**
@@ -1011,6 +1117,8 @@ export class Game implements WorldHost {
   goToRoom(plan: RoomPlan, resume?: RunSnapshot): void {
     const run = this.run!;
     run.enter(plan);
+    if (run.mission) run.mission.step = run.mission.next;
+    const ms = this.mission;
     const restore = resume?.cleared && Array.isArray(resume.doors) && typeof resume.roomRng === 'number' ? resume : null;
     if (restore) run.rng.state = restore.roomRng!;
     run.roomRng = run.rng.state;
@@ -1020,7 +1128,9 @@ export class Game implements WorldHost {
     if (!restore) this.saveRun();
     this.particles.clear();
     const biome = run.biome;
-    const layout = generateLayout(run.rng, biome, plan.kind, { chestChance: this.stats.chestChance, depth: run.depth, heights: this.heightsFor(run) });
+    const layout = ms
+      ? generateLayout(new Rng(ms.room.seed), biome, plan.kind, { chestChance: 0, depth: 1, shape: ms.room.shape, heights: ms.room.heights && this.members.every((m) => m.stats.canJump) ? ms.room.heights : 0 })
+      : generateLayout(run.rng, biome, plan.kind, { chestChance: this.stats.chestChance, depth: run.depth, heights: this.heightsFor(run) });
     for (const m of this.members) m.player.castAmmo = m.stats.castAmmo;
     const w = new World(this, layout, biome, this.camera, this.particles, this.members.map((m) => m.player));
     this.world = w;
@@ -1035,7 +1145,7 @@ export class Game implements WorldHost {
     switch (plan.kind) {
       case 'combat': {
         const elite = plan.reward?.kind === 'hammer' || plan.reward?.kind === 'artifact';
-        const waves = generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite, this.members.length);
+        const waves = ms?.room.waves ? missionWaves(ms.room, this.members.length) : generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite, this.members.length);
         w.startEncounter(waves, sc.hp, sc.dmg);
         if (run.depth === 0) w.showBanner(biome.name, biome.subtitle);
         else w.showBanner(`Chamber ${run.depth + 1}`, elite ? 'Enchanted foes lie in wait' : biome.name);
@@ -1071,6 +1181,11 @@ export class Game implements WorldHost {
         break;
       default:
         break;
+    }
+    if (ms && run.mission) {
+      // Campaign chambers: the mission's title and the chamber's goal.
+      w.showBanner(ms.m.title, ms.room.line);
+      run.mission.surviveLeft = ms.room.goal === 'survive' ? (ms.room.survive ?? 30) : 0;
     }
     if (restore) {
       // The chamber was already won: no foes, what was used stays used, what
@@ -1123,7 +1238,8 @@ export class Game implements WorldHost {
   /** Saves the escape at the start of the current chamber (solo play only). */
   private saveRun(extra: Partial<RunSnapshot> = {}): void {
     const run = this.run;
-    if (!run || this.net?.clientStep || this.runSaveOff) return;
+    // Missions are short and never saved mid-way (an escape's save is left alone).
+    if (!run || this.net?.clientStep || this.runSaveOff || run.mission) return;
     if (this.members.length !== 1) {
       writeRun(null);
       return;
@@ -1202,6 +1318,15 @@ export class Game implements WorldHost {
     const run = this.run;
     // A late answer from a chamber already left (or an escape already over) changes nothing.
     if (!run || w !== this.world) return;
+    const ms = this.mission;
+    if (ms && run.mission) {
+      // A mission has one way on: its next chamber.
+      if (ms.last) return;
+      run.mission.next = run.mission.step + 1;
+      this.pendingDoors = [missionPlan(ms.m, run.mission.next)];
+      w.openDoors(this.pendingDoors.map((p) => p.reward));
+      return;
+    }
     if (run.current.kind === 'boss' && run.isFinalBiome) {
       // The escape counts at once; the victory screen follows a moment later.
       const summary = this.recordVictory();
@@ -1236,6 +1361,10 @@ export class Game implements WorldHost {
           if (run.current.kind === 'boss') w.healPlayer(p.maxHp * 0.3, true);
         }),
       );
+    }
+    if (run.mission) {
+      this.missionRoomCleared(w);
+      return;
     }
     const p = this.me.player;
     this.save.stats.bestDepth = Math.max(this.save.stats.bestDepth, run.roomsCleared);
@@ -1350,6 +1479,15 @@ export class Game implements WorldHost {
     }
     // The escape is already won: its victory screen is on the way.
     if (run.won) return;
+    if (run.mission) {
+      // A mission is simply retried; an escape's save is left alone.
+      this.mode = 'over';
+      this.save.stats.deaths++;
+      this.persist();
+      const m = MISSION_BY_ID[run.mission.id];
+      w.later(1.8, () => screens.missionFailed(this, m));
+      return;
+    }
     this.mode = 'over';
     this.save.stats.deaths++;
     this.persist();
@@ -1917,6 +2055,10 @@ export class Game implements WorldHost {
   }
 
   abandonRun(): void {
+    if (this.run?.mission) {
+      this.toCampaign();
+      return;
+    }
     writeRun(null);
     this.ui.closeAll();
     this.transition(() => this.enterHub(), true);
@@ -1987,4 +2129,16 @@ export class Game implements WorldHost {
   rewardLabel(r: RewardSpec): string {
     return r.kind === 'boon' && r.god ? `${GODS[r.god].name}` : REWARD_INFO[r.kind].label;
   }
+}
+
+/** The plan for a mission's chamber (its reward shows on the door leading there). */
+function missionPlan(m: Mission, step: number): RoomPlan {
+  const room = m.rooms[step];
+  return { kind: room.kind, reward: room.reward ? { ...room.reward } : null };
+}
+
+/** A mission chamber's set waves (more foes for a party: +35% per extra hero, as in escapes). */
+function missionWaves(room: MissionRoom, party: number): Wave[] {
+  const more = 1 + 0.35 * Math.max(0, party - 1);
+  return (room.waves ?? []).map((wave) => wave.flatMap(([kind, n, mod]) => Array.from({ length: Math.max(1, Math.round(n * more)) }, () => ({ kind, mod: mod ?? null }))));
 }

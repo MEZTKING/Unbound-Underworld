@@ -6,6 +6,7 @@ import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
 import { partsFromHistory } from './smith';
 import type { RoomKind, WeaponId } from './types';
+import { defaultCampaign, normalizeCampaign, type CampaignProgress } from './campaign';
 
 export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'nunchaku', 'scythe', 'blunderbuss', 'katana'];
 
@@ -123,6 +124,8 @@ export interface SaveData {
   notice: string;
   /** Gear owned and equipped. */
   gear: GearState;
+  /** Campaign missions finished (stars and best times). */
+  campaign: CampaignProgress;
 }
 
 /** A hero's customised appearance; anything unset uses the hero's default. */
@@ -222,6 +225,7 @@ export function defaultSave(): SaveData {
     skills: {},
     smith: { parts: [] },
     progress: 2,
+    campaign: defaultCampaign(),
   };
 }
 
@@ -312,6 +316,7 @@ export function normalizeSave(raw: unknown): SaveData {
     skills: typeof r.skills === 'object' && r.skills ? Object.fromEntries(Object.entries(r.skills).filter(([k, v]) => isCharacterId(k) && typeof v === 'object' && v)) : {},
     smith: { parts },
     progress: 2,
+    campaign: normalizeCampaign(r.campaign),
   };
 }
 

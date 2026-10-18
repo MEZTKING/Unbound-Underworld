@@ -568,6 +568,8 @@ export interface LayoutOptions {
   depth?: number;
   /** 0–1: how much raised ground the chamber gets (0 = none; needs every hero able to jump). */
   heights?: number;
+  /** A set shape (campaign chambers); otherwise one is picked. */
+  shape?: RoomShape;
 }
 
 /** True when a rectangle is clear of rock, pits, lava, traps and the entrance. */
@@ -665,7 +667,7 @@ export function generateLayout(rng: Rng, biome: BiomeInfo, kind: RoomKind, opts:
     l.obstacles.push({ type: 'circle', x: 200, y: 330, r: 30, style: 'pillar' }, { type: 'circle', x: l.w - 200, y: 330, r: 30, style: 'pillar' });
     return l;
   }
-  const shape = pickShape(rng, o.depth ?? 1);
+  const shape = o.shape ?? pickShape(rng, o.depth ?? 1);
   const { w, h } = shapeSize(rng, shape);
   for (let attempt = 0; attempt < 8; attempt++) {
     const l = baseLayout(kind, biome.id, w, h, seed);
