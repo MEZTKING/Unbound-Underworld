@@ -2739,3 +2739,165 @@ ul.worn .stars {
   animation-duration: 0.25s;
   animation-delay: 0s;
 }
+
+/* ---------------------------------------------------------------- campaign */
+.chapter {
+  text-align: left;
+  margin: 10px 0 16px;
+}
+.chapter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 4px;
+}
+.chapter-head h3 {
+  margin: 0;
+  font-family: var(--serif);
+  color: var(--gold);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+.chapter-head small,
+.chapter-head em {
+  color: var(--muted);
+  font-size: 13px;
+}
+.chapter.soon {
+  opacity: 0.6;
+}
+.missions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.mission {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--ink);
+  font: inherit;
+  background: rgba(255, 216, 144, 0.04);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.mission:hover,
+.mission.sel,
+.mission:focus-visible {
+  background: rgba(255, 216, 144, 0.1);
+  box-shadow: 0 0 10px rgba(255, 216, 144, 0.25);
+}
+.mission.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mission.done {
+  border-color: rgba(255, 216, 144, 0.6);
+}
+.mnum {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  font-family: var(--serif);
+  color: var(--gold);
+}
+.mtext {
+  flex: 1;
+  min-width: 0;
+}
+.mtext b {
+  display: block;
+  font-family: var(--serif);
+  color: var(--gold);
+}
+.mtext small,
+.mres small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.mres {
+  flex: none;
+  text-align: right;
+}
+.mstars i {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.18);
+}
+.mstars i.on {
+  color: #ffd04a;
+  text-shadow: 0 0 6px rgba(255, 208, 74, 0.6);
+}
+.result-stars {
+  font-size: 40px;
+  margin: 4px 0 8px;
+}
+.mgoals {
+  text-align: left;
+  margin: 6px auto 10px;
+  max-width: 420px;
+  padding-left: 18px;
+}
+.chapter-end {
+  color: var(--gold);
+}
+.story {
+  justify-content: flex-end;
+}
+.story-panel {
+  width: min(760px, 100%);
+  margin-bottom: 6vh;
+  text-align: left;
+}
+.story-head {
+  font-family: var(--serif);
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.story-line .speaker {
+  display: block;
+  font-family: var(--serif);
+  color: var(--c);
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.story-line p {
+  font-size: 20px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+.story-line.narrator p {
+  font-style: italic;
+  color: var(--muted);
+}
+.story-dots {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.story-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+}
+.story-dots i.on {
+  background: var(--gold);
+}
+@media (max-width: 700px) {
+  .missions {
+    grid-template-columns: 1fr;
+  }
+}

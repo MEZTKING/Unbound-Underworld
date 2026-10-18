@@ -551,6 +551,15 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
   ry += 22;
   ctx.font = `600 13px ${FONT}`;
   ctx.fillStyle = '#c8b8c0';
+  if (run?.mission?.goal) {
+    // Campaign: the mission's goal (a countdown when holding out).
+    ctx.fillStyle = '#ffd890';
+    ctx.font = `700 ${compact ? 13 : 15}px ${FONT}`;
+    ctx.fillText(run.mission.goal, rx, ry);
+    ry += 18;
+    ctx.font = `600 13px ${FONT}`;
+    ctx.fillStyle = '#c8b8c0';
+  }
   if (compact) {
     // Location and timer are left out on phones; banners announce each room.
     if (run && run.heat > 0) {
@@ -560,7 +569,7 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
     return;
   }
   if (run) {
-    const label = run.current.kind === 'boss' ? 'Guardian' : run.current.kind === 'combat' ? `Chamber ${run.depth + 1}` : run.current.kind === 'antechamber' ? 'Antechamber' : run.current.kind === 'shop' ? 'Wares' : 'Rest';
+    const label = run.mission ? `Mission · chamber ${run.mission.step + 1}` : run.current.kind === 'boss' ? 'Guardian' : run.current.kind === 'combat' ? `Chamber ${run.depth + 1}` : run.current.kind === 'antechamber' ? 'Antechamber' : run.current.kind === 'shop' ? 'Wares' : 'Rest';
     ctx.fillText(`${w.biome.name} · ${label}`, rx, ry);
     ry += 18;
     if (run.heat > 0) {

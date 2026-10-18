@@ -22,6 +22,8 @@ import { GEAR_RARITY, GEAR_SLOTS, MATERIAL_IDS, MATERIALS, SLOT_NAME, slotIcon }
 import { mapScreen } from './map';
 import { leaveOnline, multiplayer } from './multiplayer';
 import { esc, type Card } from './overlay';
+import { campaign } from './campaign';
+export { campaign, missionComplete, missionFailed } from './campaign';
 
 export type CardData = Card;
 
@@ -206,6 +208,7 @@ export function title(g: Game): void {
       <div class="menu">
         ${saved ? `<button class="btn primary resume" data-nav data-a="resume">Resume Escape<small>${esc(saved)}</small></button>` : ''}
         <button class="btn${saved ? '' : ' primary'}" data-nav data-a="play">${saved ? 'Hall of Shades' : g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
+        <button class="btn" data-nav data-a="campaign">Campaign</button>
         <button class="btn" data-nav data-a="multi">Multiplayer</button>
         <button class="btn" data-nav data-a="slots">Save Slot ${currentSlot()}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
@@ -239,6 +242,7 @@ export function title(g: Game): void {
       }
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
+    else if (a === 'campaign') campaign(g);
     else if (a === 'multi') multiplayer(g);
     else if (a === 'slots') saveSlots(g);
     else if (a === 'quit') exitGame();
@@ -604,6 +608,8 @@ export function pause(g: Game): void {
   const run = guest ? null : g.run;
   // A party escape isn't saved: leaving it ends it, so that asks first.
   const party = !!run && g.members.length > 1;
+  // A campaign mission isn't saved part-way: leaving it ends the attempt.
+  const mission = !!run?.mission;
   const confirm = party ? ' data-confirm' : '';
   const build = buildList(g);
   const el = g.ui.push(
@@ -622,10 +628,10 @@ export function pause(g: Game): void {
           <button class="btn" data-nav data-a="settings">Settings</button>
           ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
           ${g.net ? `<button class="btn" data-nav data-a="leave">${guest ? 'Leave the game' : 'Stop hosting'}</button>` : ''}
-          <button class="btn" data-nav data-a="title"${confirm}>${party ? 'Quit to Title (ends escape)' : run ? 'Save &amp; Quit to Title' : 'Title Screen'}</button>
-          ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit"${confirm}>${party ? 'Exit Game (ends escape)' : run ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
-          ${run ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
-          ${run ? `<p class="small save-note">${party ? 'Party escapes aren\'t saved: quitting ends this one.' : 'Your escape is saved when you enter a chamber, and again once you win it (with what you earned there).'}</p>` : ''}
+          ${mission ? '<button class="btn" data-nav data-a="retry">Restart mission</button><button class="btn" data-nav data-a="leave-mission">Leave mission</button>' : `<button class="btn" data-nav data-a="title"${confirm}>${party ? 'Quit to Title (ends escape)' : run ? 'Save &amp; Quit to Title' : 'Title Screen'}</button>`}
+          ${CAN_EXIT ? `<button class="btn" data-nav data-a="exit"${confirm}>${party ? 'Exit Game (ends escape)' : run && !mission ? 'Save &amp; Exit Game' : 'Exit Game'}</button>` : ''}
+          ${run && !mission ? '<button class="btn danger" data-nav data-a="abandon">Abandon escape</button>' : ''}
+          ${mission ? '<p class="small save-note">Missions aren\'t saved part-way: leaving ends this attempt (a saved escape is kept).</p>' : run ? `<p class="small save-note">${party ? 'Party escapes aren\'t saved: quitting ends this one.' : 'Your escape is saved when you enter a chamber, and again once you win it (with what you earned there).'}</p>` : ''}
         </div>
         <div class="build organised compact">${build}</div>
       </div>
@@ -640,6 +646,8 @@ export function pause(g: Game): void {
       return;
     }
     if (a === 'resume') g.ui.pop();
+    else if (a === 'leave-mission') g.toCampaign();
+    else if (a === 'retry' && g.run?.mission) g.startMission(g.run.mission.id);
     else if (a === 'help') help(g);
     else if (a === 'codex') codex(g);
     else if (a === 'gear') gearScreen(g);

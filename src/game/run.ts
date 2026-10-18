@@ -62,6 +62,22 @@ export interface RunSnapshot {
   left?: LeftBehind;
 }
 
+/** A campaign mission in progress. */
+export interface MissionRun {
+  id: string;
+  /** The chamber being played, and the one the open door leads to. */
+  step: number;
+  next: number;
+  /** Health lost so far, and the hero's max health when it began (for the damage star). */
+  damage: number;
+  lastHp: number;
+  maxHp: number;
+  /** Seconds left to hold out in a "survive" chamber. */
+  surviveLeft: number;
+  /** The goal shown on the HUD. */
+  goal: string;
+}
+
 /** Rewards and drops not yet taken in a won chamber. */
 export interface LeftBehind {
   rewards: RewardSpec[];
@@ -131,6 +147,8 @@ export class Run {
   roomRng = 0;
   /** The final guardian fell (the escape is already counted). */
   won = false;
+  /** A campaign mission being played (missions are never saved mid-way). */
+  mission: MissionRun | null = null;
   /** Per-biome once-only rooms and rewards. */
   used = new Set<string>();
   spoils: Spoils = { materials: {}, gear: [] };
