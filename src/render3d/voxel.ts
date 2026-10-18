@@ -488,7 +488,8 @@ function buildHeroRig(p: Player, b: RigBuilder, shadowMat: THREE.Material): Rig 
   h.position.y = 19;
   torso.add(h);
   b.box(h, pal.skin, 12, 12, 12, 0, 6, 0);
-  b.box(h, pal.hair, 12.6, 4, 12.6, 0, 11, -0.3);
+  // Hair sits a little proud of the head on every side (shared faces flicker).
+  b.box(h, pal.hair, 12.6, 4.6, 12.6, 0, 11, 0);
   b.box(h, pal.hair, 12.6, 9, 3, 0, 7.5, -5);
   b.eyes(h, pal.crown === 'horns' ? '#d090ff' : '#3a2018', 6.5, 6.1, 5, 2.2);
   switch (pal.crown) {
@@ -506,12 +507,13 @@ function buildHeroRig(p: Player, b: RigBuilder, shadowMat: THREE.Material): Rig 
       b.glow(h, pal.glow, 2, 2, 2, 0, 15.5, 7);
       break;
     case 'helm':
-      b.box(h, '#b07a30', 13.4, 6, 13.4, 0, 10, 0);
-      b.box(h, '#c2263a', 2.5, 6, 14, 0, 15, -1);
+      // Clear of the hair's top and sides, so no face is shared with it.
+      b.box(h, '#b07a30', 13.4, 7, 13.4, 0, 10.2, 0);
+      b.box(h, '#c2263a', 2.5, 6, 14.2, 0, 15.4, -1);
       break;
     case 'circlet':
       b.glow(h, pal.glow, 13.2, 1.5, 13.2, 0, 11, 0, 0.9);
-      b.glow(h, pal.glow, 3, 3, 1, 0, 13, 6.8);
+      b.glow(h, pal.glow, 3, 3, 1, 0, 13, 7);
       break;
     case 'horns':
       b.box(h, '#2a1438', 3, 9, 3, -5, 15, 0).rotation.z = 0.45;
