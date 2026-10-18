@@ -53,8 +53,24 @@ export function costText(cost: Materials): string {
 
 export type GearSlot = 'helmet' | 'armor' | 'legs' | 'boots';
 export const GEAR_SLOTS: GearSlot[] = ['helmet', 'armor', 'legs', 'boots'];
-export const SLOT_NAME: Record<GearSlot, string> = { helmet: 'Helmet', armor: 'Armor', legs: 'Leggings', boots: 'Boots' };
-export const SLOT_GLYPH: Record<GearSlot, string> = { helmet: '⛑', armor: '⛨', legs: '⧉', boots: '⚶' };
+export const SLOT_NAME: Record<GearSlot, string> = { helmet: 'Helmet', armor: 'Breastplate', legs: 'Leggings', boots: 'Boots' };
+
+/**
+ * Each slot's icon as an SVG path on a 24×24 grid (filled even-odd, so the
+ * inner lines are cut out): a crested helm, a breastplate, leggings on a
+ * belt and a boot. Drawn in menus (inline SVG) and on dropped loot (Path2D).
+ */
+export const SLOT_PATH: Record<GearSlot, string> = {
+  helmet: 'M12 2.5C7.3 2.5 4.5 6 4.5 10.5V17l3 3h3.2v-5.2h2.6V20h3.2l3-3v-6.5C19.5 6 16.7 2.5 12 2.5Z M6.8 9.8h4.4v1.9H6.8Z M12.8 9.8h4.4v1.9h-4.4Z M11.4 4.2h1.2v4.4h-1.2Z',
+  armor: 'M7.5 2.8 10 4.3c.6.4 1.3.6 2 .6s1.4-.2 2-.6l2.5-1.5 4.3 2.6-2.1 4.5V19c0 1.1-.9 2-2 2H7.3c-1.1 0-2-.9-2-2V9.9L3.2 5.4Z M7.6 9.4c1.3.9 2.6 1.2 3.8 1.1v1.2c-1.4.1-2.9-.3-4.3-1.2Z M16.4 9.4c-1.3.9-2.6 1.2-3.8 1.1v1.2c1.4.1 2.9-.3 4.3-1.2Z M7.3 15.8h9.4v1.3H7.3Z',
+  legs: 'M5 2.5h14v4.8l-1.9 14.2h-4.3L12 11.2l-.8 10.3H6.9L5 7.3Z M5 5.4h14v1.2H5Z M11.4 2.5h1.2v2.9h-1.2Z',
+  boots: 'M6.4 2.5h6.8v9.6l5.1 2.5c1.7.8 2.7 2.4 2.7 4.2v2.7H3.5v-3.4l1.6-1.4c.8-.7 1.3-1.7 1.3-2.8Z M6.4 6h6.8v1.2H6.4Z M3.5 18.6H21v1.2H3.5Z',
+};
+
+/** A slot's icon as inline SVG for menus (coloured by `currentColor`). */
+export function slotIcon(slot: GearSlot, size = 24): string {
+  return `<svg class="slot-icon" viewBox="0 0 24 24" width="${size}" height="${size}" aria-label="${SLOT_NAME[slot]}" role="img"><path fill="currentColor" fill-rule="evenodd" d="${SLOT_PATH[slot]}"/></svg>`;
+}
 
 export type GearRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'unique' | 'ghost';
 export const GEAR_RARITY: Record<GearRarity, { name: string; color: string; affixes: number; power: number }> = {

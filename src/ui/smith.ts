@@ -3,7 +3,7 @@
 import { audio } from '../engine/audio';
 import { Rng } from '../engine/math';
 import type { Game } from '../game/game';
-import { costText, craftGear, CRAFTS, GEAR_RARITY, GEAR_SLOTS, hasMaterials, INVENTORY_SIZE, MATERIAL_IDS, MATERIALS, SLOT_GLYPH, SLOT_NAME, spendMaterials, type GearSlot } from '../game/gear';
+import { costText, craftGear, CRAFTS, GEAR_RARITY, GEAR_SLOTS, hasMaterials, INVENTORY_SIZE, MATERIAL_IDS, MATERIALS, SLOT_NAME, slotIcon, spendMaterials, type GearSlot } from '../game/gear';
 import { nextForge, FORGE } from '../game/progression';
 import { hasPart, SMITH_PART_BY_ID, SMITH_PARTS } from '../game/smith';
 import { WEAPON_INFO } from '../game/weapons';
@@ -102,7 +102,7 @@ function craftScreen(g: Game, after: () => void): void {
   const render = () => {
     const mats = MATERIAL_IDS.map((k) => `<span class="mat" style="--c:${MATERIALS[k].color}"><b>${MATERIALS[k].glyph}</b>${g.save.materials[k] ?? 0}<small>${esc(MATERIALS[k].name)}</small></span>`).join('');
     const slots = (['any', ...GEAR_SLOTS] as const)
-      .map((s) => `<button class="btn${slot === s ? ' primary' : ''}" data-nav data-slot="${s}">${s === 'any' ? 'Any slot' : `${SLOT_GLYPH[s]} ${SLOT_NAME[s]}`}</button>`)
+      .map((s) => `<button class="btn${slot === s ? ' primary' : ''}" data-nav data-slot="${s}">${s === 'any' ? 'Any slot' : `${slotIcon(s, 18)} ${SLOT_NAME[s]}`}</button>`)
       .join('');
     const full = g.save.gear.items.length >= INVENTORY_SIZE;
     const recipes = CRAFTS.map((c, i) => {

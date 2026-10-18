@@ -24,7 +24,7 @@ import {
   reforgeCost,
   reforgeGear,
   salvageValue,
-  SLOT_GLYPH,
+  slotIcon,
   SLOT_NAME,
   spendMaterials,
   upgradeCost,
@@ -46,7 +46,7 @@ function itemCard(item: GearItem, opts: { equipped?: boolean; selected?: boolean
   const r = GEAR_RARITY[item.rarity];
   const perk = item.perk ? PERKS[item.perk] : null;
   return `<button class="gear-item tier-${item.rarity}${opts.selected ? ' on' : ''}${opts.equipped ? ' worn' : ''}" data-nav ${opts.attr} style="--c:${r.color}">
-    <span class="gear-glyph">${SLOT_GLYPH[item.slot]}</span>
+    <span class="gear-glyph">${slotIcon(item.slot, 30)}</span>
     <span class="gear-text"><b>${esc(item.name)}</b>${starsHtml(item.level)}
       <small>${r.name} ${SLOT_NAME[item.slot]}${opts.equipped ? ' · equipped' : ''}</small>
       ${item.affixes.map((_, i) => `<i>${esc(describeAffix(item, i))}</i>`).join('')}
@@ -67,7 +67,7 @@ export function gearScreen(g: Game, smith = false): void {
       const item = gear.items.find((i) => i.uid === gear.equipped[s]);
       return item
         ? itemCard(item, { equipped: true, selected: selected === item.uid, attr: `data-item="${item.uid}"` })
-        : `<div class="gear-item empty"><span class="gear-glyph">${SLOT_GLYPH[s]}</span><span class="gear-text"><b>${SLOT_NAME[s]}</b><small>Empty</small></span></div>`;
+        : `<div class="gear-item empty"><span class="gear-glyph">${slotIcon(s, 30)}</span><span class="gear-text"><b>${SLOT_NAME[s]}</b><small>Empty</small></span></div>`;
     }).join('');
     const bag = gear.items
       .filter((i) => !Object.values(gear.equipped).includes(i.uid))

@@ -18,7 +18,7 @@ import { APP_VERSION, applyUpdate, check, updatesSupported, watchUpdates, type U
 import { BINDABLE, keyLabel, type Action } from '../engine/input';
 import { devMenu } from './dev';
 import { gearScreen, starsHtml } from './gear';
-import { GEAR_RARITY, GEAR_SLOTS, MATERIAL_IDS, MATERIALS, SLOT_GLYPH, SLOT_NAME } from '../game/gear';
+import { GEAR_RARITY, GEAR_SLOTS, MATERIAL_IDS, MATERIALS, SLOT_NAME, slotIcon } from '../game/gear';
 import { mapScreen } from './map';
 import { leaveOnline, multiplayer } from './multiplayer';
 import { esc, type Card } from './overlay';
@@ -824,8 +824,8 @@ export function heroes(g: Game): void {
     const worn = GEAR_SLOTS.map((slot) => {
       const item = g.save.gear.items.find((i) => i.uid === g.save.gear.equipped[slot]);
       return item
-        ? `<li class="tier-${item.rarity}" style="--c:${GEAR_RARITY[item.rarity].color}"><b>${SLOT_GLYPH[slot]}</b> ${esc(item.name)} ${starsHtml(item.level)}</li>`
-        : `<li class="empty"><b>${SLOT_GLYPH[slot]}</b> ${SLOT_NAME[slot]}: empty</li>`;
+        ? `<li class="tier-${item.rarity}" style="--c:${GEAR_RARITY[item.rarity].color}"><b>${slotIcon(slot, 18)}</b> ${esc(item.name)} ${starsHtml(item.level)}</li>`
+        : `<li class="empty"><b>${slotIcon(slot, 18)}</b> ${SLOT_NAME[slot]}: empty</li>`;
     }).join('');
     const pct = lv.need ? Math.round((lv.into / lv.need) * 100) : 100;
     return `<div class="hero-sheet" style="--c:${def.color}">

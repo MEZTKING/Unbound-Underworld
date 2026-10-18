@@ -1559,10 +1559,19 @@ h3.section small {
   box-shadow: 0 0 10px color-mix(in srgb, var(--c) 35%, transparent);
 }
 .gear-glyph {
-  font-size: 24px;
-  width: 28px;
+  width: 32px;
+  flex: none;
   text-align: center;
   color: var(--c, #aaa);
+}
+/* Gear slot icons (helm, breastplate, leggings, boots) sit on the text line. */
+.slot-icon {
+  display: inline-block;
+  vertical-align: -0.2em;
+}
+.gear-glyph .slot-icon {
+  display: block;
+  margin: 2px auto 0;
 }
 .gear-text b {
   font-family: var(--serif);
@@ -1714,7 +1723,7 @@ h3.section small {
 }
 .gear-item.tier-ghost .gear-glyph {
   animation: ghostfloat 3s ease-in-out infinite;
-  text-shadow: 0 0 10px var(--c);
+  filter: drop-shadow(0 0 6px var(--c));
 }
 @keyframes ghostdrift {
   50% {
