@@ -657,16 +657,16 @@ A bonus is its base value × roll × tier strength × star bonus. Ghost bonuses 
 
 | Bonus | Common, level 1 (typical) | Slots |
 |---|---|---|
-| +8 max health | 8 | Helmet, Armor, Leggings, Boots |
-| +4% damage | 4% | Helmet, Armor, Leggings, Boots |
+| +8 max health | 8 | Helmet, Breastplate, Leggings, Boots |
+| +4% damage | 4% | Helmet, Breastplate, Leggings, Boots |
 | +3% move speed | 3% | Leggings, Boots |
-| +2% critical chance | 2% | Helmet, Armor |
-| −3% damage taken | 3% | Armor, Leggings, Helmet |
+| +2% critical chance | 2% | Helmet, Breastplate |
+| −3% damage taken | 3% | Breastplate, Leggings, Helmet |
 | −6% dash recharge | 6% | Boots |
-| +6% obols found | 6% | Helmet, Armor, Leggings, Boots |
-| +8% Echoes gathered | 8% | Helmet, Armor |
+| +6% obols found | 6% | Helmet, Breastplate, Leggings, Boots |
+| +8% Echoes gathered | 8% | Helmet, Breastplate |
 | +6% Wrath gain | 6% | Helmet |
-| +6% potion healing | 6% | Armor |
+| +6% potion healing | 6% | Breastplate |
 
 Rare and better pieces are starred up from 1 to 10 stars. Stars 2–5 are gold and add 15% to every bonus each; stars 6–10 turn the gold stars purple one by one and add 20% each.
 

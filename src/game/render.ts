@@ -6,7 +6,7 @@ import { DOOR_W, LEDGE_H, levelAt, TRAP_SIZE, WALL_H, type Obstacle, type RoomLa
 import type { RewardSpec, Shape } from './types';
 import { REVIVE_RANGE, REVIVE_TIME, type Interactable, type World } from './world';
 import { prefs } from './prefs';
-import { GEAR_RARITY, MATERIALS, SLOT_GLYPH } from './gear';
+import { GEAR_RARITY, MATERIALS, SLOT_PATH, type GearSlot } from './gear';
 import { isSpear, WEAPON_INFO } from './weapons';
 
 const PAD = 90;
@@ -719,7 +719,7 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       const l = pk.loot;
       if (!l) break;
       const color = l.gear ? GEAR_RARITY[l.gear.rarity].color : MATERIALS[l.material ?? 'bone'].color;
-      const glyph = l.gear ? SLOT_GLYPH[l.gear.slot] : MATERIALS[l.material ?? 'bone'].glyph;
+      const glyph = MATERIALS[l.material ?? 'bone'].glyph;
       const size = l.gear ? 15 : 10;
       const hover = y - 10 + Math.sin(w.time * 4 + pk.x) * 3;
       // A soft beam marks gear so it isn't missed.
@@ -768,6 +768,16 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
         ctx.restore();
       }
       ctx.fillStyle = color;
+      if (l.gear) {
+        // Gear shows its slot's icon: helm, breastplate, leggings or boots.
+        const k = (size * 1.35) / 24;
+        ctx.save();
+        ctx.translate(pk.x - 12 * k, hover - 12 * k);
+        ctx.scale(k, k);
+        ctx.fill(slotPath(l.gear.slot), 'evenodd');
+        ctx.restore();
+        break;
+      }
       ctx.font = `700 ${Math.round(size * 1.1)}px Georgia, serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -776,6 +786,14 @@ function drawPickup(ctx: CanvasRenderingContext2D, w: World, pk: World['pickups'
       break;
     }
   }
+}
+
+const slotPaths = new Map<GearSlot, Path2D>();
+/** A gear slot's icon as a canvas path (built once). */
+function slotPath(slot: GearSlot): Path2D {
+  let p = slotPaths.get(slot);
+  if (!p) slotPaths.set(slot, (p = new Path2D(SLOT_PATH[slot])));
+  return p;
 }
 
 function drawBreakable(ctx: CanvasRenderingContext2D, b: World['breakables'][number]): void {
