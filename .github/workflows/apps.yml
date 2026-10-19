@@ -57,7 +57,8 @@ jobs:
       - run: npm test
       - name: Google sign-in for cloud saves
         if: env.GOOGLE_DESKTOP_CLIENT_ID != '' && env.GOOGLE_DESKTOP_CLIENT_SECRET != ''
-        run: node -e "require('fs').writeFileSync('electron/google.json', JSON.stringify({ clientId: process.env.GOOGLE_DESKTOP_CLIENT_ID, clientSecret: process.env.GOOGLE_DESKTOP_CLIENT_SECRET }))"
+        run: |
+          node -e "require('fs').writeFileSync('electron/google.json', JSON.stringify({ clientId: process.env.GOOGLE_DESKTOP_CLIENT_ID, clientSecret: process.env.GOOGLE_DESKTOP_CLIENT_SECRET }))"
       - run: npm run dist:desktop -- ${{ matrix.flag }}
         env:
           # Builds are unsigned; don't look for signing certificates.
