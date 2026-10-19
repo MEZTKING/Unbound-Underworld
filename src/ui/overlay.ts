@@ -124,10 +124,10 @@ export class UI {
     return el;
   }
 
-  /** Re-scans the top screen for focusable items (after dynamic changes). */
-  refreshItems(focus?: number): void {
+  /** Re-scans the top screen for focusable items (after dynamic changes); with `within`, only if that screen holds it. */
+  refreshItems(focus?: number, within?: HTMLElement): void {
     const s = this.top;
-    if (!s) return;
+    if (!s || (within && !s.el.contains(within))) return;
     s.items = [...s.el.querySelectorAll<HTMLElement>('[data-nav]')];
     s.items.forEach((it, i) => {
       it.onmouseenter = () => this.setFocus(i, false);

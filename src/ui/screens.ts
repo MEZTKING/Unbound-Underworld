@@ -20,7 +20,7 @@ import { devMenu } from './dev';
 import { gearScreen, starsHtml } from './gear';
 import { GEAR_RARITY, GEAR_SLOTS, MATERIAL_IDS, MATERIALS, SLOT_NAME, slotIcon } from '../game/gear';
 import { mapScreen } from './map';
-import { leaveOnline, multiplayer } from './multiplayer';
+import { leaveOnline, multiplayer, saveSync } from './multiplayer';
 import { esc, type Card } from './overlay';
 import { campaign } from './campaign';
 export { campaign, missionComplete, missionFailed } from './campaign';
@@ -325,7 +325,7 @@ export function saveSlots(g: Game): void {
     `<div class="panel wide"><h2 class="title">Save Slots</h2>
       <div class="subtitle">Each slot is a separate journey with its own progress.</div>
       <div class="cards grid">${Array.from({ length: SLOTS }, (_, i) => card(i + 1)).join('')}</div>
-      <div class="row-btns"><button class="btn danger" data-nav data-a="erase">Erase a slot…</button><button class="btn primary" data-nav data-a="back">Back</button></div></div>`,
+      <div class="row-btns"><button class="btn" data-nav data-a="sync">Sync between devices…</button><button class="btn danger" data-nav data-a="erase">Erase a slot…</button><button class="btn primary" data-nav data-a="back">Back</button></div></div>`,
     { onBack: () => g.ui.pop(), cols: 2 },
   );
   let erasing = false;
@@ -364,7 +364,8 @@ export function saveSlots(g: Game): void {
       erasing = !erasing;
       b.textContent = erasing ? 'Cancel erasing' : 'Erase a slot…';
       g.ui.toast(erasing ? 'Pick the slot to erase.' : 'Erasing cancelled.');
-    } else g.ui.pop();
+    } else if (b.dataset.a === 'sync') saveSync(g);
+    else g.ui.pop();
   });
 }
 

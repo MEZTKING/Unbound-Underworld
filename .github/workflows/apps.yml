@@ -41,6 +41,12 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.all_platforms && '[{"name":"Windows","os":"windows-latest","flag":"--win"},{"name":"macOS","os":"macos-latest","flag":"--mac"},{"name":"Linux","os":"ubuntu-latest","flag":"--linux"}]' || '[{"name":"Windows","os":"windows-latest","flag":"--win nsis"}]') }}
     runs-on: ${{ matrix.os }}
+    env:
+      # Optional: Google Drive cloud saves (see docs/GOOGLE_DRIVE.md). Without
+      # these the game simply doesn't offer Google Drive.
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+      GOOGLE_DESKTOP_CLIENT_ID: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+      GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,6 +55,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Google sign-in for cloud saves
+        if: env.GOOGLE_DESKTOP_CLIENT_ID != '' && env.GOOGLE_DESKTOP_CLIENT_SECRET != ''
+        run: |
+          node -e "require('fs').writeFileSync('electron/google.json', JSON.stringify({ clientId: process.env.GOOGLE_DESKTOP_CLIENT_ID, clientSecret: process.env.GOOGLE_DESKTOP_CLIENT_SECRET }))"
       - run: npm run dist:desktop -- ${{ matrix.flag }}
         env:
           # Builds are unsigned; don't look for signing certificates.
@@ -78,6 +88,8 @@ jobs:
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      # Optional: Google Drive cloud saves (see docs/GOOGLE_DRIVE.md).
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -141,6 +153,8 @@ jobs:
     name: Package (Web)
     if: inputs.all_platforms
     runs-on: ubuntu-latest
+    env:
+      VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

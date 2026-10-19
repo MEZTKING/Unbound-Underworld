@@ -5,3 +5,4 @@ node_modules
 /release
 saves/
 server/saves/
+/electron/google.json

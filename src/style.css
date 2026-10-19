@@ -2636,6 +2636,30 @@ ul.worn .stars {
   padding: 10px 12px;
   min-width: 0;
 }
+/* Google Drive: the easy way, so it spans the row above the others. */
+.mp-grid section.mp-drive {
+  grid-column: 1 / -1;
+  border-color: rgba(127, 232, 255, 0.35);
+}
+.mp-grid section.mp-drive[hidden] {
+  display: none;
+}
+.mp-grid .mp-drive h3 {
+  color: #7fe8ff;
+}
+/* "Keep in sync": the box beside its words. */
+.mp-grid label.row {
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  text-align: left;
+}
+.mp-grid label.row input {
+  flex: none;
+  width: auto;
+  margin-top: 3px;
+}
 .mp-grid h3 {
   margin: 0 0 6px;
   font-family: 'Cinzel', Georgia, serif;
