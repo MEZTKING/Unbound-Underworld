@@ -5,6 +5,7 @@ import type { Game } from '../game/game';
 import { currentSlot, writeSave } from '../game/meta';
 import { levelFromXp } from '../game/progression';
 import { NetClient } from '../net/client';
+import { backupHost, backupName, backupNow, backupText, markBackupSeen, readBackup, readSlotBackup, setSlotBackup, slotBackup } from '../net/backupfile';
 import { cloudIsNewer, drive, driveSignIn, driveSignOut, loadDriveConf, preloadGis, storeDriveConf, type CloudSave } from '../net/gdrive';
 import { NetHost } from '../net/host';
 import { lanBridge, type LanGame } from '../net/lan';
@@ -274,6 +275,7 @@ export function saveSync(g: Game, server = ''): void {
     `<div class="panel wide"><h2 class="title" style="color:#7fe8ff">Sync Saves</h2>
       <div class="subtitle">Play on Windows and Android with the same progress.</div>
       <div class="mp-grid">
+        <section class="mp-drive" data-backup></section>
         <section class="mp-drive" data-drive hidden></section>
         <section class="mp-online"><h3>Through a server</h3>
           <label class="field">Server address <input data-f="server" value="${esc(conf.server)}" placeholder="the game server's address" autocomplete="off" spellcheck="false"></label>
@@ -315,6 +317,7 @@ export function saveSync(g: Game, server = ''): void {
     }
   };
   field('auto')!.onchange = read;
+  backupSection(g, el.querySelector<HTMLElement>('[data-backup]')!, work);
   driveSection(g, el.querySelector<HTMLElement>('[data-drive]')!, work);
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
@@ -381,11 +384,11 @@ function driveSection(g: Game, sec: HTMLElement, work: (fn: () => Promise<void>)
   const render = () => {
     const conf = loadDriveConf();
     sec.innerHTML = conf.on
-      ? `<h3>Google Drive</h3>
+      ? `<h3>Google Drive sign-in</h3>
         <p class="small">Signed in${conf.email ? ` as <b>${esc(conf.email)}</b>` : ''}. Slot ${slot} on this device shares its save with slot ${slot} on your other devices.</p>
         <div class="row-btns"><button class="btn primary" data-nav data-g="up">Upload this save</button><button class="btn" data-nav data-g="down">Download to this device</button><button class="btn ghost" data-nav data-g="out">Sign out</button></div>
         <label class="row"><input type="checkbox" data-g-auto${conf.auto ? ' checked' : ''}> Keep in sync: upload after each escape, and offer a newer save when the game starts</label>`
-      : `<h3>Google Drive</h3>
+      : `<h3>Google Drive sign-in</h3>
         <p class="small">The easiest way: sign in with the same Google account on each device. Your save is kept in a hidden folder in your Google Drive that only this game can see.</p>
         <div class="row-btns"><button class="btn primary" data-nav data-g="in">Sign in with Google</button></div>`;
     bind(sec, '[data-g]', act);
@@ -451,27 +454,147 @@ function driveSection(g: Game, sec: HTMLElement, work: (fn: () => Promise<void>)
 }
 
 /** Offers the Drive copy of a slot's save over this device's. */
-function offerCloud(g: Game, got: CloudSave, slot: number, justSignedIn = false): void {
+interface Offer {
+  /** Where the other save is, e.g. "Google Drive" or "your backup file". */
+  from: string;
+  title: string;
+  /** Remembers the decision, so the same copy isn't offered again. */
+  seen: () => void;
+  /** Keeping this device's save: write it over the other copy, so both agree. */
+  keep: () => Promise<unknown>;
+}
+
+/** Offers another copy of a slot's save over this device's. */
+function offerSave(g: Game, got: CloudSave, slot: number, o: Offer): void {
   const when = new Date(got.save.lastPlayed).toLocaleString();
   const theirs = levelFromXp(got.save.xp).level;
-  const done = (use: boolean) => {
-    const c = loadDriveConf();
-    c.seen[slot] = Math.max(c.seen[slot] ?? 0, got.at);
-    storeDriveConf(c);
-    if (use) replaceSave(g, got.save);
-    // Keeping this one: it goes up over the Drive copy now, so both devices agree.
-    else void drive().upload(g.save, slot).catch(() => undefined);
-  };
   g.ui.choice({
-    title: justSignedIn ? 'A Save in Google Drive' : 'A Newer Save',
-    subtitle: `Google Drive has a save for slot ${slot} from ${when} (level ${theirs}; this device is level ${g.level}). Which one do you want to keep?`,
+    title: o.title,
+    subtitle: `${o.from[0].toUpperCase()}${o.from.slice(1)} has a save for slot ${slot} from ${when} (level ${theirs}; this device is level ${g.level}). Which one do you want to keep?`,
     color: '#7fe8ff',
     cards: [
-      { title: 'Use the Google Drive save', color: '#7fe8ff', desc: "Replaces this device's save with the one from Google Drive." },
-      { title: "Keep this device's save", color: '#c8b8c0', desc: 'Uploads this save over the one in Google Drive.' },
+      { title: `Use the save from ${o.from}`, color: '#7fe8ff', desc: `Replaces this device's save with the one from ${o.from}.` },
+      { title: "Keep this device's save", color: '#c8b8c0', desc: `Writes this save over the one in ${o.from}.` },
     ],
-    onPick: (i) => done(i === 0),
+    onPick: (i) => {
+      o.seen();
+      if (i === 0) replaceSave(g, got.save);
+      else void o.keep().catch(() => undefined);
+    },
   });
+}
+
+function offerCloud(g: Game, got: CloudSave, slot: number, justSignedIn = false): void {
+  offerSave(g, got, slot, {
+    from: 'Google Drive',
+    title: justSignedIn ? 'A Save in Google Drive' : 'A Newer Save',
+    seen: () => {
+      const c = loadDriveConf();
+      c.seen[slot] = Math.max(c.seen[slot] ?? 0, got.at);
+      storeDriveConf(c);
+    },
+    keep: () => drive().upload(g.save, slot),
+  });
+}
+
+function offerBackup(g: Game, got: CloudSave, slot: number, title = 'A Newer Save'): void {
+  offerSave(g, got, slot, { from: 'your backup file', title, seen: () => markBackupSeen(slot, got.at), keep: () => backupNow(g.save, slot) });
+}
+
+/** Backing up to a file the player picks (Google Drive through the system's file picker or folder). */
+function backupSection(g: Game, sec: HTMLElement, work: (fn: () => Promise<void>) => Promise<void>): void {
+  const host = backupHost();
+  const slot = currentSlot();
+  let folder = '';
+  const how = () =>
+    IS_NATIVE
+      ? 'Tap <b>Back up</b> and choose <b>Drive</b> in the file picker. On your other device, choose <b>Use a backup file</b> and pick the same file.'
+      : IS_DESKTOP
+        ? folder
+          ? `Google Drive is on this computer (<code>${esc(folder)}</code>): <b>Back up</b> saves the file there, and Google Drive copies it to your other devices. On another device, choose <b>Use a backup file</b> and pick it.`
+          : 'Save the file in your Google Drive folder (install <b>Google Drive for desktop</b> to get one; any folder works too). On another device, choose <b>Use a backup file</b> and pick it.'
+        : 'Download a backup file and keep it in Google Drive. On another device, load it from there.';
+  const render = () => {
+    const b = host.keeps ? slotBackup(slot) : null;
+    sec.innerHTML = b
+      ? `<h3>Back up to Google Drive</h3>
+        <p class="small">Slot ${slot} is backed up to <b>${esc(b.link.name)}</b>.</p>
+        <div class="row-btns"><button class="btn primary" data-nav data-b="now">Back up now</button><button class="btn" data-nav data-b="load">Load from this file</button><button class="btn" data-nav data-b="open">Use another file…</button><button class="btn ghost" data-nav data-b="stop">Stop backing up</button></div>
+        <label class="row"><input type="checkbox" data-b-auto${b.auto ? ' checked' : ''}> Keep it up to date: back up after each escape, and offer a newer save from the file when the game starts</label>`
+      : `<h3>Back up to Google Drive</h3>
+        <p class="small">${how()}</p>
+        <div class="row-btns"><button class="btn primary" data-nav data-b="new">${host.keeps ? 'Back up…' : 'Download backup'}</button><button class="btn" data-nav data-b="open">${host.keeps ? 'Use a backup file…' : 'Load backup file…'}</button></div>
+        ${host.keeps ? '<p class="small">The game keeps that file up to date after each escape.</p>' : ''}`;
+    bind(sec, '[data-b]', act);
+    const auto = sec.querySelector<HTMLInputElement>('[data-b-auto]');
+    if (auto)
+      auto.onchange = () => {
+        const cur = slotBackup(slot);
+        if (cur) setSlotBackup(slot, { ...cur, auto: auto.checked });
+      };
+    g.ui.refreshItems(undefined, sec);
+  };
+  const act = (btn: HTMLElement) => {
+    const a = btn.dataset.b;
+    if (a === 'new')
+      void work(async () => {
+        const at = Date.now();
+        const link = await host.create(backupName(slot), backupText(g.save, at));
+        if (link) {
+          setSlotBackup(slot, { link, auto: true, seen: at });
+          render();
+        }
+        if (link || !host.keeps) {
+          audio.play('boon');
+          g.ui.toast(host.keeps ? 'Backed up. The game keeps this file up to date.' : 'Backup downloaded. Put it in Google Drive to keep it safe.', 4000);
+        }
+      });
+    else if (a === 'open')
+      void work(async () => {
+        const got = await host.open();
+        if (!got) return;
+        const save = readBackup(got.text);
+        if (got.link) {
+          setSlotBackup(slot, { link: got.link, auto: true, seen: 0 });
+          render();
+        }
+        if (Math.abs(save.save.lastPlayed - g.save.lastPlayed) <= 1000) {
+          markBackupSeen(slot, save.at);
+          g.ui.toast('That backup is the same as this save.', 3000);
+        } else if (host.keeps) offerBackup(g, save, slot, 'A Save in the Backup');
+        // The browser can't write the file back, so keeping this save just leaves it as it is.
+        else offerSave(g, save, slot, { from: 'the backup file', title: 'A Save in the Backup', seen: () => undefined, keep: async () => undefined });
+      });
+    else if (a === 'now')
+      void work(async () => {
+        await backupNow(g.save, slot);
+        audio.play('boon');
+        g.ui.toast('Backed up.', 2500);
+      });
+    else if (a === 'load') {
+      if (!btn.dataset.armed) {
+        btn.dataset.armed = '1';
+        btn.textContent = 'Confirm: replace this save';
+        return;
+      }
+      void work(async () => {
+        const got = await readSlotBackup(slot);
+        if (!got) throw new Error('Choose a backup file first.');
+        markBackupSeen(slot, got.at);
+        replaceSave(g, got.save);
+      });
+    } else if (a === 'stop') {
+      setSlotBackup(slot, null);
+      render();
+      g.ui.toast('The game no longer writes to that file. The file itself stays where it is.', 3500);
+    }
+  };
+  render();
+  if (IS_DESKTOP)
+    void host.driveFolder().then((f) => {
+      folder = f;
+      if (f && sec.isConnected && !slotBackup(slot)) render();
+    });
 }
 
 /** Puts `save` in the slot in use and restarts the game with it. */
@@ -488,6 +611,9 @@ function replaceSave(g: Game, save: ReturnType<typeof importSave>): void {
 
 /** Keep-in-sync: after an escape, the save goes up in the background. */
 export function syncAfterEscape(g: Game): void {
+  const slot = currentSlot();
+  const file = slotBackup(slot);
+  if (file?.auto) void backupNow(g.save, slot).catch(() => undefined);
   const drv = loadDriveConf();
   if (drv.on && drv.auto) {
     const slot = currentSlot();
@@ -516,6 +642,17 @@ export function syncAfterEscape(g: Game): void {
 
 /** Keep-in-sync: at start, if Google Drive or the server holds a newer save than this device's, offer it. */
 export function syncAtStart(g: Game): void {
+  const file = slotBackup(currentSlot());
+  if (file?.auto) {
+    const slot = currentSlot();
+    readSlotBackup(slot)
+      .then((got) => {
+        if (got && cloudIsNewer(got, g.save, file.seen)) offerBackup(g, got, slot);
+      })
+      .catch(() => {
+        /* the file is out of reach (offline, moved, or access removed) */
+      });
+  }
   const drv = loadDriveConf();
   if (drv.on && drv.auto) {
     const slot = currentSlot();

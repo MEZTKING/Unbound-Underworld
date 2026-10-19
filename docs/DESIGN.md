@@ -291,6 +291,7 @@ Up to four heroes (`MAX_PARTY`). The **party core** lets one `World` hold severa
 | Party members, co-op scaling | `src/game/party.ts` |
 | Online play: relay link, host, client, state sync, LAN, save sync | `src/net/` |
 | Cloud saves in Google Drive: Drive calls and sign-in per platform (setup: [GOOGLE_DRIVE.md](GOOGLE_DRIVE.md)) | `src/net/gdrive.ts`, `electron/google.cjs`, `GoogleDrivePlugin.java` |
+| Backup files (Google Drive through the file picker or Drive folder, no setup) | `src/net/backupfile.ts`, `electron/backup.cjs`, `BackupFilePlugin.java` |
 | Relay server (standalone, LAN, Docker) | `server/` (+ `android/.../LanRelay.java`, `LanHostPlugin.java`) |
 | Heroes, perks, Wrath ultimates | `src/game/characters.ts` |
 | Gods, boons, duos, anvil upgrades, stat assembly | `src/game/boons.ts` |

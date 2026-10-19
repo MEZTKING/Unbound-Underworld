@@ -1,5 +1,12 @@
 # Cloud saves with Google Drive: one-time setup
 
+> **No setup needed for backups.** *Sync Saves → Back up to Google Drive* works
+> in every build. It saves a backup file through Android's file picker (choose
+> **Drive**) or into the Google Drive folder on a PC, and the game keeps that
+> file up to date (`src/net/backupfile.ts`, `BackupFilePlugin.java`,
+> `electron/backup.cjs`). This page is only for the optional **sign-in**
+> version, which needs the game registered with Google.
+
 Players sign in with Google on each device. Each save slot is then kept as a
 small file in a hidden app folder in their own Google Drive, and slot 1 on a
 phone shares its progress with slot 1 on a PC. Nothing goes through a server

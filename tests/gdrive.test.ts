@@ -92,6 +92,26 @@ describe('Google Drive saves', () => {
     const cloud = { save: { ...defaultSave(), lastPlayed: 20_000 }, at: 20_500 };
     expect(cloudIsNewer(cloud, local, 0)).toBe(true);
     expect(cloudIsNewer(cloud, local, 20_500)).toBe(false);
+    // This device played since (opening the game saves), but the copy changed after its last sync: still offered.
+    expect(cloudIsNewer(cloud, { ...local, lastPlayed: 30_000 }, 15_000)).toBe(true);
+    // The same save as this device's: nothing to offer.
     expect(cloudIsNewer({ ...cloud, save: { ...cloud.save, lastPlayed: 10_500 } }, local, 0)).toBe(false);
+  });
+});
+
+describe('backup files', () => {
+  it('round-trips a save on one line, ignoring anything a provider left after it', async () => {
+    const { backupText, readBackup, backupName } = await import('../src/net/backupfile');
+    const save = defaultSave();
+    save.xp = 4321;
+    const text = backupText(save, 99);
+    expect(text.endsWith('\n')).toBe(true);
+    expect(text.trim().includes('\n')).toBe(false);
+    // A provider that can't truncate leaves the end of a longer, older file behind.
+    const got = readBackup(`${text}"leftover":{"from":"an older, longer backup"}}`);
+    expect(got.at).toBe(99);
+    expect(got.save.xp).toBe(4321);
+    expect(() => readBackup('{"nope":1}\n')).toThrow(/isn't a backup/);
+    expect(backupName(3)).toBe('unbound-underworld-slot-3.json');
   });
 });
