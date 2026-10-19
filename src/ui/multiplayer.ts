@@ -2,13 +2,15 @@
 // or through an online server, and moving a save between devices.
 import { audio } from '../engine/audio';
 import type { Game } from '../game/game';
-import { writeSave } from '../game/meta';
+import { currentSlot, writeSave } from '../game/meta';
 import { levelFromXp } from '../game/progression';
 import { NetClient } from '../net/client';
+import { cloudIsNewer, drive, driveSignIn, driveSignOut, loadDriveConf, preloadGis, storeDriveConf, type CloudSave } from '../net/gdrive';
 import { NetHost } from '../net/host';
 import { lanBridge, type LanGame } from '../net/lan';
 import { RelayLink, serverUrl } from '../net/link';
 import { downloadSave, exportSave, importSave, loadSync, newSyncKey, storeSync, uploadSave } from '../net/savesync';
+import { IS_DESKTOP, IS_NATIVE } from '../platform';
 import { esc } from './overlay';
 import { localCoop } from './party';
 
@@ -263,20 +265,21 @@ export function multiplayer(g: Game): void {
 
 // ---------------------------------------------------------------- save sync
 
-/** Moving this save between devices: through a server with a sync key, or as a code to copy. */
+/** Moving this save between devices: Google Drive, a server with a sync key, or a code to copy. */
 export function saveSync(g: Game, server = ''): void {
   const conf = loadSync();
   if (!conf.server && server) conf.server = server;
   const el = g.ui.push(
     'station',
     `<div class="panel wide"><h2 class="title" style="color:#7fe8ff">Sync Saves</h2>
-      <div class="subtitle">Play on Windows and Android with the same progress. Use the same server and sync key on both devices.</div>
+      <div class="subtitle">Play on Windows and Android with the same progress.</div>
       <div class="mp-grid">
+        <section class="mp-drive" data-drive hidden></section>
         <section class="mp-online"><h3>Through a server</h3>
           <label class="field">Server address <input data-f="server" value="${esc(conf.server)}" placeholder="the game server's address" autocomplete="off" spellcheck="false"></label>
           <label class="field">Sync key <input data-f="key" value="${esc(conf.key)}" placeholder="at least 8 characters" autocomplete="off" spellcheck="false"></label>
           <div class="row-btns"><button class="btn" data-nav data-a="newkey">New key</button></div>
-          <p class="small">Anyone with the key can load this save, so keep it to yourself.</p>
+          <p class="small">Use the same server and key on both devices. Anyone with the key can load this save, so keep it to yourself.</p>
           <div class="row-btns"><button class="btn primary" data-nav data-a="up">Upload this save</button><button class="btn" data-nav data-a="down">Download to this device</button></div>
           <label class="row"><input type="checkbox" data-f="auto"${conf.auto ? ' checked' : ''}> Keep in sync: upload after each escape, and offer a newer save when the game starts</label>
         </section>
@@ -287,7 +290,7 @@ export function saveSync(g: Game, server = ''): void {
           <div class="row-btns"><button class="btn" data-nav data-a="load">Load pasted save</button></div>
         </section>
       </div>
-      <p class="small">Loading another save replaces the one in slot in use on this device.</p>
+      <p class="small">Loading another save replaces the one in the slot in use on this device (slot ${currentSlot()}).</p>
       <button class="btn" data-nav data-a="back">Back</button></div>`,
     { onBack: () => g.ui.pop() },
   );
@@ -312,6 +315,7 @@ export function saveSync(g: Game, server = ''): void {
     }
   };
   field('auto')!.onchange = read;
+  driveSection(g, el.querySelector<HTMLElement>('[data-drive]')!, work);
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
     if (a === 'back') {
@@ -370,6 +374,106 @@ export function saveSync(g: Game, server = ''): void {
   });
 }
 
+/** The Google Drive part of Sync Saves: shown only in builds set up for it. */
+function driveSection(g: Game, sec: HTMLElement, work: (fn: () => Promise<void>) => Promise<void>): void {
+  const d = drive();
+  const slot = currentSlot();
+  const render = () => {
+    const conf = loadDriveConf();
+    sec.innerHTML = conf.on
+      ? `<h3>Google Drive</h3>
+        <p class="small">Signed in${conf.email ? ` as <b>${esc(conf.email)}</b>` : ''}. Slot ${slot} on this device shares its save with slot ${slot} on your other devices.</p>
+        <div class="row-btns"><button class="btn primary" data-nav data-g="up">Upload this save</button><button class="btn" data-nav data-g="down">Download to this device</button><button class="btn ghost" data-nav data-g="out">Sign out</button></div>
+        <label class="row"><input type="checkbox" data-g-auto${conf.auto ? ' checked' : ''}> Keep in sync: upload after each escape, and offer a newer save when the game starts</label>`
+      : `<h3>Google Drive</h3>
+        <p class="small">The easiest way: sign in with the same Google account on each device. Your save is kept in a hidden folder in your Google Drive that only this game can see.</p>
+        <div class="row-btns"><button class="btn primary" data-nav data-g="in">Sign in with Google</button></div>`;
+    bind(sec, '[data-g]', act);
+    const auto = sec.querySelector<HTMLInputElement>('[data-g-auto]');
+    if (auto)
+      auto.onchange = () => {
+        const c = loadDriveConf();
+        c.auto = auto.checked;
+        storeDriveConf(c);
+      };
+    g.ui.refreshItems(undefined, sec);
+  };
+  const markSeen = (at: number) => {
+    const c = loadDriveConf();
+    c.seen[slot] = Math.max(c.seen[slot] ?? 0, at);
+    storeDriveConf(c);
+  };
+  const act = (b: HTMLElement) => {
+    const a = b.dataset.g;
+    if (a === 'in')
+      void work(async () => {
+        const conf = await driveSignIn();
+        render();
+        audio.play('boon');
+        g.ui.toast(`Signed in to Google Drive${conf.email ? ` as ${conf.email}` : ''}.`, 3500);
+        // First time on this account: put this save up, or offer the one already there.
+        const got = await d.download(slot);
+        if (!got) markSeen(await d.upload(g.save, slot));
+        else if (Math.abs(got.save.lastPlayed - g.save.lastPlayed) > 1000) offerCloud(g, got, slot, true);
+        else markSeen(got.at);
+      });
+    else if (a === 'up')
+      void work(async () => {
+        markSeen(await d.upload(g.save, slot, true));
+        audio.play('boon');
+        g.ui.toast(`Saved to Google Drive. On your other device, sign in and pick "Download" in slot ${slot}.`, 4500);
+      });
+    else if (a === 'down') {
+      if (!b.dataset.armed) {
+        b.dataset.armed = '1';
+        b.textContent = 'Confirm: replace this save';
+        return;
+      }
+      void work(async () => {
+        const got = await d.download(slot, true);
+        if (!got) throw new Error(`Google Drive has no save for slot ${slot} yet. Upload one from your other device first.`);
+        markSeen(got.at);
+        replaceSave(g, got.save);
+      });
+    } else if (a === 'out')
+      void work(async () => {
+        await driveSignOut();
+        render();
+        g.ui.toast('Signed out of Google Drive. Your saves there stay put.', 3500);
+      });
+  };
+  void d.auth.available().then((ok) => {
+    if (!ok || !sec.isConnected) return;
+    if (!IS_DESKTOP && !IS_NATIVE) void preloadGis().catch(() => undefined);
+    sec.hidden = false;
+    render();
+  });
+}
+
+/** Offers the Drive copy of a slot's save over this device's. */
+function offerCloud(g: Game, got: CloudSave, slot: number, justSignedIn = false): void {
+  const when = new Date(got.save.lastPlayed).toLocaleString();
+  const theirs = levelFromXp(got.save.xp).level;
+  const done = (use: boolean) => {
+    const c = loadDriveConf();
+    c.seen[slot] = Math.max(c.seen[slot] ?? 0, got.at);
+    storeDriveConf(c);
+    if (use) replaceSave(g, got.save);
+    // Keeping this one: it goes up over the Drive copy now, so both devices agree.
+    else void drive().upload(g.save, slot).catch(() => undefined);
+  };
+  g.ui.choice({
+    title: justSignedIn ? 'A Save in Google Drive' : 'A Newer Save',
+    subtitle: `Google Drive has a save for slot ${slot} from ${when} (level ${theirs}; this device is level ${g.level}). Which one do you want to keep?`,
+    color: '#7fe8ff',
+    cards: [
+      { title: 'Use the Google Drive save', color: '#7fe8ff', desc: "Replaces this device's save with the one from Google Drive." },
+      { title: "Keep this device's save", color: '#c8b8c0', desc: 'Uploads this save over the one in Google Drive.' },
+    ],
+    onPick: (i) => done(i === 0),
+  });
+}
+
 /** Puts `save` in the slot in use and restarts the game with it. */
 function replaceSave(g: Game, save: ReturnType<typeof importSave>): void {
   void leaveOnline(g);
@@ -384,6 +488,20 @@ function replaceSave(g: Game, save: ReturnType<typeof importSave>): void {
 
 /** Keep-in-sync: after an escape, the save goes up in the background. */
 export function syncAfterEscape(g: Game): void {
+  const drv = loadDriveConf();
+  if (drv.on && drv.auto) {
+    const slot = currentSlot();
+    drive()
+      .upload(g.save, slot)
+      .then((at) => {
+        const c = loadDriveConf();
+        c.seen[slot] = Math.max(c.seen[slot] ?? 0, at);
+        storeDriveConf(c);
+      })
+      .catch(() => {
+        /* offline or signed out: next time */
+      });
+  }
   const conf = loadSync();
   if (!conf.auto || !conf.server || conf.key.length < 8) return;
   uploadSave(conf, g.save)
@@ -396,8 +514,20 @@ export function syncAfterEscape(g: Game): void {
     });
 }
 
-/** Keep-in-sync: at start, if the server holds a save newer than this device's, offer it. */
+/** Keep-in-sync: at start, if Google Drive or the server holds a newer save than this device's, offer it. */
 export function syncAtStart(g: Game): void {
+  const drv = loadDriveConf();
+  if (drv.on && drv.auto) {
+    const slot = currentSlot();
+    drive()
+      .download(slot)
+      .then((got) => {
+        if (got && cloudIsNewer(got, g.save, drv.seen[slot] ?? 0)) offerCloud(g, got, slot);
+      })
+      .catch(() => {
+        /* offline or signed out */
+      });
+  }
   const conf = loadSync();
   if (!conf.auto || !conf.server || conf.key.length < 8) return;
   downloadSave(conf)

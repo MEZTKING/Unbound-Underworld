@@ -69,6 +69,8 @@ dependencies {
     implementation project(':capacitor-android')
     // Hosting games on the same Wi-Fi (LanRelay).
     implementation "org.java-websocket:Java-WebSocket:1.5.7"
+    // Cloud saves: access to the game's folder in Google Drive (GoogleDrivePlugin).
+    implementation "com.google.android.gms:play-services-auth:21.3.0"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

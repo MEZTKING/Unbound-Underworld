@@ -290,6 +290,7 @@ Up to four heroes (`MAX_PARTY`). The **party core** lets one `World` hold severa
 | Altar of Ashes (two tables) / hero skill trees / Blacksmith parts | `src/game/altar.ts` / `src/game/herotree.ts` / `src/game/smith.ts` |
 | Party members, co-op scaling | `src/game/party.ts` |
 | Online play: relay link, host, client, state sync, LAN, save sync | `src/net/` |
+| Cloud saves in Google Drive: Drive calls and sign-in per platform (setup: [GOOGLE_DRIVE.md](GOOGLE_DRIVE.md)) | `src/net/gdrive.ts`, `electron/google.cjs`, `GoogleDrivePlugin.java` |
 | Relay server (standalone, LAN, Docker) | `server/` (+ `android/.../LanRelay.java`, `LanHostPlugin.java`) |
 | Heroes, perks, Wrath ultimates | `src/game/characters.ts` |
 | Gods, boons, duos, anvil upgrades, stat assembly | `src/game/boons.ts` |

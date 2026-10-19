@@ -147,7 +147,8 @@ Up to four heroes play together. Everyone keeps their own progress: experience, 
 - **Local co-op (same screen).** *Multiplayer → Local co-op → Add a player*, then press any button on the new player's gamepad and pick their hero. Player 1 keeps the keyboard and mouse (or another gamepad). The camera keeps everyone in view, and player 2 gets their own HUD panel at the bottom right.
 - **Same Wi-Fi or hotspot.** In the Windows or Android app, *Host on this network* hosts from your device (allow it through the Windows firewall if asked). Others choose *Find games nearby* and join with one click, or type the host's address (shown when you start hosting). A phone sharing its hotspot can host, too. The web version can join by address when it's opened over `http` (browsers only allow secure `wss://` connections from the `https` site).
 - **Online, through your own server.** Run the server below on any machine with Node 18+, then everyone enters its address under *Online*: the host picks *Host here* and gets a 5-letter **room code**, and the others *Join* with it. Anyone can host this way, from Windows, Android or the browser. A player whose connection drops is reconnected into their seat automatically (the server keeps it for two minutes, and keeps the game for a minute if the host drops).
-- **Sync saves between devices.** *Multiplayer → Sync saves between devices*: pick a sync key (or make one), *Upload this save* on one device and *Download to this device* on the other, through your server. Turn on *Keep in sync* to upload after each escape and be offered the newer save when the game starts. Without a server, *Copy save code* and paste it on the other device.
+- **Cloud saves with Google Drive.** *Save Slot → Sync between devices* (or *Multiplayer → Sync saves between devices*) → *Sign in with Google* on each device, with the same Google account. Each save slot is kept in a hidden folder in your own Google Drive that only the game can see, so slot 1 on your phone and slot 1 on your PC share their progress. With *Keep in sync* on (the default), the save uploads after each escape. When the game starts, it offers the Drive copy if that copy is newer. Builds offer this once the Google Cloud project is set up: see [docs/GOOGLE_DRIVE.md](docs/GOOGLE_DRIVE.md).
+- **Sync saves through your server.** In the same screen: pick a sync key (or make one), *Upload this save* on one device and *Download to this device* on the other, through your server. Turn on *Keep in sync* to upload after each escape and be offered the newer save when the game starts. Without a server, *Copy save code* and paste it on the other device.
 
 **Running the game server.** It's one folder with no packages to install: `server/` in this repository, also attached to every release as `Unbound-Underworld-Server-<version>.zip`.
 
@@ -240,7 +241,7 @@ These URL parameters are handy for testing:
 ### Project layout
 
 ```
-electron/        desktop app shell (window, app:// file serving, fullscreen toggle, self-updating, LAN hosting)
+electron/        desktop app shell (window, app:// file serving, fullscreen toggle, self-updating, LAN hosting, Google sign-in)
 android/         Android app project (Capacitor): landscape, immersive fullscreen, icons, LAN hosting plugin (LanRelay)
 server/          the multiplayer relay: relay-core.cjs (rooms, codes, rejoining, save sync; a dependency-free WebSocket server),
                  lan.cjs (finding games nearby), index.cjs (the standalone server), Dockerfile
@@ -274,11 +275,11 @@ src/
   render3d/
     voxel.ts     the 3D voxel view (three.js): block rooms, props, doors and animated figures
   net/           online play: relay link, host (snapshots, effects, remote controls), client (mirror world, prediction),
-                 state sync, LAN bridges, save sync
+                 state sync, LAN bridges, save sync, Google Drive cloud saves
   ui/            DOM menus (boon cards, Altar, Ascension, Hall of Heroes, Blacksmith, multiplayer, pause…) and touch controls
 tests/           Vitest suites
 scripts/         gen-docs.ts (writes docs/GAME_DATA.md)
-docs/            DESIGN.md (how the game works), GAME_DATA.md (generated reference), screenshots
+docs/            DESIGN.md (how the game works), GAME_DATA.md (generated reference), GOOGLE_DRIVE.md (cloud save setup), screenshots
 ```
 
 The art is all made in code: the 3D view builds every room, prop and character from blocks with three.js, and the 2D view draws them on a canvas. Every sound and the music are synthesized with WebAudio, so the game ships without any image or audio files. The fonts (Cinzel and EB Garamond, under the SIL Open Font License) are bundled, so the game also runs offline. Progress is saved to `localStorage`.
