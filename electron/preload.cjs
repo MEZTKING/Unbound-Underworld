@@ -1,4 +1,4 @@
-// Gives the game a small, safe bridge to the desktop shell: update checks, the window mode, LAN multiplayer and Google sign-in.
+// Gives the game a small, safe bridge to the desktop shell: update checks, the window mode, LAN multiplayer, Google sign-in and save backup files.
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktop', {
@@ -31,4 +31,13 @@ contextBridge.exposeInMainWorld('uuDrive', {
   token: () => plain(ipcRenderer.invoke('drive:token')),
   drop: () => plain(ipcRenderer.invoke('drive:drop')),
   signOut: () => plain(ipcRenderer.invoke('drive:signOut')),
+});
+
+// Save backups in a file the player picks, e.g. in the Google Drive folder (backup.cjs).
+contextBridge.exposeInMainWorld('uuBackup', {
+  drive: () => plain(ipcRenderer.invoke('backup:drive')),
+  create: (name) => plain(ipcRenderer.invoke('backup:create', name)),
+  open: () => plain(ipcRenderer.invoke('backup:open')),
+  read: (id) => plain(ipcRenderer.invoke('backup:read', id)),
+  write: (id, text) => plain(ipcRenderer.invoke('backup:write', id, text)),
 });

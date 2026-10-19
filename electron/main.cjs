@@ -5,6 +5,7 @@ const { app, BrowserWindow, ipcMain, net, protocol, screen, shell } = require('e
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { registerBackup } = require('./backup.cjs');
 const { registerGoogle } = require('./google.cjs');
 
 const DIST = path.join(__dirname, '..', 'dist');
@@ -219,6 +220,7 @@ if (!app.requestSingleInstanceLock()) {
     registerWindowMode();
     registerNet();
     registerGoogle();
+    registerBackup();
     windowMode = loadMode();
     createWindow();
     app.on('activate', () => {

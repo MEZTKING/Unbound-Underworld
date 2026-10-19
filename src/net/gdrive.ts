@@ -171,9 +171,13 @@ export function parseStored(text: string): CloudSave {
   return { save: normalizeSave(raw.save), at: Number(raw.at) || 0 };
 }
 
-/** True when the Drive copy should be offered over this device's save. */
+/**
+ * True when the other copy should be offered over this device's save: another
+ * device wrote it since this one last wrote, loaded or turned down a copy.
+ * (Comparing play times wouldn't do: just opening the game saves locally.)
+ */
 export function cloudIsNewer(cloud: CloudSave, local: SaveData, seen: number): boolean {
-  return cloud.save.lastPlayed > local.lastPlayed + 1000 && cloud.at > seen;
+  return cloud.at > seen && Math.abs(cloud.save.lastPlayed - local.lastPlayed) > 1000;
 }
 
 // ---------------------------------------------------------------- sign-in per platform

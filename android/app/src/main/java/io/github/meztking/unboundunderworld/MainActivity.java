@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ApkUpdaterPlugin.class);
         registerPlugin(LanHostPlugin.class);
         registerPlugin(GoogleDrivePlugin.class);
+        registerPlugin(BackupFilePlugin.class);
         super.onCreate(savedInstanceState);
     }
 

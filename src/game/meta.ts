@@ -330,8 +330,10 @@ export function loadSave(): SaveData {
 }
 
 export function writeSave(s: SaveData): void {
+  // Kept on the save in memory too: syncing compares it to other devices' copies.
+  s.lastPlayed = Date.now();
   try {
-    localStorage.setItem(saveKey(), JSON.stringify({ ...s, lastPlayed: Date.now() }));
+    localStorage.setItem(saveKey(), JSON.stringify(s));
   } catch {
     /* storage unavailable (private mode) — progress lasts for this session only */
   }
