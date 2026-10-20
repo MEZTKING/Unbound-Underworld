@@ -23,6 +23,7 @@ import { mapScreen } from './map';
 import { leaveOnline, multiplayer, saveSync } from './multiplayer';
 import { esc, type Card } from './overlay';
 import { campaign } from './campaign';
+import { lockDev } from '../game/devaccess';
 import { COLOR_MODE_NAME, type ColorMode } from '../game/palette';
 export { campaign, missionComplete, missionFailed } from './campaign';
 export { dailyMenu, dailyResults } from './daily';
@@ -374,6 +375,37 @@ export function saveSlots(g: Game): void {
   });
 }
 
+/** The owner's passphrase for the developer options (asked once per device). */
+function devPassphrase(g: Game): void {
+  const el = g.ui.push(
+    'station',
+    `<div class="panel"><h2 class="title">Developer access</h2>
+      <div class="subtitle">For the game's owner only.</div>
+      <label class="field">Passphrase <input type="password" data-f="pass" autocomplete="off" spellcheck="false"></label>
+      <div class="row-btns"><button class="btn primary" data-nav data-a="ok">Unlock</button><button class="btn" data-nav data-a="back">Back</button></div></div>`,
+    { onBack: () => g.ui.pop() },
+  );
+  const input = el.querySelector<HTMLInputElement>('[data-f="pass"]')!;
+  setTimeout(() => input.focus(), 50);
+  const submit = () => {
+    if (g.unlockDev(input.value)) {
+      audio.play('boon');
+      g.ui.toast('Developer options unlocked on this device');
+      g.ui.closeAll();
+      settings(g);
+    } else {
+      audio.play('deny');
+      input.value = '';
+      g.ui.toast("That isn't it.");
+    }
+  };
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') submit();
+    e.stopPropagation();
+  };
+  bind(el, '[data-a]', (b) => (b.dataset.a === 'ok' ? submit() : g.ui.pop()));
+}
+
 export function help(g: Game, intro = false): void {
   const el = g.ui.push(
     'help',
@@ -461,7 +493,7 @@ export function settings(g: Game): void {
       ${toggle('vibration')}
       <h3 class="section">Data</h3>
       <button class="btn danger" data-nav data-a="reset">Erase save data</button>
-      ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button>' : ''}
+      ${g.devUnlocked ? '<button class="btn" data-nav data-a="dev">Developer options</button><button class="btn ghost" data-nav data-a="devlock">Lock developer options on this device</button>' : ''}
       <div class="update-box">
         <div class="update-version" data-ver>Version ${APP_VERSION}</div>
         <div data-box></div>
@@ -473,17 +505,14 @@ export function settings(g: Game): void {
   if (updatesSupported) updateBox(g, el, el.querySelector<HTMLElement>('[data-box]')!, true);
   const wm = el.querySelector<HTMLElement>('[data-wmode]');
   if (wm) void getWindowMode().then((m) => (wm.textContent = WINDOW_LABEL[m]));
-  // The secret way in to the developer options: tap the version seven times.
+  // The secret way in to the developer options: tap the version seven times, then the owner's passphrase.
   let taps = 0;
   const ver = el.querySelector<HTMLElement>('[data-ver]');
   if (ver)
     ver.onclick = () => {
       if (g.devUnlocked || ++taps < 7) return;
-      g.unlockDev();
-      audio.play('boon');
-      g.ui.toast('Developer options unlocked');
-      g.ui.pop();
-      settings(g);
+      taps = 0;
+      devPassphrase(g);
     };
   const apply = () => {
     g.applySettings();
@@ -511,7 +540,11 @@ export function settings(g: Game): void {
   bind(el, '[data-a]', (b) => {
     const a = b.dataset.a;
     if (a === 'dev') devMenu(g);
-    else if (a === 'keys') keyBindings(g);
+    else if (a === 'devlock') {
+      lockDev();
+      g.ui.toast('Developer options locked. The passphrase opens them again.');
+      setTimeout(() => location.reload(), 900);
+    } else if (a === 'keys') keyBindings(g);
     else if (a === 'color') {
       const modes = Object.keys(COLOR_MODE_NAME) as ColorMode[];
       s.colorMode = modes[(modes.indexOf(s.colorMode) + 1) % modes.length];

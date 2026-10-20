@@ -298,6 +298,26 @@ numbers, with Favor and Torment included, are in [GAME_DATA.md](GAME_DATA.md).
 
 ---
 
+## Pacing
+
+**Done in v0.15.** Getting in is quick, and the mid and late game are a grind.
+A model of a typical run at each level is checked by the tests:
+
+| | Runs per level | Runs so far |
+|---|---|---|
+| Levels 1–9 | under 1 (a new mechanic almost every run) | Wrath at level 10 after ~5 |
+| Level 15 | ~1.3 | ~11 |
+| Level 20 | ~2.9 | ~22 |
+| Level 30 | ~4.8 | ~61 |
+| Level 40 | ~9.4 | ~134 |
+| Level 49 | ~15 | ~245 to max (the old curve: ~107) |
+
+- **Fledgling's Grace:** foes deal 30% less damage at level 1, fading out by
+  level 6.
+- **Weapon forge:** the top tiers cost more Ash (III 120, IV 400, V 900).
+- **Old saves:** converted, so players keep their level and their progress into
+  it.
+
 ## Further ahead
 
 Ideas, in no fixed order:

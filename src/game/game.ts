@@ -1,3 +1,4 @@
+import { devAllowed, gameParams, tryDevPassphrase } from './devaccess';
 import { dailyFor, dailyKey, dailyScore, recordDaily, type DailyRun } from './daily';
 import { applyColorMode } from './palette';
 import { audio, type Mood } from '../engine/audio';
@@ -99,7 +100,6 @@ const VIEW_PITCH = 0.7;
 const CAM_TURN_MAX = 0.74;
 const CAM_TURN_SPEED = 1.6;
 
-const DEV_KEY = 'unbound-underworld-dev';
 
 const CHARON_LINES = ['Hrrrnnngh…', 'Mmmmhhhaaaah.', 'Hhhrrrraaaagh!', '…Hmmmm.'];
 
@@ -141,7 +141,9 @@ export class Game implements WorldHost {
   /** Z / X camera turn away from the default 3D angle (radians). */
   private camTurn = 0;
   private last = 0;
-  private params = new URLSearchParams(location.search);
+  /** Address parameters: the debug ones (?god, ?seed…) only with developer access (devaccess.ts). */
+  private params = gameParams(location.search);
+  private devOk = devAllowed();
   private lastHit = 'the Underworld';
   private debugLevel = 0;
   private fps = 60;
@@ -582,21 +584,16 @@ export class Game implements WorldHost {
     return this.debugLevel;
   }
 
-  /** Developer options are unlocked on this device (secret: tap the version in Settings 7 times) or by ?dev. */
+  /** Developer options: only on a device where the owner's passphrase was entered (tap the version in Settings 7 times). */
   get devUnlocked(): boolean {
-    try {
-      return this.params.has('dev') || localStorage.getItem(DEV_KEY) === '1';
-    } catch {
-      return this.params.has('dev');
-    }
+    return this.devOk;
   }
 
-  unlockDev(): void {
-    try {
-      localStorage.setItem(DEV_KEY, '1');
-    } catch {
-      /* private mode: ?dev still works */
-    }
+  /** Tries the developer passphrase; true when it unlocked this device. */
+  unlockDev(passphrase: string): boolean {
+    if (!tryDevPassphrase(passphrase)) return false;
+    this.devOk = true;
+    return true;
   }
 
   /** Your level (from total experience). */
