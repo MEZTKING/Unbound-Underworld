@@ -11,10 +11,48 @@ import type { WeaponId } from './types';
  */
 export const MAX_LEVEL = 50;
 
-/** Experience needed to go from `level` to `level + 1` (the climb flattens after 30). */
+/**
+ * Experience needed to go from `level` to `level + 1`. The early levels come
+ * quickly (about a run each, so new mechanics keep arriving); from level 10
+ * the climb grows steeply, so the mid and late game is a grind (see
+ * tests/leveling.test.ts for runs per level).
+ */
 export function xpToNext(level: number): number {
+  if (level < 10) return 50 + (level - 1) * 25;
+  const k = level - 9;
+  return Math.round(250 + k * 100 + k * k * 12);
+}
+
+/** The curve before v0.15 (gentle all the way, flattening after 30): only used to convert old saves. */
+export function xpToNextV1(level: number): number {
   const l = Math.min(level, 30);
   return Math.round(60 + (l - 1) * 45 + (l - 1) ** 2 * 3) + Math.max(0, level - 30) * 100;
+}
+
+/** The current experience curve's version (saves record it). */
+export const XP_CURVE = 2;
+
+/**
+ * Converts experience earned under the old curve so the player keeps the same
+ * level and the same share of the way to the next one.
+ */
+export function convertXpV1(xp: number): number {
+  let level = 1;
+  let rest = Math.max(0, Math.floor(xp));
+  while (level < MAX_LEVEL && rest >= xpToNextV1(level)) {
+    rest -= xpToNextV1(level);
+    level++;
+  }
+  if (level >= MAX_LEVEL) return xpForLevel(MAX_LEVEL);
+  return xpForLevel(level) + Math.floor((rest / xpToNextV1(level)) * xpToNext(level));
+}
+
+/**
+ * Fledgling's Grace: new shades take less damage while they learn (30% less at
+ * level 1, fading to nothing by level 6).
+ */
+export function fledglingGrace(level: number): number {
+  return Math.max(0, Math.min(0.3, ((6 - level) / 5) * 0.3));
 }
 
 /** Level and progress within it for a total amount of experience. */
@@ -66,6 +104,7 @@ export function applyLevel(level: number, s: PlayerStats): void {
   const b = levelBonus(level);
   s.maxHp += b.hp;
   s.globalDmg += b.dmg;
+  s.damageTaken *= 1 - fledglingGrace(level);
 }
 
 export function tierFor(level: number): Tier {
@@ -161,9 +200,9 @@ export interface ForgeTier {
 export const FORGE: ForgeTier[] = [
   { tier: 1, name: 'Tier I', cost: 0, level: 1, desc: 'Base weapon' },
   { tier: 2, name: 'Tier II · Tempered', cost: 30, level: 3, desc: '+10% weapon damage' },
-  { tier: 3, name: 'Tier III · Awakened', cost: 80, level: 13, desc: '+20% weapon damage. Every 4th Attack unleashes an arcane wave.' },
-  { tier: 4, name: 'Tier IV · Exalted', cost: 150, level: 16, desc: '+30% weapon damage. Waves grow larger.' },
-  { tier: 5, name: 'Tier V · Mythic', cost: 260, level: 20, desc: '+45% weapon damage. Waves split in three and the weapon blazes.' },
+  { tier: 3, name: 'Tier III · Awakened', cost: 120, level: 13, desc: '+20% weapon damage. Every 4th Attack unleashes an arcane wave.' },
+  { tier: 4, name: 'Tier IV · Exalted', cost: 400, level: 16, desc: '+30% weapon damage. Waves grow larger.' },
+  { tier: 5, name: 'Tier V · Mythic', cost: 900, level: 20, desc: '+45% weapon damage. Waves split in three and the weapon blazes.' },
 ];
 
 export function forgeDamage(tier: number): number {

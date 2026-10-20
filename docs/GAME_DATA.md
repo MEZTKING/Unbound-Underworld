@@ -25,6 +25,8 @@
 
 Experience carries over between runs. Max level: **50**. Every level gives every hero +1 max Health, and every fifth level +1% damage. Levels also open the Altar of Ashes' sections. The same experience raises the hero you play (see *Hero skill trees*).
 
+The curve is quick early (50–250 XP for levels 1–9, about a run each) and steep from level 10 (362 XP, rising to 23,450 for level 49). *Fledgling's Grace*: at level 1 foes deal 30% less damage, fading to nothing by level 6.
+
 **Experience sources**
 
 | Source | XP |
@@ -55,56 +57,56 @@ Experience carries over between runs. Max level: **50**. Every level gives every
 
 | Level | XP to next | Total XP | Rank | Bonus for every hero | Unlocks |
 |---|---|---|---|---|---|
-| 1 | 60 | 0 | Shade | +0 HP |  |
-| 2 | 108 | 60 | Shade | +1 HP | Gear & Inventory, Guard & Parry, Healing Potion |
-| 3 | 162 | 168 | Shade | +2 HP | Cast, Forge: Tier II · Tempered |
-| 4 | 222 | 330 | Shade | +3 HP | Artifacts, Altar: Cinders (with 120 Ash spent above) |
-| 5 | 288 | 552 | Wraith | +4 HP, +1% dmg | Jump & Slam, Weapon: Titan Gauntlets |
-| 6 | 360 | 840 | Wraith | +5 HP, +1% dmg | Enchantments |
-| 7 | 438 | 1200 | Wraith | +6 HP, +1% dmg | Hephaestus' Anvil, Hero: Gorran |
-| 8 | 522 | 1638 | Wraith | +7 HP, +1% dmg | Second Artifact Slot, Weapon: Riptide Chains |
-| 9 | 612 | 2160 | Wraith | +8 HP, +1% dmg |  |
-| 10 | 708 | 2772 | Revenant | +9 HP, +2% dmg | Wrath, Hero: Ione, Weapon: Reaper's Crescent, Altar: Flames (with 500 Ash spent above) |
-| 11 | 810 | 3480 | Revenant | +10 HP, +2% dmg |  |
-| 12 | 918 | 4290 | Revenant | +11 HP, +2% dmg | Third Artifact Slot, Weapon: Thunderbuss |
-| 13 | 1032 | 5208 | Revenant | +12 HP, +2% dmg | Awakened Weapons, Forge: Tier III · Awakened |
-| 14 | 1152 | 6240 | Revenant | +13 HP, +2% dmg | Hero: Erebos |
-| 15 | 1278 | 7392 | Champion | +14 HP, +3% dmg | Weapon: Starsplitter |
-| 16 | 1410 | 8670 | Champion | +15 HP, +3% dmg | Forge: Tier IV · Exalted |
-| 17 | 1548 | 10080 | Champion | +16 HP, +3% dmg |  |
-| 18 | 1692 | 11628 | Champion | +17 HP, +3% dmg | Hero: Rook, Altar: Blaze (with 1300 Ash spent above) |
-| 19 | 1842 | 13320 | Champion | +18 HP, +3% dmg |  |
-| 20 | 1998 | 15162 | Unbound | +19 HP, +4% dmg | Forge: Tier V · Mythic |
-| 21 | 2160 | 17160 | Unbound | +20 HP, +4% dmg |  |
-| 22 | 2328 | 19320 | Unbound | +21 HP, +4% dmg | Hero: Selene |
-| 23 | 2502 | 21648 | Unbound | +22 HP, +4% dmg |  |
-| 24 | 2682 | 24150 | Unbound | +23 HP, +4% dmg |  |
-| 25 | 2868 | 26832 | Ascendant | +24 HP, +5% dmg |  |
-| 26 | 3060 | 29700 | Ascendant | +25 HP, +5% dmg | Altar: Inferno (with 2600 Ash spent above) |
-| 27 | 3258 | 32760 | Ascendant | +26 HP, +5% dmg |  |
-| 28 | 3462 | 36018 | Ascendant | +27 HP, +5% dmg |  |
-| 29 | 3672 | 39480 | Ascendant | +28 HP, +5% dmg |  |
-| 30 | 3888 | 43152 | Exarch | +29 HP, +6% dmg | Altar: Smoulder (with 0 Ash spent above) |
-| 31 | 3988 | 47040 | Exarch | +30 HP, +6% dmg |  |
-| 32 | 4088 | 51028 | Exarch | +31 HP, +6% dmg |  |
-| 33 | 4188 | 55116 | Exarch | +32 HP, +6% dmg |  |
-| 34 | 4288 | 59304 | Exarch | +33 HP, +6% dmg |  |
-| 35 | 4388 | 63592 | Eternal | +34 HP, +7% dmg |  |
-| 36 | 4488 | 67980 | Eternal | +35 HP, +7% dmg | Altar: Pyre (with 3000 Ash spent above) |
-| 37 | 4588 | 72468 | Eternal | +36 HP, +7% dmg |  |
-| 38 | 4688 | 77056 | Eternal | +37 HP, +7% dmg |  |
-| 39 | 4788 | 81744 | Eternal | +38 HP, +7% dmg |  |
-| 40 | 4888 | 86532 | Sovereign | +39 HP, +8% dmg |  |
-| 41 | 4988 | 91420 | Sovereign | +40 HP, +8% dmg |  |
-| 42 | 5088 | 96408 | Sovereign | +41 HP, +8% dmg | Altar: Furnace (with 7000 Ash spent above) |
-| 43 | 5188 | 101496 | Sovereign | +42 HP, +8% dmg |  |
-| 44 | 5288 | 106684 | Sovereign | +43 HP, +8% dmg |  |
-| 45 | 5388 | 111972 | Paragon | +44 HP, +9% dmg |  |
-| 46 | 5488 | 117360 | Paragon | +45 HP, +9% dmg |  |
-| 47 | 5588 | 122848 | Paragon | +46 HP, +9% dmg |  |
-| 48 | 5688 | 128436 | Paragon | +47 HP, +9% dmg | Altar: Heart of the Pyre (with 12000 Ash spent above) |
-| 49 | 5788 | 134124 | Paragon | +48 HP, +9% dmg |  |
-| 50 | — | 139912 | Deathless | +49 HP, +10% dmg |  |
+| 1 | 50 | 0 | Shade | +0 HP |  |
+| 2 | 75 | 50 | Shade | +1 HP | Gear & Inventory, Guard & Parry, Healing Potion |
+| 3 | 100 | 125 | Shade | +2 HP | Cast, Forge: Tier II · Tempered |
+| 4 | 125 | 225 | Shade | +3 HP | Artifacts, Altar: Cinders (with 120 Ash spent above) |
+| 5 | 150 | 350 | Wraith | +4 HP, +1% dmg | Jump & Slam, Weapon: Titan Gauntlets |
+| 6 | 175 | 500 | Wraith | +5 HP, +1% dmg | Enchantments |
+| 7 | 200 | 675 | Wraith | +6 HP, +1% dmg | Hephaestus' Anvil, Hero: Gorran |
+| 8 | 225 | 875 | Wraith | +7 HP, +1% dmg | Second Artifact Slot, Weapon: Riptide Chains |
+| 9 | 250 | 1100 | Wraith | +8 HP, +1% dmg |  |
+| 10 | 362 | 1350 | Revenant | +9 HP, +2% dmg | Wrath, Hero: Ione, Weapon: Reaper's Crescent, Altar: Flames (with 500 Ash spent above) |
+| 11 | 498 | 1712 | Revenant | +10 HP, +2% dmg |  |
+| 12 | 658 | 2210 | Revenant | +11 HP, +2% dmg | Third Artifact Slot, Weapon: Thunderbuss |
+| 13 | 842 | 2868 | Revenant | +12 HP, +2% dmg | Awakened Weapons, Forge: Tier III · Awakened |
+| 14 | 1050 | 3710 | Revenant | +13 HP, +2% dmg | Hero: Erebos |
+| 15 | 1282 | 4760 | Champion | +14 HP, +3% dmg | Weapon: Starsplitter |
+| 16 | 1538 | 6042 | Champion | +15 HP, +3% dmg | Forge: Tier IV · Exalted |
+| 17 | 1818 | 7580 | Champion | +16 HP, +3% dmg |  |
+| 18 | 2122 | 9398 | Champion | +17 HP, +3% dmg | Hero: Rook, Altar: Blaze (with 1300 Ash spent above) |
+| 19 | 2450 | 11520 | Champion | +18 HP, +3% dmg |  |
+| 20 | 2802 | 13970 | Unbound | +19 HP, +4% dmg | Forge: Tier V · Mythic |
+| 21 | 3178 | 16772 | Unbound | +20 HP, +4% dmg |  |
+| 22 | 3578 | 19950 | Unbound | +21 HP, +4% dmg | Hero: Selene |
+| 23 | 4002 | 23528 | Unbound | +22 HP, +4% dmg |  |
+| 24 | 4450 | 27530 | Unbound | +23 HP, +4% dmg |  |
+| 25 | 4922 | 31980 | Ascendant | +24 HP, +5% dmg |  |
+| 26 | 5418 | 36902 | Ascendant | +25 HP, +5% dmg | Altar: Inferno (with 2600 Ash spent above) |
+| 27 | 5938 | 42320 | Ascendant | +26 HP, +5% dmg |  |
+| 28 | 6482 | 48258 | Ascendant | +27 HP, +5% dmg |  |
+| 29 | 7050 | 54740 | Ascendant | +28 HP, +5% dmg |  |
+| 30 | 7642 | 61790 | Exarch | +29 HP, +6% dmg | Altar: Smoulder (with 0 Ash spent above) |
+| 31 | 8258 | 69432 | Exarch | +30 HP, +6% dmg |  |
+| 32 | 8898 | 77690 | Exarch | +31 HP, +6% dmg |  |
+| 33 | 9562 | 86588 | Exarch | +32 HP, +6% dmg |  |
+| 34 | 10250 | 96150 | Exarch | +33 HP, +6% dmg |  |
+| 35 | 10962 | 106400 | Eternal | +34 HP, +7% dmg |  |
+| 36 | 11698 | 117362 | Eternal | +35 HP, +7% dmg | Altar: Pyre (with 3000 Ash spent above) |
+| 37 | 12458 | 129060 | Eternal | +36 HP, +7% dmg |  |
+| 38 | 13242 | 141518 | Eternal | +37 HP, +7% dmg |  |
+| 39 | 14050 | 154760 | Eternal | +38 HP, +7% dmg |  |
+| 40 | 14882 | 168810 | Sovereign | +39 HP, +8% dmg |  |
+| 41 | 15738 | 183692 | Sovereign | +40 HP, +8% dmg |  |
+| 42 | 16618 | 199430 | Sovereign | +41 HP, +8% dmg | Altar: Furnace (with 7000 Ash spent above) |
+| 43 | 17522 | 216048 | Sovereign | +42 HP, +8% dmg |  |
+| 44 | 18450 | 233570 | Sovereign | +43 HP, +8% dmg |  |
+| 45 | 19402 | 252020 | Paragon | +44 HP, +9% dmg |  |
+| 46 | 20378 | 271422 | Paragon | +45 HP, +9% dmg |  |
+| 47 | 21378 | 291800 | Paragon | +46 HP, +9% dmg |  |
+| 48 | 22402 | 313178 | Paragon | +47 HP, +9% dmg | Altar: Heart of the Pyre (with 12000 Ash spent above) |
+| 49 | 23450 | 335580 | Paragon | +48 HP, +9% dmg |  |
+| 50 | — | 359030 | Deathless | +49 HP, +10% dmg |  |
 
 **Mechanic unlocks** (hidden from the HUD, buttons and help until unlocked)
 
@@ -323,9 +325,9 @@ Each weapon belongs to one class (hero): picking the hero picks the weapon. Ever
 |---|---|---|---|
 | Tier I | — | 1 | Base weapon |
 | Tier II · Tempered | 30 | 3 | +10% weapon damage |
-| Tier III · Awakened | 80 | 13 | +20% weapon damage. Every 4th Attack unleashes an arcane wave. |
-| Tier IV · Exalted | 150 | 16 | +30% weapon damage. Waves grow larger. |
-| Tier V · Mythic | 260 | 20 | +45% weapon damage. Waves split in three and the weapon blazes. |
+| Tier III · Awakened | 120 | 13 | +20% weapon damage. Every 4th Attack unleashes an arcane wave. |
+| Tier IV · Exalted | 400 | 16 | +30% weapon damage. Waves grow larger. |
+| Tier V · Mythic | 900 | 20 | +45% weapon damage. Waves split in three and the weapon blazes. |
 
 **Hephaestus' Anvil upgrades** (one per anvil, per run)
 

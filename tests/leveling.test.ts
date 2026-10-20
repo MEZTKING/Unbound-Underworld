@@ -17,6 +17,11 @@ import {
   UNLOCKS,
   xpForLevel,
   xpToNext,
+  xpToNextV1,
+  convertXpV1,
+  XP_CURVE,
+  XP,
+  fledglingGrace,
 } from '../src/game/progression';
 import { ALTAR, ALTAR_UPGRADES, altarDefiance, applyAltar, canBuyAltar, migrateTalents, nextAltarCost, sectionState, tableOpen } from '../src/game/altar';
 import { applySkills, canRaiseSkill, HERO_MAX_LEVEL, HERO_TREES, heroLevelFromXp, heroPoints, heroXpForLevel, rowOpen } from '../src/game/herotree';
@@ -78,10 +83,12 @@ describe('feature unlocks', () => {
 });
 
 describe('levels to 50', () => {
-  it('reaches level 50 with a gentler climb after 30', () => {
+  it('reaches level 50: quick early levels, then a steep climb', () => {
     expect(MAX_LEVEL).toBe(50);
     expect(levelFromXp(xpForLevel(50) + 1e6).level).toBe(50);
-    expect(xpToNext(31) - xpToNext(30)).toBe(100);
+    for (let l = 1; l < 50; l++) expect(xpToNext(l + 1)).toBeGreaterThan(xpToNext(l));
+    // The step from level 30 on is far bigger than the early ones.
+    expect(xpToNext(31) - xpToNext(30)).toBeGreaterThan(10 * (xpToNext(3) - xpToNext(2)));
     expect(tierFor(50).name).toBe('Deathless');
     expect(TIERS.every((t, i) => i === 0 || t.level > TIERS[i - 1].level)).toBe(true);
   });
@@ -238,12 +245,64 @@ describe('save migration', () => {
     // Their old unlocks aren't announced all over again.
     expect(vet.seenLevel).toBe(levelFromXp(vet.xp).level);
     const kept = normalizeSave({ xp: 500, talents: { might: 2 }, character: 'lyra', forge: { sword: 3 }, weapons: ['sword', 'fists', 'bogus'] });
-    expect(kept.xp).toBe(500);
+    // Experience from the old curve is converted: same level, same share of the way to the next.
+    expect(kept.xp).toBe(convertXpV1(500));
+    expect(kept.xpCurve).toBe(XP_CURVE);
+    expect(normalizeSave({ xp: 500, xpCurve: XP_CURVE }).xp).toBe(500);
     expect(kept.character).toBe('lyra');
     // Talents moved onto the Altar (v0.9).
     expect(kept.talents).toEqual({});
     expect(kept.upgrades.fury).toBe(2);
     expect(kept.weapons).toEqual(['sword', 'fists']);
     expect(normalizeSave({ character: 'nobody' }).character).toBe('kael');
+  });
+});
+
+describe('the pace of the climb', () => {
+  /**
+   * A typical run's experience at a given level: newcomers fall early in the
+   * first region, mid players reach the Groves, late players escape.
+   */
+  const runXp = (level: number): number => {
+    const r = level < 4 ? [3, 18, 0, 0] : level < 8 ? [6, 40, 1, 0] : level < 15 ? [11, 75, 2, 0] : level < 25 ? [16, 115, 3, 0] : [21, 160, 4, 1];
+    const [rooms, kills, bosses, esc] = r;
+    return rooms * XP.room + kills * XP.kill + Math.round(kills * 0.15) * (XP.eliteKill - XP.kill) + bosses * XP.boss + esc * XP.escape;
+  };
+  const runsFor = (from: number, to: number) => {
+    let n = 0;
+    for (let l = from; l < to; l++) n += xpToNext(l) / runXp(l);
+    return n;
+  };
+
+  it('the early game is quick: every unlock up to Wrath (level 10) in under 8 runs', () => {
+    expect(runsFor(1, 10)).toBeLessThan(8);
+    for (let l = 1; l < 10; l++) expect(xpToNext(l) / runXp(l)).toBeLessThanOrEqual(1);
+  });
+
+  it('the mid and late game are a grind: runs per level keep rising', () => {
+    expect(xpToNext(20) / runXp(20)).toBeGreaterThan(1.8);
+    expect(xpToNext(35) / runXp(35)).toBeGreaterThan(4);
+    expect(xpToNext(49) / runXp(49)).toBeGreaterThan(9);
+    // About twice the runs to reach level 50 as the old curve (107).
+    expect(runsFor(1, 50)).toBeGreaterThan(2 * 107);
+  });
+
+  it('old saves keep their level and progress when converted', () => {
+    for (const xp of [0, 59, 60, 500, 3000, 20000, 90000, 1e7]) {
+      let lv = 1;
+      let rest = xp;
+      while (lv < MAX_LEVEL && rest >= xpToNextV1(lv)) rest -= xpToNextV1(lv++);
+      expect(levelFromXp(convertXpV1(xp)).level).toBe(lv);
+    }
+  });
+
+  it("Fledgling's Grace softens the first levels and is gone by level 6", () => {
+    expect(fledglingGrace(1)).toBeCloseTo(0.3);
+    expect(fledglingGrace(3)).toBeCloseTo(0.18);
+    expect(fledglingGrace(6)).toBe(0);
+    expect(fledglingGrace(30)).toBe(0);
+    const s = baseStats();
+    applyLevel(1, s);
+    expect(s.damageTaken).toBeCloseTo(0.7);
   });
 });

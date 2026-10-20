@@ -69,7 +69,7 @@ Five layers, all permanent. The split is deliberate: the **Altar** and your **le
 
 | Layer | Currency | Where | What it gives |
 |---|---|---|---|
-| **Level & rank** | Experience (automatic) | — | Max level 50, eleven ranks (Shade → Deathless). Unlocks mechanics, heroes and forge tiers; +1 max Health per level and +1% damage per five levels for every hero (`applyLevel`); opens Altar sections |
+| **Level & rank** | Experience (automatic) | — | Max level 50, eleven ranks (Shade → Deathless). Unlocks mechanics, heroes and forge tiers; +1 max Health per level and +1% damage per five levels for every hero (`applyLevel`), and Fledgling's Grace below level 6 (`fledglingGrace`); opens Altar sections. The curve (`xpToNext`) is quick to level 10 and steep after; `tests/leveling.test.ts` checks the runs per level against a model of a typical run, and old saves are converted (`convertXpV1`, `xpCurve`) |
 | **Altar of Ashes** | Ash | Altar (mirror) | Two tables of permanent upgrades for every hero (`altar.ts`). Sections run weakest → strongest; each opens at a level *and* once enough Ash is spent on the sections above. The Deep Altar opens when the first table is complete. Paced to finish around level 50 |
 | **Hero skill trees** | Hero skill points | *Ascension* stone | Each hero's own tree (`herotree.ts`): 3 branches × 4 rows (capstone last). Points come from that hero's level (max 20, one point per level), raised by the experience earned while playing them. Rows open with points in the branch; more ranks than points. Free respec |
 | **Weapon forge** | Ash (+ level) | Blacksmith (needs the Whetstone) | Forge each class weapon from Tier I to Tier V |

@@ -3,7 +3,7 @@ import { migrateTalents } from './altar';
 import { MATERIAL_IDS, normalizeGear, type GearState, type MaterialId, type Materials } from './gear';
 import { CHARACTER_BY_ID, CHARACTERS, isCharacterId, type CharacterId, type Palette } from './characters';
 import { HERO_MAX_LEVEL, heroXpForLevel } from './herotree';
-import { levelFromXp, MAX_LEVEL, xpForLevel } from './progression';
+import { convertXpV1, levelFromXp, MAX_LEVEL, XP_CURVE, xpForLevel } from './progression';
 import type { RunSnapshot } from './run';
 import { partsFromHistory } from './smith';
 import type { RoomKind, WeaponId } from './types';
@@ -103,6 +103,8 @@ export interface SaveData {
   seenIntro: boolean;
   /** Total experience; sets your level. */
   xp: number;
+  /** Which experience curve `xp` was earned under (older saves are converted). */
+  xpCurve: number;
   /** Highest level whose unlocks were announced. */
   seenLevel: number;
   /** Talents from before v0.9 (moved onto the Altar; kept empty). */
@@ -222,6 +224,7 @@ export function defaultSave(): SaveData {
     settings: defaultSettings(),
     seenIntro: false,
     xp: 0,
+    xpCurve: XP_CURVE,
     seenLevel: 1,
     talents: {},
     character: 'kael',
@@ -275,7 +278,9 @@ export function normalizeSave(raw: unknown): SaveData {
   const r = raw as Partial<SaveData>;
   const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
   const stats = { ...d.stats, ...(typeof r.stats === 'object' && r.stats ? r.stats : {}) };
-  const xp = typeof r.xp === 'number' ? Math.max(0, num(r.xp, 0)) : legacyXp(stats);
+  // Experience from before the v0.15 curve is converted: same level, same progress into it.
+  const rawXp = typeof r.xp === 'number' ? Math.max(0, num(r.xp, 0)) : legacyXp(stats);
+  const xp = num(r.xpCurve, 1) >= XP_CURVE ? rawXp : convertXpV1(rawXp);
   const character = isCharacterId(r.character) ? r.character : 'kael';
   // v0.7: each hero wields one weapon, so Ash spent unlocking weapons comes back.
   const oldWeapons = Array.isArray(r.weapons) ? r.weapons.filter(isWeaponId) : [];
@@ -314,6 +319,7 @@ export function normalizeSave(raw: unknown): SaveData {
     settings: { ...d.settings, ...(typeof r.settings === 'object' && r.settings ? r.settings : {}) },
     seenIntro: !!r.seenIntro,
     xp,
+    xpCurve: XP_CURVE,
     seenLevel: Math.max(1, num(r.seenLevel, typeof r.xp === 'number' ? 1 : levelFromXp(xp).level)),
     talents: {},
     character,

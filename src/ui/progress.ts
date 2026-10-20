@@ -5,7 +5,7 @@ import { ALTAR, canBuyAltar, nextAltarCost, rankOf, sectionState, spentBefore, t
 import { CHARACTER_BY_ID, CHARACTERS, characterUnlocked, type CharacterId } from '../game/characters';
 import type { Game } from '../game/game';
 import { canRaiseSkill, HERO_MAX_LEVEL, HERO_TREES, heroLevelFromXp, heroPoints, ROW_GATE, rowOpen, spentSkill, branchSpent } from '../game/herotree';
-import { levelBonus, levelFromXp, MAX_LEVEL, tierFor } from '../game/progression';
+import { fledglingGrace, levelBonus, levelFromXp, MAX_LEVEL, tierFor } from '../game/progression';
 import { esc } from './overlay';
 
 function bind(el: HTMLElement, sel: string, fn: (b: HTMLElement) => void): void {
@@ -48,7 +48,7 @@ export function altar(g: Game): void {
       .join('');
     const done = tableComplete(ranks, table);
     return `<div class="row-btns tabs">${tabs}</div>
-      <div class="subtitle">Ash: <b>${g.save.ash}</b> ◆ · Level ${level}: +${lb.hp} max Health${lb.dmg ? ` and +${Math.round(lb.dmg * 100)}% damage` : ''} for every hero</div>
+      <div class="subtitle">Ash: <b>${g.save.ash}</b> ◆ · Level ${level}: +${lb.hp} max Health${lb.dmg ? ` and +${Math.round(lb.dmg * 100)}% damage` : ''} for every hero${fledglingGrace(level) > 0 ? ` · Fledgling's Grace: take ${Math.round(fledglingGrace(level) * 100)}% less damage (fades by level 6)` : ''}</div>
       <p class="small">${esc(t.blurb)}${table === 0 && !done ? ' Complete every upgrade here to open the Deep Altar.' : ''}</p>
       ${sections}`;
   };

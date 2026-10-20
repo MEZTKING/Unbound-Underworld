@@ -13,7 +13,7 @@ import { HERO_MAX_LEVEL, HERO_TREES, heroPoints, heroXpForLevel, heroXpToNext, R
 import { SMITH_PARTS } from '../src/game/smith';
 import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, ENDGAME_TRAIT_HEAT, GUARDIAN_RULE_HEAT, PAINTED, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
 import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, maxDropStars, minRoll, PERKS, RARITY_ORDER, regionMaterial, SLOT_NAME, starOdds, upgradeCost } from '../src/game/gear';
-import { FORGE, levelBonus, levelFromXp, MAX_LEVEL, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
+import { FORGE, fledglingGrace, levelBonus, levelFromXp, MAX_LEVEL, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
 import { BIOMES, ENEMY_COST } from '../src/game/rooms';
 import type { BossKind, EnemyKind, GodId, Rarity } from '../src/game/types';
@@ -62,6 +62,8 @@ line();
 line('## Progression: levels, ranks and unlocks');
 line();
 line(`Experience carries over between runs. Max level: **${MAX_LEVEL}**. Every level gives every hero +1 max Health, and every fifth level +1% damage. Levels also open the Altar of Ashes' sections. The same experience raises the hero you play (see *Hero skill trees*).`);
+line();
+line(`The curve is quick early (${xpToNext(1)}–${xpToNext(9)} XP for levels 1–9, about a run each) and steep from level 10 (${xpToNext(10)} XP, rising to ${xpToNext(MAX_LEVEL - 1).toLocaleString()} for level ${MAX_LEVEL - 1}). *Fledgling's Grace*: at level 1 foes deal ${Math.round(fledglingGrace(1) * 100)}% less damage, fading to nothing by level 6.`);
 line();
 line('**Experience sources**');
 line();

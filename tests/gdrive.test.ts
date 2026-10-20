@@ -81,7 +81,7 @@ describe('Google Drive saves', () => {
   it('refuses files that are not this game’s saves', () => {
     expect(() => parseStored('not json')).toThrow(/damaged/);
     expect(() => parseStored(JSON.stringify({ hello: 1 }))).toThrow(/not a save/);
-    const ok = parseStored(JSON.stringify({ game: 'unbound-underworld', v: 1, at: 5, save: { xp: 10 } }));
+    const ok = parseStored(JSON.stringify({ game: 'unbound-underworld', v: 1, at: 5, save: { xp: 10, xpCurve: 2 } }));
     expect(ok.at).toBe(5);
     expect(ok.save.xp).toBe(10);
   });
