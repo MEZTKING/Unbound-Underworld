@@ -69,6 +69,36 @@ export abstract class Boss extends Enemy {
       return;
     }
     super.update(w, dt);
+    this.watchStuck(w, dt);
+  }
+
+  private stuckCheckT = 1;
+  private stuckFor = 0;
+  private stuckFrom = { x: 0, y: 0 };
+
+  /**
+   * Last resort: a guardian pressed against an obstacle that hasn't got
+   * anywhere in 3 s, while still away from the hero, slips out to open ground
+   * near them (in a puff of smoke) rather than stay wedged.
+   */
+  private watchStuck(w: World, dt: number): void {
+    this.stuckCheckT -= dt;
+    if (this.stuckCheckT > 0) return;
+    this.stuckCheckT = 1;
+    const moved = Math.hypot(this.x - this.stuckFrom.x, this.y - this.stuckFrom.y);
+    this.stuckFrom = { x: this.x, y: this.y };
+    const pressed = this.lastHit !== null && this.speed > 0 && this.status.stun === undefined;
+    const away = Math.hypot(this.x - w.player.x, this.y - w.player.y) > this.r + 140;
+    this.stuckFor = pressed && away && moved < 14 ? this.stuckFor + 1 : 0;
+    if (this.stuckFor < 3) return;
+    this.stuckFor = 0;
+    const a = angleTo(w.player, this);
+    const spot = w.openSpotNear(clamp(w.player.x + Math.cos(a) * 260, 80, w.room.w - 80), clamp(w.player.y + Math.sin(a) * 260, 160, w.room.h - 80), this.r);
+    w.particles.burst(this.x, this.y - this.height / 2, '#6a5a70', 16, 240, { kind: 'smoke', size: 14, gravity: 0, life: 0.6, additive: false });
+    this.x = spot.x;
+    this.y = spot.y;
+    this.vx = this.vy = this.kx = this.ky = 0;
+    w.particles.burst(this.x, this.y - this.height / 2, '#6a5a70', 16, 240, { kind: 'smoke', size: 14, gravity: 0, life: 0.6, additive: false });
   }
 
   onDamaged(w: World, dmg: number, source: Parameters<Enemy['onDamaged']>[2]): void {
@@ -809,10 +839,14 @@ export class Cerberus extends Boss {
     switch (this.state) {
       case 'idle':
         this.circle(w, 320, dt, this.speed * 0.6);
-        if (this.cd <= 0) this.setState(this.choose([
+        // He only charges down a clear lane: a pillar in the way means a leap instead.
+        if (this.cd <= 0) this.setState(this.choose(w.clearPath(this.x, this.y, p.x, p.y, this.r) ? [
           ['charge', 3],
           ['breath', 2],
           ['leap', 2],
+        ] : [
+          ['leap', 3],
+          ['breath', 1],
         ]));
         this.breaths = 0;
         break;
@@ -891,7 +925,8 @@ export class Cerberus extends Boss {
       }
       case 'leap': {
         if (this.stateT < 0.02) {
-          this.leap = { sx: this.x, sy: this.y, tx: clamp(p.x, 80, w.room.w - 80), ty: clamp(p.y, 140, w.room.h - 80) };
+          const land = w.openSpotNear(clamp(p.x, 80, w.room.w - 80), clamp(p.y, 140, w.room.h - 80), this.r);
+          this.leap = { sx: this.x, sy: this.y, tx: land.x, ty: land.y };
           this.telegraph(w, { type: 'circle', x: this.leap.tx, y: this.leap.ty, r: 160 }, 1.1 / this.haste, () => {
             w.addHitbox({ team: 'enemy', shape: { type: 'circle', x: this.leap.tx, y: this.leap.ty, r: 160 }, damage: this.dmg * 1.2, source: 'enemy', knock: 600, ttl: 0.1, hit: new Set(), owner: this, tag: 'ground' });
             w.addHitbox({ team: 'enemy', shape: { type: 'ring', x: this.leap.tx, y: this.leap.ty, r1: 150, r2: 180 }, damage: this.dmg * 0.7, source: 'enemy', knock: 300, ttl: 1.4, hit: new Set(), owner: this, tag: 'ground', grow: 460 });

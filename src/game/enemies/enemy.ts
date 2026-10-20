@@ -100,6 +100,10 @@ export abstract class Enemy extends Actor {
   /** Seconds this foe has been stuck out of reach (see `World.unstick`). */
   stuckT = 0;
   lastPos = { x: 0, y: 0 };
+  /** Seconds pressed against an obstacle; and while skirting round one, how long and which way. */
+  private snagT = 0;
+  private skirtT = 0;
+  private skirt = { x: 0, y: 0 };
   /** Party play: the hero this foe is after (see `World.targetFor`). */
   target: Actor | null = null;
   retargetT = 0;
@@ -261,12 +265,18 @@ export abstract class Enemy extends Actor {
     return n >= 2 + w.tokenBonus;
   }
 
-  /** Steers toward a point using line of sight or the room's flow field. */
+  /**
+   * Steers toward a point. When something stands in the way of a point on the
+   * hero's side, it follows the room's flow field round it; when it is pressed
+   * against an obstacle anyway (a big body on a pillar's corner), it slides
+   * along, and if it still makes no headway it skirts round for a moment.
+   */
   moveToward(w: World, tx: number, ty: number, speed: number, dt: number, accel = 10): void {
     let dx = tx - this.x;
     let dy = ty - this.y;
-    const toPlayer = tx === w.player.x && ty === w.player.y;
-    if (toPlayer && !w.lineOfSight(this.x, this.y, tx, ty, this.r)) {
+    const p = w.player;
+    const towardHero = Math.hypot(tx - p.x, ty - p.y) < Math.hypot(this.x - p.x, this.y - p.y) + this.r;
+    if (towardHero && !w.clearPath(this.x, this.y, tx, ty, this.r)) {
       const f = w.flowDir(this.x, this.y);
       if (f) {
         dx = f.x;
@@ -278,8 +288,36 @@ export abstract class Enemy extends Actor {
       this.stop(dt);
       return;
     }
-    this.vx = damp(this.vx, (dx / l) * speed, accel, dt);
-    this.vy = damp(this.vy, (dy / l) * speed, accel, dt);
+    let ux = dx / l;
+    let uy = dy / l;
+    const n = this.lastHit;
+    if (this.skirtT > 0) {
+      this.skirtT -= dt;
+      ux = this.skirt.x;
+      uy = this.skirt.y;
+    } else if (n && ux * n.x + uy * n.y < -0.2) {
+      // Pressed into something: slide along it, and skirt round if that stalls.
+      const into = ux * n.x + uy * n.y;
+      const sx = ux - n.x * into;
+      const sy = uy - n.y * into;
+      this.snagT += dt;
+      if (this.snagT > 0.5 || Math.hypot(sx, sy) < 0.25) {
+        // Go round on the side the slide was already heading (head-on: either).
+        const along = sx * -n.y + sy * n.x;
+        const side = Math.abs(along) > 0.05 ? Math.sign(along) : this.id % 2 ? 1 : -1;
+        this.skirt = { x: -n.y * side * 0.85 + n.x * 0.5, y: n.x * side * 0.85 + n.y * 0.5 };
+        this.skirtT = 0.6;
+        this.snagT = 0;
+        ux = this.skirt.x;
+        uy = this.skirt.y;
+      } else {
+        const sl = Math.hypot(sx, sy);
+        ux = sx / sl;
+        uy = sy / sl;
+      }
+    } else this.snagT = Math.max(0, this.snagT - dt);
+    this.vx = damp(this.vx, ux * speed, accel, dt);
+    this.vy = damp(this.vy, uy * speed, accel, dt);
     this.turnTo(Math.atan2(this.vy, this.vx), dt);
   }
 
