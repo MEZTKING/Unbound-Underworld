@@ -439,6 +439,39 @@ export class World {
     return true;
   }
 
+  /** A clear walk for a body of radius `r`: its middle and both flanks pass. */
+  clearPath(x1: number, y1: number, x2: number, y2: number, r: number): boolean {
+    if (!this.lineOfSight(x1, y1, x2, y2)) return false;
+    const d = Math.hypot(x2 - x1, y2 - y1);
+    if (d < 1 || r < 20) return true;
+    const ox = (-(y2 - y1) / d) * r * 0.8;
+    const oy = ((x2 - x1) / d) * r * 0.8;
+    return this.lineOfSight(x1 + ox, y1 + oy, x2 + ox, y2 + oy) && this.lineOfSight(x1 - ox, y1 - oy, x2 - ox, y2 - oy);
+  }
+
+  /** Open floor a walker can stand on (no obstacle, pit or lava). */
+  openAt(x: number, y: number): boolean {
+    return x > 0 && y > 0 && x < this.room.w && y < this.room.h && this.grid.block[this.cellIndex(x, y)] === 0;
+  }
+
+  /** The nearest spot to (x, y) where a body of radius `r` stands clear of obstacles. */
+  openSpotNear(x: number, y: number, r: number): Vec {
+    const clear = (px: number, py: number) => {
+      if (!this.openAt(px, py)) return false;
+      for (let i = 0; i < 8; i++) if (!this.openAt(px + Math.cos((i * TAU) / 8) * r * 0.8, py + Math.sin((i * TAU) / 8) * r * 0.8)) return false;
+      return true;
+    };
+    if (clear(x, y)) return { x, y };
+    for (let d = CELL / 2; d < 600; d += CELL / 2) {
+      for (let i = 0; i < 16; i++) {
+        const px = x + Math.cos((i * TAU) / 16) * d;
+        const py = y + Math.sin((i * TAU) / 16) * d;
+        if (px > r + 20 && py > r + 100 && px < this.room.w - r - 20 && py < this.room.h - r - 20 && clear(px, py)) return { x: px, y: py };
+      }
+    }
+    return { x, y };
+  }
+
   private solidAt(x: number, y: number): boolean {
     for (const o of this.room.obstacles) {
       if (o.type === 'rect' ? x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h : (x - o.x) ** 2 + (y - o.y) ** 2 < o.r * o.r) return true;
