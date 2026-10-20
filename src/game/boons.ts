@@ -882,9 +882,11 @@ export function godsInBuild(boons: readonly OwnedBoon[]): GodId[] {
 export type RarityOdds = Record<'common' | 'rare' | 'epic' | 'heroic', number>;
 
 /**
- * Boon rarity by region: early boons are mostly Common, and the rarer ones
- * grow more likely the deeper the escape goes. The very first boon of an
- * escape is at most Rare.
+ * Boon rarity at the start of each region: early boons are mostly Common, and
+ * the rarer ones grow more likely the deeper the escape goes. Within a region
+ * the odds climb chamber by chamber towards the next region's, so there is no
+ * sudden jump at a region's gate. The very first boon of an escape is at most
+ * Rare. (tests/boons.test.ts checks real offers against these.)
  */
 export const BOON_RARITY_BY_REGION: RarityOdds[] = [
   { common: 0.925, rare: 0.07, epic: 0.005, heroic: 0 },
@@ -892,13 +894,30 @@ export const BOON_RARITY_BY_REGION: RarityOdds[] = [
   { common: 0.775, rare: 0.15, epic: 0.06, heroic: 0.015 },
   { common: 0.71, rare: 0.165, epic: 0.095, heroic: 0.03 },
 ];
+/** Where the last region's odds climb to, by its end. */
+export const BOON_RARITY_END: RarityOdds = { common: 0.65, rare: 0.18, epic: 0.125, heroic: 0.045 };
 const FIRST_BOON_ODDS: RarityOdds = { common: 0.95, rare: 0.05, epic: 0, heroic: 0 };
 /** Per rank of Favor of the Gods. */
 export const FAVOR_ODDS = { rare: 0.02, epic: 0.01, heroic: 0.0025 };
 
-/** Rarity odds for a boon in region `region` (0–3). Each rank of Favor of the Gods moves 3.25% from Common to the rarer tiers. */
-export function boonRarityOdds(region: number, first = false, favor = 0): RarityOdds {
-  const base = first ? FIRST_BOON_ODDS : BOON_RARITY_BY_REGION[Math.max(0, Math.min(BOON_RARITY_BY_REGION.length - 1, region))];
+/** The base odds `progress` (0–1) of the way through region `region`. */
+export function regionRarity(region: number, progress = 0): RarityOdds {
+  const last = BOON_RARITY_BY_REGION.length - 1;
+  const r = Math.max(0, Math.min(last, region));
+  const from = BOON_RARITY_BY_REGION[r];
+  const to = BOON_RARITY_BY_REGION[r + 1] ?? BOON_RARITY_END;
+  const t = Math.max(0, Math.min(1, progress));
+  const mix = (k: keyof RarityOdds) => from[k] + (to[k] - from[k]) * t;
+  return { common: mix('common'), rare: mix('rare'), epic: mix('epic'), heroic: mix('heroic') };
+}
+
+/**
+ * Rarity odds for a boon `progress` (0–1) of the way through region `region`
+ * (0–3). Each rank of Favor of the Gods moves 3.25% from Common to the rarer
+ * tiers.
+ */
+export function boonRarityOdds(region: number, first = false, favor = 0, progress = 0): RarityOdds {
+  const base = first ? FIRST_BOON_ODDS : regionRarity(region, progress);
   const f = first ? 0 : favor;
   const rare = base.rare + f * FAVOR_ODDS.rare;
   const epic = base.epic + f * FAVOR_ODDS.epic;

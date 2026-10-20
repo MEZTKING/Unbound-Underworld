@@ -23,6 +23,7 @@ import { mapScreen } from './map';
 import { leaveOnline, multiplayer, saveSync } from './multiplayer';
 import { esc, type Card } from './overlay';
 import { campaign } from './campaign';
+import { COLOR_MODE_NAME, type ColorMode } from '../game/palette';
 export { campaign, missionComplete, missionFailed } from './campaign';
 
 export type CardData = Card;
@@ -392,7 +393,7 @@ export function help(g: Game, intro = false): void {
 
 export function settings(g: Game): void {
   const s = g.save.settings;
-  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'attackPreview' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration' | 'view3d';
+  type Toggle = 'muted' | 'assist' | 'aimAssist' | 'damageNumbers' | 'hints' | 'doorInfo' | 'attackPreview' | 'hitstop' | 'showFps' | 'leftHanded' | 'vibration' | 'foeOutline' | 'toggleGuard';
   type Slider = 'volume' | 'music' | 'shake' | 'flashes' | 'touchSize' | 'touchOpacity' | 'uiSize';
   const toggleLabel: Record<Toggle, string> = {
     muted: 'Sound',
@@ -406,8 +407,10 @@ export function settings(g: Game): void {
     showFps: 'Show FPS',
     leftHanded: 'Left-handed layout',
     vibration: 'Vibration',
-    view3d: '3D voxel view (off: classic 2D)',
+    foeOutline: 'High-contrast foes (a bright ring)',
+    toggleGuard: 'Guard: tap to raise, tap to lower',
   };
+  const speedLabel = (v: number) => `${Math.round(v * 100)}%${v < 1 ? ' (no achievements)' : ''}`;
   const isOn = (k: Toggle) => (k === 'muted' ? !s.muted : s[k]);
   const toggle = (k: Toggle) => `<button class="btn toggle${isOn(k) ? ' on' : ''}" data-nav data-t="${k}"><span>${toggleLabel[k]}</span><b>${isOn(k) ? 'On' : 'Off'}</b></button>`;
   const slider = (k: Slider, label: string, min: number, max: number, step: number) =>
@@ -422,18 +425,22 @@ export function settings(g: Game): void {
       ${slider('music', 'Music volume', 0, 1, 0.05)}
       ${toggle('muted')}
       <h3 class="section">Gameplay</h3>
-      ${toggle('assist')}
       ${toggle('aimAssist')}
       ${toggle('damageNumbers')}
       ${toggle('attackPreview')}
       ${toggle('hints')}
       ${document.body.classList.contains('touch') ? toggle('doorInfo') : ''}
       ${document.body.classList.contains('touch') ? '' : '<h3 class="section">Controls</h3><button class="btn toggle" data-nav data-a="keys"><span>Key bindings</span><b>⌨</b></button>'}
+      <h3 class="section">Accessibility</h3>
+      ${slider('uiSize', 'Text and UI size', 0.75, 1.5, 0.05)}
+      ${slider('shake', 'Screen shake (left: off)', 0, 1.5, 0.1)}
+      ${slider('flashes', 'Flashes (left: softest)', 0, 1, 0.1)}
+      <button class="btn toggle" data-nav data-a="color"><span>Colour-blind colours</span><b data-color>${esc(COLOR_MODE_NAME[s.colorMode] ?? 'Off')}</b></button>
+      ${toggle('foeOutline')}
+      ${toggle('toggleGuard')}
+      ${toggle('assist')}
+      <button class="btn toggle" data-nav data-a="speed"><span>Game speed</span><b data-speed>${speedLabel(s.speed)}</b></button>
       <h3 class="section">Display</h3>
-      ${toggle('view3d')}
-      ${slider('uiSize', 'UI size', 0.75, 1.5, 0.05)}
-      ${slider('shake', 'Screen shake', 0, 1.5, 0.1)}
-      ${slider('flashes', 'Flash intensity', 0, 1, 0.1)}
       ${toggle('hitstop')}
       ${toggle('showFps')}
       ${
@@ -501,6 +508,20 @@ export function settings(g: Game): void {
     const a = b.dataset.a;
     if (a === 'dev') devMenu(g);
     else if (a === 'keys') keyBindings(g);
+    else if (a === 'color') {
+      const modes = Object.keys(COLOR_MODE_NAME) as ColorMode[];
+      s.colorMode = modes[(modes.indexOf(s.colorMode) + 1) % modes.length];
+      b.querySelector('b')!.textContent = COLOR_MODE_NAME[s.colorMode];
+      audio.play('select');
+      apply();
+    } else if (a === 'speed') {
+      const speeds = [1, 0.85, 0.7];
+      s.speed = speeds[(speeds.indexOf(s.speed) + 1) % speeds.length] ?? 1;
+      b.querySelector('b')!.textContent = speedLabel(s.speed);
+      audio.play('select');
+      apply();
+      if (s.speed < 1) g.ui.toast('A slower game gives more time to react. Achievements are off while it is below 100%.', 4000);
+    }
     else if (a === 'window') {
       // Windowed → Borderless → Fullscreen. Borderless reopens the window, so save first.
       const order: WindowMode[] = ['windowed', 'borderless', 'fullscreen'];
@@ -536,7 +557,7 @@ function boonCard(b: OwnedBoon, opts: { slot?: string } = {}): string {
   const gods = def.duoOf ? def.duoOf.map((id) => GODS[id].glyph).join(' ') : GODS[def.god].glyph;
   return `<div class="bcard" style="--c:${col}">
     ${opts.slot ? `<span class="bslot">${opts.slot}</span>` : ''}
-    <div class="bhead"><i class="bglyph">${gods}</i><b>${esc(def.name)}</b><span class="tag" style="--t:${RARITY_COLOR[b.rarity]}">${b.rarity}${b.level > 1 ? ` · Lv ${b.level}` : ''}</span></div>
+    <div class="bhead"><i class="bglyph">${gods}</i><b>${esc(def.name)}</b><span class="tag" style="--t:${def.fixed && def.slot !== 'duo' ? '#d8c8a0' : RARITY_COLOR[b.rarity]}">${def.fixed && def.slot !== 'duo' ? 'special' : b.rarity}${b.level > 1 ? ` · Lv ${b.level}` : ''}</span></div>
     <div class="bdesc">${esc(describeBoon(b))}</div></div>`;
 }
 

@@ -7,7 +7,7 @@ import type { Loot } from './entities';
 import type { GearRarity, MaterialId } from './gear';
 import { altarDefiance, altarFavor, applyAltar, rankOf } from './altar';
 import { heatScale, type SaveData } from './meta';
-import { DOOR_COUNT, DOOR_WEIGHT } from './odds';
+import { DOOR_COUNT, DOOR_WEIGHT, PAINTED } from './odds';
 import { hasFeature } from './progression';
 import { BIOMES, type BiomeInfo } from './rooms';
 import type { PlayerStats } from './stats';
@@ -277,6 +277,12 @@ export class Run {
     return run;
   }
 
+  /** How far through the current region the escape is (0 at its first chamber, 1 at its guardian). */
+  get regionProgress(): number {
+    const rooms = this.biome.combatRooms;
+    return rooms > 0 ? Math.min(1, this.depth / rooms) : 1;
+  }
+
   get biome(): BiomeInfo {
     return BIOMES[this.biomeIndex];
   }
@@ -370,13 +376,15 @@ export class Run {
     if (options.every(([, w]) => w <= 0)) return null;
     const kind = this.rng.weighted(options);
     usedKinds.add(kind);
+    if (kind === 'shop' || kind === 'fountain') return { kind, reward: { kind } };
+    // In the Gilded Groves a door may lead into a fresco: a Painted Chamber.
+    const painted = this.biomeIndex === PAINTED.region && d >= 1 && this.rng.chance(PAINTED.chance) ? { painted: true } : {};
     if (kind === 'boon') {
       const god = this.rng.pick(gods);
       usedGods.add(god);
-      return { kind: 'combat', reward: { kind, god } };
+      return { kind: 'combat', reward: { kind, god, ...painted } };
     }
-    if (kind === 'shop' || kind === 'fountain') return { kind, reward: { kind } };
-    return { kind: 'combat', reward: { kind } };
+    return { kind: 'combat', reward: { kind, ...painted } };
   }
 
   /** Advances bookkeeping when entering a new room. */

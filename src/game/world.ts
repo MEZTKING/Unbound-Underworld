@@ -174,6 +174,8 @@ export class World {
   encounter: Encounter | null = null;
   boss: Enemy | null = null;
   banner: { title: string; sub: string; t: number } | null = null;
+  /** A flat chamber, painted like a fresco (drawn in 2D with a gilded frame). */
+  painted = false;
   /** Behind the title screen the camera drifts slowly around the hall. */
   titleDrift = false;
   /** Extra attack tokens for foes (more at higher Torment). */

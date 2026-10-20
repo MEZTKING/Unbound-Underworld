@@ -10,7 +10,7 @@ import { heatScale, WEAPON_IDS } from '../src/game/meta';
 import { ALTAR, ALTAR_BY_ID, altarTotal } from '../src/game/altar';
 import { HERO_MAX_LEVEL, HERO_TREES, heroPoints, heroXpForLevel, heroXpToNext, ROW_GATE } from '../src/game/herotree';
 import { SMITH_PARTS } from '../src/game/smith';
-import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
+import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, PAINTED, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
 import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, maxDropStars, minRoll, PERKS, RARITY_ORDER, regionMaterial, SLOT_NAME, starOdds, upgradeCost } from '../src/game/gear';
 import { FORGE, levelBonus, levelFromXp, MAX_LEVEL, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
@@ -342,11 +342,12 @@ table(
   doorKinds.map((k) => [REWARD_INFO[k] ? `${REWARD_INFO[k].glyph} ${REWARD_INFO[k].label}` : k, DOOR_WEIGHT[k], pc(DOOR_WEIGHT[k] / weightTotal), DOOR_RULE[k]]),
 );
 line('Fixed doors: after the last chamber of a region comes the antechamber, then the guardian; after a guardian, a boon door into the next region.');
+line(`Painted Chambers: in ${BIOMES[PAINTED.region].name}, from its second chamber, each combat door has a ${pc(PAINTED.chance)} chance to lead into a fresco: the chamber is drawn flat (2D), and a boon there is at least Rare (its Common odds go to Rare).`);
 line();
 
 line('### Boon rarity');
 line();
-line('Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike; deeper regions raise the odds. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon.');
+line('Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike. The odds climb chamber by chamber: from a region\'s first chamber (below) towards the next region\'s, so there is no jump at a region\'s gate. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon. Sacred Ward, Second Step and Extra Shard work the same at any rarity, so they show as *Special* and roll none.');
 line();
 const rar = (o: { common: number; rare: number; epic: number; heroic: number }) => [pc(o.common), pc(o.rare), pc(o.epic), pc(o.heroic)];
 const favorMax = ALTAR_BY_ID.favor.costs.length;
@@ -354,7 +355,8 @@ table(
   ['When', 'Common', 'Rare', 'Epic', 'Heroic'],
   [
     ['First boon of an escape', ...rar(boonRarityOdds(0, true))],
-    ...BOON_RARITY_BY_REGION.map((_, i) => [BIOMES[i]?.name ?? `Region ${i + 1}`, ...rar(boonRarityOdds(i))]),
+    ...BOON_RARITY_BY_REGION.map((_, i) => [`${BIOMES[i]?.name ?? `Region ${i + 1}`}, first chamber`, ...rar(boonRarityOdds(i))]),
+    ['End of the last region', ...rar(boonRarityOdds(BOON_RARITY_BY_REGION.length - 1, false, 0, 1))],
     ...BOON_RARITY_BY_REGION.map((_, i) => [`${BIOMES[i]?.name ?? `Region ${i + 1}`}, Favor ${favorMax}`, ...rar(boonRarityOdds(i, false, favorMax))]),
   ],
 );

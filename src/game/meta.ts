@@ -1,3 +1,4 @@
+import type { ColorMode } from './palette';
 import { migrateTalents } from './altar';
 import { MATERIAL_IDS, normalizeGear, type GearState, type MaterialId, type Materials } from './gear';
 import { CHARACTER_BY_ID, CHARACTERS, isCharacterId, type CharacterId, type Palette } from './characters';
@@ -34,9 +35,16 @@ export interface Settings {
   touchOpacity: number;
   leftHanded: boolean;
   /** 3D voxel view; off draws the classic 2D view. */
-  view3d: boolean;
   /** HUD, menu and label size multiplier (0.75..1.5). */
   uiSize: number;
+  /** Colour-blind friendly rarity colours. */
+  colorMode: ColorMode;
+  /** A bright ring around every foe. */
+  foeOutline: boolean;
+  /** Guard: tap to raise, tap again to lower (instead of holding). */
+  toggleGuard: boolean;
+  /** Game speed for more reaction time: 1, 0.85 or 0.7 (below 1 turns achievements off). */
+  speed: number;
   /** Rebound keys: action → key codes (unset actions use the defaults). */
   keys: Record<string, string[]>;
 }
@@ -60,8 +68,11 @@ export function defaultSettings(): Settings {
     touchSize: 1,
     touchOpacity: 0.9,
     leftHanded: false,
-    view3d: true,
     uiSize: 1,
+    colorMode: 'normal',
+    foeOutline: false,
+    toggleGuard: false,
+    speed: 1,
     keys: {},
   };
 }

@@ -46,6 +46,9 @@ export const DOOR_RULE: Record<DoorReward, string> = {
   fountain: 'From chamber 3, once per region',
 };
 
+/** Painted Chambers: in this region (the Gilded Groves), from its second chamber, a combat door may lead into a fresco (drawn flat, in 2D). */
+export const PAINTED = { region: 2, chance: 0.18 };
+
 /** Chance a foe of cost 2+ in a wave carries an elite trait (armored, swift, volatile or regenerating). */
 export function eliteChance(depth: number, region: number, eliteRoom: boolean): number {
   return Math.min(0.45, 0.05 + depth * 0.04 + region * 0.08 + (eliteRoom ? 0.3 : 0));

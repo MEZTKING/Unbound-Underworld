@@ -93,7 +93,7 @@ When a mechanic is locked, its rewards (tomes, artifact caches, anvils, Cast boo
 - **Inputs.**
   - Attack and Special. **Combat grammar:** taps chain (`ActionDef.chain` = the step); holding Attack for `POWER_HOLD` (0.22 s) after a chain hit swaps into `Weapon.powered(step)`, a charge built by `poweredAttack()` (level 1–3 from the chain step, a Perfect for releasing on the flash). Still holding after that = `Weapon.held()` (repeat, a spin, the bow's draw, the katana's ready stance…). A Special within 0.6 s of a chain hit is a combo special (30% faster windup, +25% damage).
   - **Attack outline and charge meter** (`render.ts`: `drawAttackPreview`, `drawChargeMeter`; setting `attackPreview`): `Weapon.preview()` returns the shapes the next tap would hit (it reads the chain step without advancing it, `nextStep()`); a charging `ActionDef` shows its own `preview` filled by charge, and its `power` (label, chain level, `mult(holdT)`) drives the meter. `hold.perfect` marks the Perfect window. The outline appears when you attack and fades 2.2 s after the last one (`OUTLINE_HOLD`); the charge outline shows whenever a move charges.
-  - **Camera** (`Game.turnCamera`, `toggleView`): `Tab` switches the 2D and 3D views; `Z` / `X` turn the 3D camera around the hero up to 0.74 rad (~42°) each way from the default 45° yaw, both together swing it back. Rooms are built to be seen from the south-east (tall walls and doors to the north and west), which is why the turn is limited. Movement and aim are camera-relative, so they follow the turn.
+  - **Camera** (`Game.turnCamera`, `applyView`): the world is 3D, except flat chambers (`Game.flatNow`: Painted Chambers, `flat` campaign rooms), which are drawn in 2D with a paper-fold transition (`body.fold`); `Z` / `X` turn the 3D camera around the hero up to 0.74 rad (~42°) each way from the default 45° yaw, both together swing it back. Rooms are built to be seen from the south-east (tall walls and doors to the north and west), which is why the turn is limited. Movement and aim are camera-relative, so they follow the turn.
   - Cast: a shard that lodges in foes; walk over it to pick it up again.
   - Dash: brief invulnerability. Attacking right after a dash gives a *Dash-Strike*.
   - Jump: attack mid-air to *Slam*.
@@ -279,7 +279,7 @@ Up to four heroes (`MAX_PARTY`). The **party core** lets one `World` hold severa
 - **Settings:**
   - Audio.
   - Assist mode, aim assist, damage numbers, control hints, and door descriptions (every door, or only the nearest).
-  - 3D voxel view or classic 2D view, UI size, shake, flashes, hit-stop, FPS counter, fullscreen.
+  - Accessibility: UI size, shake, flashes, colour-blind colours (`palette.ts` recolours rarities in place), high-contrast foe rings, tap-to-guard, assist mode, game speed (100/85/70%, achievements off below 100%, ignored online). Display: hit-stop, FPS counter, fullscreen.
   - Touch button size, opacity, left-handed layout and vibration.
 
 ## 11. Where things live in the code

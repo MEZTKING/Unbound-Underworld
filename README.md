@@ -57,6 +57,7 @@ On touch screens, drag anywhere on the left half to move. The buttons on the rig
 
 ## Game documentation
 
+- **[docs/ROADMAP.md](docs/ROADMAP.md):** what's coming. Every chapter still to come, bosses whose rules you must learn, the levels that turn flat, the daily challenge, endgame, accessibility and the boon rarity tests.
 - **[docs/DESIGN.md](docs/DESIGN.md):** how the game works. Covers the run structure, progression and unlock order, combat, build systems, heroes, enemy and boss behaviour, where everything lives in the code, and how to add new content.
 - **[docs/GAME_DATA.md](docs/GAME_DATA.md):** every number in the game, generated from the code. This includes the level table, the Altar of Ashes, hero skill trees, the Blacksmith, heroes, weapons and forge tiers, every boon, enchantment and artifact, regions, enemies, guardians and Torment. Run `npm run docs` after changing game data; CI checks that it's up to date.
 
@@ -87,7 +88,6 @@ To try the touch controls on a computer, open the browser's device toolbar (phon
 | Healing potion | `R` or `4` | `LB` |
 | Wrath (ultimate, when the gauge is full) | `V` or `5` | `R3` |
 | Interact | `E` | `Select` / `R3` |
-| Switch 2D / 3D view | `Tab` | — |
 | Turn the camera (3D, up to 45° each way) | `Z` / `X` | — |
 | Pause · Mute | `Esc` · `M` | `Start` |
 
@@ -165,8 +165,15 @@ For play over the internet, forward the port on your router (or run it on a VPS)
 ### Settings
 *Settings* (on the title screen or in the pause menu) has:
 - **Audio:** sound and music volume, mute.
-- **Gameplay:** Assist mode (take half damage), aim assist, damage numbers, the attack range outline and charge meter, control hints, and (on phones) door descriptions for every door or only the one you walk up to.
-- **Display:** the **3D voxel view** (on by default, with a Hades-style angled camera) or the classic 2D view, plus **UI size**, a **window mode** on desktop (Windowed, Borderless or Fullscreen), screen shake, flash intensity, hit-stop, an FPS counter and fullscreen. On desktop the 3D view has real-time shadows and lights. Phones get a lighter version without shadows, at a lower resolution. If a device can't run WebGL, the game uses the 2D view.
+- **Gameplay:** aim assist, damage numbers, the attack range outline and charge meter, control hints, and (on phones) door descriptions for every door or only the one you walk up to.
+- **Accessibility:**
+  - text and UI size, screen shake (down to off) and flash strength (down to softest);
+  - **colour-blind colours** (red–green or blue–yellow), which recolour every rarity; tiers are always named too;
+  - **high-contrast foes**, which put a bright ring around every foe;
+  - **tap-to-guard**: tap once to raise Guard and again to lower it;
+  - Assist mode (take half damage);
+  - **game speed** at 100%, 85% or 70%. Below 100% achievements are off. Online play always runs at full speed.
+- **Display:** a **window mode** on desktop (Windowed, Borderless or Fullscreen), hit-stop, an FPS counter and fullscreen. The game is drawn in a 3D voxel view with a Hades-style angled camera. Desktops get real-time shadows and lights; phones get a lighter version without shadows, at a lower resolution. **Some places are flat**: they turn 2D on their own, with a paper-fold as the world flattens. These are the *Painted Chambers* of the Gilded Groves, where a door sometimes leads into a fresco; a boon there is at least Rare. Later chapters add more (see [docs/ROADMAP.md](docs/ROADMAP.md)). Devices that can't run WebGL play everything in 2D.
 - **Touch:** button size and opacity, a left-handed (mirrored) layout, and vibration.
 
 On PC, point at a HUD icon (boons, enchantments, artifacts, potion) to see what it does. The synthesized score uses strings, flute, bells, a lyre, a choir and drums; each guardian has its own battle theme, which intensifies (and brings in the choir) in phase 2.
@@ -236,7 +243,7 @@ These URL parameters are handy for testing:
 | `?level=12` | Play at that level for this session (unlocks everything up to it) |
 | `?seed=123` | Use a fixed run seed |
 | `?dev` | Show the developer options |
-| `?view=2d` | Use the classic 2D view for this session |
+| `?view=2d` | Draw everything in 2D for this session |
 | `?quality=high\|balanced` | Force the 3D view's quality (shadows on or off) |
 
 ### Project layout

@@ -611,7 +611,7 @@ function drawDoorIcons(ctx: CanvasRenderingContext2D, w: World): void {
     upright(ctx, w, d.x, 0, iconZ, () => drawRewardIcon(ctx, reward, d.x, -iconZ, 22, w.time));
     if (!d.open) continue;
     const info = REWARD_INFO[reward.kind];
-    const title = reward.kind === 'boon' && reward.god ? `${GODS[reward.god].name}'s Boon` : info.label;
+    const title = `${reward.painted ? 'Painted · ' : ''}${reward.kind === 'boon' && reward.god ? `${GODS[reward.god].name}'s Boon` : info.label}`;
     const dist = Math.min(...view.map((p) => Math.hypot(p.x - d.x, p.y)));
     const near = dist < 460;
     if (!renderOpts.touch) {
@@ -1383,6 +1383,41 @@ function renderLights(w: World, ctx: CanvasRenderingContext2D, dpr: number): voi
 
 // ---------------------------------------------------------------- main entry
 
+/** High-contrast foes (accessibility): a bright two-tone ring under every foe. */
+function drawFoeMarks(ctx: CanvasRenderingContext2D, w: World): void {
+  if (!prefs.foeOutline) return;
+  for (const e of w.enemies) {
+    if (e.dead || e.spawning || e.isDummy) continue;
+    const r = e.r + 8;
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(e.x, e.y, r, r * 0.75, 0, 0, TAU);
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = e.isBoss ? '#ff3df0' : '#ffe600';
+    ctx.stroke();
+  }
+}
+
+/** Painted Chambers: the room is a fresco, so it gets a parchment wash and a gilded frame. */
+function drawFresco(ctx: CanvasRenderingContext2D, w: World, dpr: number): void {
+  if (!w.painted) return;
+  const cam = w.camera;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgb(255, 228, 182)';
+  ctx.fillRect(0, 0, cam.vw, cam.vh);
+  ctx.globalCompositeOperation = 'source-over';
+  const b = Math.max(10, Math.min(cam.vw, cam.vh) * 0.022);
+  ctx.strokeStyle = '#c9a24a';
+  ctx.lineWidth = b;
+  ctx.strokeRect(b / 2, b / 2, cam.vw - b, cam.vh - b);
+  ctx.strokeStyle = 'rgba(80, 50, 10, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(b + 3, b + 3, cam.vw - 2 * b - 6, cam.vh - 2 * b - 6);
+}
+
 export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number): void {
   overlayDpr = dpr;
   const cam = w.camera;
@@ -1404,6 +1439,7 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   drawTraps(ctx, w);
   drawDoors(ctx, w);
   for (const z of w.zones) if (z.kind === 'web' || z.kind === 'fog') drawZone(ctx, z, w.time);
+  drawFoeMarks(ctx, w);
 
   // ---- y-sorted props & actors
   type Item = { y: number; draw: () => void };
@@ -1448,6 +1484,7 @@ export function renderWorld(w: World, ctx: CanvasRenderingContext2D, dpr: number
   for (const it of items) it.draw();
 
   renderLights(w, ctx, dpr);
+  drawFresco(ctx, w, dpr);
 
   // ---- emissive & UI-in-world
   cam.apply(ctx, dpr);
@@ -1768,6 +1805,7 @@ export function renderOverlay(w: World, ctx: CanvasRenderingContext2D, dpr: numb
   }
   ctx.restore();
   w.eachHero(() => drawPlayerRings(ctx, w));
+  drawFoeMarks(ctx, w);
   for (const it of w.interactables) {
     if (it.kind !== 'shop') continue;
     const y = it.y - 68 + Math.sin(w.time * 2 + it.x) * 4;

@@ -18,6 +18,10 @@ export const prefs = {
   doorInfo: true,
   /** Outline where the next attack will land, and the charge meter. */
   attackPreview: true,
+  /** High-contrast foes: a bright ring around each one. */
+  foeOutline: false,
+  /** Guard toggles on a tap instead of being held. */
+  toggleGuard: false,
 };
 
 export type Prefs = typeof prefs;
