@@ -1,3 +1,4 @@
+import { applyColorMode } from './palette';
 import { audio, type Mood } from '../engine/audio';
 import { Camera } from '../engine/camera';
 import { Input, keyLabel, PadControl, type Action, type Control } from '../engine/input';
@@ -432,7 +433,7 @@ export class Game implements WorldHost {
 
   /** Awards any achievements just earned. God mode (or developer cheats) disables them. */
   checkAchievements(): void {
-    if (this.godMode || this.cheated) return;
+    if (this.godMode || this.cheated || this.gameSpeed < 1) return;
     for (const a of newAchievements(this.save)) {
       this.save.achievements.push(a.id);
       this.ui.toast(`${a.glyph} Achievement: ${a.name}`, 3200);
@@ -457,6 +458,9 @@ export class Game implements WorldHost {
     prefs.assist = st.assist;
     prefs.doorInfo = st.doorInfo;
     prefs.attackPreview = st.attackPreview;
+    prefs.foeOutline = st.foeOutline;
+    prefs.toggleGuard = st.toggleGuard;
+    applyColorMode(st.colorMode);
     this.touch.configure(st.touchSize, st.touchOpacity, st.leftHanded);
     this.input.setBindings(st.keys as Partial<Record<Action, string[]>>);
     // The HUD shows the first key bound to each action (keyboard play only).
@@ -475,18 +479,47 @@ export class Game implements WorldHost {
     return this.touch.enabled ? 'balanced' : 'high';
   }
 
-  /** True while the 3D voxel view is drawing the world. */
-  get view3d(): boolean {
-    return !!this.voxel && this.save.settings.view3d && this.voxelState === 'ready';
+  /** Accessibility game speed (achievements are off below 100%). */
+  get gameSpeed(): number {
+    const s = this.save.settings.speed;
+    return s >= 1 ? 1 : Math.max(0.7, s);
   }
 
+  /** True while the 3D voxel view is drawing the world. */
+  get view3d(): boolean {
+    return !!this.voxel && this.voxelState === 'ready' && this.want3d;
+  }
+
+  /** The chamber is flat: painted chambers, flat missions and daily Flatland runs are drawn in 2D. */
+  get flatNow(): boolean {
+    const run = this.run;
+    return !!run && (!!run.current.reward?.painted || !!this.mission?.room.flat);
+  }
+
+  /** The game is 3D, except in flat chambers and on devices that can't draw 3D (and with ?view=2d). */
+  private get want3d(): boolean {
+    return !!this.canvas3d && this.params.get('view') !== '2d' && !this.flatNow;
+  }
+
+  /** Whether the last applyView left the world flat, to fold the screen when that changes. */
+  private wasFlat = false;
+
   /**
-   * Switches between the 3D voxel view and the classic 2D view. three.js is
-   * only downloaded the first time the 3D view is used; if WebGL isn't
-   * available the game stays in 2D.
+   * Draws the world in 3D or, in flat chambers, in 2D. three.js is only
+   * downloaded the first time the 3D view is used; if WebGL isn't available
+   * the game stays in 2D.
    */
   applyView(): void {
-    const want = this.save.settings.view3d && !!this.canvas3d && this.params.get('view') !== '2d';
+    const want = this.want3d;
+    const flat = this.flatNow;
+    if (flat !== this.wasFlat) {
+      this.wasFlat = flat;
+      // The world folds flat (or unfolds): a short paper-fold as the view changes.
+      document.body.classList.remove('fold');
+      void document.body.offsetWidth;
+      document.body.classList.add('fold');
+      setTimeout(() => document.body.classList.remove('fold'), 700);
+    }
     if (want && this.voxelState === 'off') {
       this.voxelState = 'loading';
       import('../render3d/voxel')
@@ -511,19 +544,6 @@ export class Game implements WorldHost {
       cam.resize(cam.vw, cam.vh);
       this.setCameraAngle(on);
     }
-  }
-
-  /** Tab: switch between the 3D and the 2D view. */
-  private toggleView(): void {
-    const st = this.save.settings;
-    if (!st.view3d && (this.voxelState === 'failed' || !this.canvas3d)) {
-      this.ui.toast("The 3D view isn't available on this device");
-      return;
-    }
-    st.view3d = !st.view3d;
-    this.applyView();
-    this.persist();
-    this.ui.toast(st.view3d ? '3D view (Tab for 2D)' : '2D view (Tab for 3D)', 1600);
   }
 
   /** Z / X turn the 3D camera around the hero; both together swing it back. */
@@ -707,7 +727,8 @@ export class Game implements WorldHost {
     // Online the room never pauses: a menu just stands your hero still.
     this.input.blocked = !!this.net && this.ui.open;
     if (!this.ui.open || this.net) {
-      this.acc += dt;
+      // Accessibility: a slower game (not online, where everyone shares one clock).
+      this.acc += dt * (this.net ? 1 : this.gameSpeed);
       let steps = 0;
       while (this.acc >= STEP && steps < 5) {
         try {
@@ -759,7 +780,6 @@ export class Game implements WorldHost {
       screens.pause(this);
       return;
     }
-    if (this.input.pressed('view') && (this.mode === 'hub' || this.mode === 'run')) this.toggleView();
     this.turnCamera(dt);
     w.titleDrift = this.mode === 'title';
     this.saveMark = Math.max(0, this.saveMark - dt);
@@ -949,6 +969,8 @@ export class Game implements WorldHost {
         // Echoes start empty: foes fill the gauge.
       });
     }
+    // The hall is never flat.
+    this.applyView();
     const layout = hubLayout();
     const w = new World(this, layout, BIOMES[3], this.camera, this.particles, this.members.map((m) => m.player));
     w.cleared = true;
@@ -1133,6 +1155,7 @@ export class Game implements WorldHost {
       : generateLayout(run.rng, biome, plan.kind, { chestChance: this.stats.chestChance, depth: run.depth, heights: this.heightsFor(run) });
     for (const m of this.members) m.player.castAmmo = m.stats.castAmmo;
     const w = new World(this, layout, biome, this.camera, this.particles, this.members.map((m) => m.player));
+    w.painted = !!plan.reward?.painted || !!ms?.room.flat;
     this.world = w;
     this.pendingDoors = [];
     this.resolving = [];
@@ -1148,6 +1171,7 @@ export class Game implements WorldHost {
         const waves = ms?.room.waves ? missionWaves(ms.room, this.members.length) : generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite, this.members.length);
         w.startEncounter(waves, sc.hp, sc.dmg);
         if (run.depth === 0) w.showBanner(biome.name, biome.subtitle);
+        else if (plan.reward?.painted) w.showBanner('A Painted Chamber', 'The world turns flat. A boon here is at least Rare.');
         else w.showBanner(`Chamber ${run.depth + 1}`, elite ? 'Enchanted foes lie in wait' : biome.name);
         break;
       }
@@ -1213,6 +1237,8 @@ export class Game implements WorldHost {
       w.showBanner('Escape resumed', left?.rewards.length ? 'This chamber is won: claim its reward.' : 'This chamber is won: choose a door.');
       this.saveClearedRoom();
     }
+    // Flat chambers are drawn in 2D; everywhere else in 3D.
+    this.applyView();
   }
 
   /** Set once another save replaces this one (it reloads): the escape here is no longer saved. */
@@ -1802,8 +1828,9 @@ export class Game implements WorldHost {
     return {
       title: def.name,
       subtitle: def.duoOf ? `${GODS[def.duoOf[0]].name} & ${GODS[def.duoOf[1]].name}` : `${GODS[def.god].name} · ${slotName}`,
-      tag: o.rarity.toUpperCase(),
-      tagColor: RARITY_COLOR[o.rarity],
+      // Boons whose effect doesn't change with rarity show no rarity at all.
+      tag: def.fixed && def.slot !== 'duo' ? 'SPECIAL' : o.rarity.toUpperCase(),
+      tagColor: def.fixed && def.slot !== 'duo' ? '#d8c8a0' : RARITY_COLOR[o.rarity],
       color: def.slot === 'duo' ? RARITY_COLOR.duo : GODS[def.god].color,
       desc: def.desc(v),
       note: replaces ? `Replaces ${replaces.name}` : undefined,
@@ -1813,7 +1840,9 @@ export class Game implements WorldHost {
 
   private offerBoons(god: GodId, after: () => void): void {
     const run = this.run!;
-    const odds = boonRarityOdds(run.biomeIndex, run.roomsCleared === 0, run.favor(this.save));
+    let odds = boonRarityOdds(run.biomeIndex, run.roomsCleared === 0, run.favor(this.save), run.regionProgress);
+    // A Painted Chamber's boon is at least Rare.
+    if (run.current.reward?.painted) odds = { ...odds, rare: odds.rare + odds.common, common: 0 };
     const offers = rollBoonOffers(run.rng, god, run.boons, odds, 3, this.stats.canCast ? undefined : (d) => !needsCast(d));
     const g = GODS[god];
     if (offers.length === 0) {

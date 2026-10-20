@@ -36,6 +36,8 @@ export interface MissionRoom {
   heights?: number;
   /** Shown under the chamber's banner. */
   line: string;
+  /** The chamber is flat: the view turns 2D inside it. */
+  flat?: boolean;
 }
 
 export interface Mission {

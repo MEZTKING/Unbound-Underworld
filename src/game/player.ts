@@ -131,6 +131,8 @@ export class Player extends Actor {
   // ---- guard
   /** Guard meter (0..GUARD_MAX): blocking drains it; empty = Guard Break. */
   guardMeter = GUARD_MAX;
+  /** Toggle Guard (accessibility): raised until tapped again. */
+  guardLatched = false;
   /** Holding Guard and blocking. */
   blocking = false;
   /** Seconds left in the parry window opened by pressing Guard. */
@@ -659,7 +661,13 @@ export class Player extends Actor {
       if (this.parryT <= 0) this.parryLock = PARRY_LOCK;
     }
     const free = this.state === 'free' || this.actionCancelable();
-    this.blocking = style !== 'evade' && inp.down('guard') && this.guardBreakT <= 0 && this.guardMeter > 0 && !this.airborne && free;
+    // Accessibility: Guard can toggle on a tap instead of being held.
+    if (prefs.toggleGuard && style !== 'evade') {
+      if (inp.pressed('guard')) this.guardLatched = !this.guardLatched;
+      if (this.guardBreakT > 0 || this.guardMeter <= 0) this.guardLatched = false;
+    } else this.guardLatched = false;
+    const held = prefs.toggleGuard ? this.guardLatched : inp.down('guard');
+    this.blocking = style !== 'evade' && held && this.guardBreakT <= 0 && this.guardMeter > 0 && !this.airborne && free;
     if (this.blocking && this.state === 'action') {
       this.weapon.cancel(this, w);
       this.endAction();

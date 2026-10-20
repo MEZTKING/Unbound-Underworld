@@ -51,6 +51,8 @@ export interface RewardSpec {
   god?: GodId;
   /** Extra loot (chests, shop) that doesn't unlock the exits. */
   bonus?: boolean;
+  /** Behind this door is a Painted Chamber: flat (2D), and a boon there is at least Rare. */
+  painted?: boolean;
 }
 
 export type Shape =

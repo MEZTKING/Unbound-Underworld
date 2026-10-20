@@ -798,18 +798,20 @@ Each door then rolls its reward from the weights below, among the rewards allowe
 | ♒ Fountain | 4 | 3.6% | From chamber 3, once per region |
 
 Fixed doors: after the last chamber of a region comes the antechamber, then the guardian; after a guardian, a boon door into the next region.
+Painted Chambers: in The Gilded Groves, from its second chamber, each combat door has a 18% chance to lead into a fresco: the chamber is drawn flat (2D), and a boon there is at least Rare (its Common odds go to Rare).
 
 ### Boon rarity
 
-Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike; deeper regions raise the odds. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon.
+Each boon offered rolls its rarity on its own. The first boon of an escape is held back so a run never opens on a big rarity spike. The odds climb chamber by chamber: from a region's first chamber (below) towards the next region's, so there is no jump at a region's gate. *Favor of the Gods* (Altar of Ashes) adds to Rare and Epic (and a little Heroic past the first region), but never to the first boon. Sacred Ward, Second Step and Extra Shard work the same at any rarity, so they show as *Special* and roll none.
 
 | When | Common | Rare | Epic | Heroic |
 |---|---|---|---|---|
 | First boon of an escape | 95% | 5% | — | — |
-| The Shackled Deep | 93% | 7% | 0.5% | — |
-| The Ember Fields | 85% | 12% | 2.5% | 0.5% |
-| The Gilded Groves | 78% | 15% | 6% | 1.5% |
-| The Last Gate | 71% | 17% | 9.5% | 3% |
+| The Shackled Deep, first chamber | 93% | 7% | 0.5% | — |
+| The Ember Fields, first chamber | 85% | 12% | 2.5% | 0.5% |
+| The Gilded Groves, first chamber | 78% | 15% | 6% | 1.5% |
+| The Last Gate, first chamber | 71% | 17% | 9.5% | 3% |
+| End of the last region | 65% | 18% | 13% | 4.5% |
 | The Shackled Deep, Favor 3 | 84% | 13% | 3.5% | — |
 | The Ember Fields, Favor 3 | 75% | 18% | 5.5% | 1.3% |
 | The Gilded Groves, Favor 3 | 68% | 21% | 9% | 2.3% |
