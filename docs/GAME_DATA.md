@@ -751,6 +751,33 @@ Unlocked at the *Oath of Torment* after slaying a guardian; each escape raises t
 | 4 | +60% | +40% | ×2.00 |
 | 5 | +75% | +50% | ×2.25 |
 
+
+**Endgame traits** (Torment 3+): besides Armored, Swift, Volatile and Regenerating, elite foes may be *Warded* (a ward soaks 90% of damage until a powered attack, Special or Cast breaks it), *Vampiric* (heals twice the damage it deals you), *Splitting* (splits into two foes with half health on death) or *Hasting* (foes near it act 30% faster).
+
+**Guardian rules** (Torment 4+): every guardian has a rule to learn; its banner names it when the fight starts.
+
+| Guardian | Rule | How it works |
+|---|---|---|
+| Vexa | Break the anchors | Three chain anchors shield her. Break them all, then strike before they rise again. |
+| The Many-Maw | Heads first | The body shrugs off blows while any head still bites. Sever the heads, then strike the body. |
+| Aurex | Crack the plating | Ordinary blows spark off his plating. Only powered attacks, Specials and Casts crack it. |
+| Threefang | Bait the charge | His hide turns most blows. Dodge his charge so he crashes into a wall, then strike while he is dazed. |
+
+
+## Daily challenge
+
+One escape a day, the same for everyone: the date (UTC) sets the seed and two modifiers. You play your own hero, at Torment 0. Score: 100 per chamber, 600 per guardian, and for an escape 2,500 plus up to 1,500 for speed (1 point a second under 25 minutes). The best score of each day is kept (30 days). The first daily run of a day extends your streak (or starts a new one) and pays 10 Ash per day of streak, up to 100. A daily run is never saved mid-way and never touches a saved escape.
+
+| Modifier | Effect |
+|---|---|
+| ✦ Glass Cannon | You deal double damage, and take double damage. |
+| ☍ Swarm | Half again as many foes, each with half the health. |
+| ▭ Flatland | The whole escape is flat: drawn in 2D. |
+| ◎ Miser's Road | No shops. Foes and pots drop double obols. |
+| ✧ Enchanted Day | Every chamber holds enchanted foes (more of them carry elite traits). |
+| ♱ No Second Chances | Death Defiance is off. Ash ×1.5. |
+| ⚑ Bounty | Guardians have +50% health. Ash ×1.5 and score ×1.25. |
+
 ## Door rewards
 
 | Reward | Shown on the door |

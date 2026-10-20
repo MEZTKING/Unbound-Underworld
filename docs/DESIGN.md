@@ -290,6 +290,8 @@ Up to four heroes (`MAX_PARTY`). The **party core** lets one `World` hold severa
 | Altar of Ashes (two tables) / hero skill trees / Blacksmith parts | `src/game/altar.ts` / `src/game/herotree.ts` / `src/game/smith.ts` |
 | Party members, co-op scaling | `src/game/party.ts` |
 | Online play: relay link, host, client, state sync, LAN, save sync | `src/net/` |
+| Daily challenge: seed, modifiers, score, streak (`dailyFor`, `dailyScore`, `recordDaily`); hooks in `Run.hasMod`, `Game.startDaily/finishDaily` | `src/game/daily.ts`, `src/ui/daily.ts` |
+| Endgame: traits from Torment 3 (`ENDGAME_TRAITS`), guardian rules from Torment 4 (`Boss.rule`, `ruleName`, `ruleHint`; `guard`/`armorFactor` overrides, `ChainAnchor`) | `src/game/odds.ts`, `src/game/enemies/bosses.ts`, `src/game/combat.ts` |
 | Cloud saves in Google Drive: Drive calls and sign-in per platform (setup: [GOOGLE_DRIVE.md](GOOGLE_DRIVE.md)) | `src/net/gdrive.ts`, `electron/google.cjs`, `GoogleDrivePlugin.java` |
 | Backup files (Google Drive through the file picker or Drive folder, no setup) | `src/net/backupfile.ts`, `electron/backup.cjs`, `BackupFilePlugin.java` |
 | Relay server (standalone, LAN, Docker) | `server/` (+ `android/.../LanRelay.java`, `LanHostPlugin.java`) |

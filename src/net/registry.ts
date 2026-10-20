@@ -1,7 +1,7 @@
 // Rebuilding foes on a joined player's screen: the host names each foe, and
 // this finds the class that draws it.
 import { createBoss, createEnemy } from '../game/enemies';
-import { HydraHead } from '../game/enemies/bosses';
+import { ChainAnchor, HydraHead } from '../game/enemies/bosses';
 import type { Enemy } from '../game/enemies/enemy';
 import type { BossKind, EnemyKind } from '../game/types';
 
@@ -17,6 +17,7 @@ export function foeFactories(): Map<string, () => Enemy> {
   for (const k of ENEMY_KINDS) map.set(createEnemy(k, 0, 0).name, () => createEnemy(k, 0, 0));
   for (const k of BOSS_KINDS) map.set(createBoss(k, 0, 0).name, () => createBoss(k, 0, 0));
   map.set(new HydraHead(0, 0, 1).name, () => new HydraHead(0, 0, 1));
+  map.set(new ChainAnchor(0, 0, null).name, () => new ChainAnchor(0, 0, null));
   byName = map;
   return map;
 }

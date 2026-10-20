@@ -1,3 +1,4 @@
+import { DAILY_MODS } from './daily';
 import { clamp, TAU } from '../engine/math';
 import { ARTIFACT_BY_ID } from './artifacts';
 import { BOON_BY_ID, describeBoon, GODS, RARITY_COLOR } from './boons';
@@ -556,6 +557,15 @@ function drawTopRight(ctx: CanvasRenderingContext2D, w: World, run: Run | null, 
     ctx.fillStyle = '#ffd890';
     ctx.font = `700 ${compact ? 13 : 15}px ${FONT}`;
     ctx.fillText(run.mission.goal, rx, ry);
+    ry += 18;
+    ctx.font = `600 13px ${FONT}`;
+    ctx.fillStyle = '#c8b8c0';
+  }
+  if (run?.daily) {
+    // The daily challenge and its two modifiers.
+    ctx.fillStyle = '#ffd04a';
+    ctx.font = `700 ${compact ? 12 : 14}px ${FONT}`;
+    ctx.fillText(`Daily · ${run.daily.mods.map((id) => DAILY_MODS[id].name).join(' · ')}`, rx, ry);
     ry += 18;
     ctx.font = `600 13px ${FONT}`;
     ctx.fillStyle = '#c8b8c0';

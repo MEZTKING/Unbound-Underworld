@@ -1,3 +1,4 @@
+import type { DailyModId, DailyRun } from './daily';
 import { Rng } from '../engine/math';
 import { ARTIFACTS } from './artifacts';
 import { availableGods, computeStats, pomCandidates, rollHammerOffers, type OwnedBoon } from './boons';
@@ -149,6 +150,10 @@ export class Run {
   won = false;
   /** A campaign mission being played (missions are never saved mid-way). */
   mission: MissionRun | null = null;
+  /** The daily challenge being played (never saved mid-way, and it leaves a saved escape alone). */
+  daily: DailyRun | null = null;
+  /** Guardians slain this run. */
+  guardians = 0;
   /** Per-biome once-only rooms and rewards. */
   used = new Set<string>();
   spoils: Spoils = { materials: {}, gear: [] };
@@ -300,16 +305,27 @@ export class Run {
     s.maxHp += this.bonusHp;
     applyAltar(save.upgrades, s);
     applyEnchantStats(s, this.enchants);
+    if (this.hasMod('glass')) {
+      s.globalDmg += 1;
+      s.damageTaken *= 2;
+    }
+    if (this.hasMod('miser')) s.goldMult *= 2;
+    if (this.hasMod('nosecond')) s.deathDefiance = 0;
     return s;
+  }
+
+  /** The daily challenge has this modifier. */
+  hasMod(id: DailyModId): boolean {
+    return !!this.daily?.mods.includes(id);
   }
 
   scales(): { hp: number; dmg: number } {
     const h = heatScale(this.heat);
-    return { hp: this.biome.hpScale * h.hp, dmg: this.biome.dmgScale * h.dmg };
+    return { hp: this.biome.hpScale * h.hp * (this.hasMod('swarm') ? 0.5 : 1), dmg: this.biome.dmgScale * h.dmg };
   }
 
   ashMult(): number {
-    return heatScale(this.heat).ash;
+    return heatScale(this.heat).ash * (this.hasMod('nosecond') || this.hasMod('bounty') ? 1.5 : 1);
   }
 
   private onceKey(k: string): string {
@@ -370,7 +386,7 @@ export class Run {
       ['hermes', !this.isUsed('hermes') && d >= 1 && !usedKinds.has('hermes') ? W.hermes : 0],
       ['enchant', enchantRoom && !usedKinds.has('enchant') ? W.enchant : 0],
       ['artifact', freeArtifacts && !usedKinds.has('artifact') ? W.artifact : 0],
-      ['shop', !this.isUsed('shop') && d >= 2 && !usedKinds.has('shop') ? W.shop : 0],
+      ['shop', !this.isUsed('shop') && d >= 2 && !usedKinds.has('shop') && !this.hasMod('miser') ? W.shop : 0],
       ['fountain', !this.isUsed('fountain') && d >= 2 && !usedKinds.has('fountain') ? W.fountain : 0],
     ];
     if (options.every(([, w]) => w <= 0)) return null;

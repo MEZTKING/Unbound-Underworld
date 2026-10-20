@@ -97,6 +97,6 @@ export type EnemyKind =
 export type BossKind = 'fury' | 'hydra' | 'talos' | 'cerberus';
 
 /** Enchanted-foe modifiers (elite variants). */
-export type EliteMod = 'armored' | 'swift' | 'volatile' | 'regenerating';
+export type EliteMod = 'armored' | 'swift' | 'volatile' | 'regenerating' | 'warded' | 'vampiric' | 'splitting' | 'hasting';
 
 export type RoomKind = 'hub' | 'combat' | 'shop' | 'fountain' | 'antechamber' | 'boss' | 'reward';

@@ -181,6 +181,7 @@ const LOOKS: Record<string, Look> = {
   'The Many-Maw': { kind: 'hydra', body: '#5a3a20', head: '#6a4428', eye: '#ffe04a' },
   Vexa: { kind: 'humanoid', body: '#2a0e1c', head: '#5a1a2e', limb: '#5a1a2e', accent: '#c8a0a8', eye: '#ff6a8a', bulk: 1.4, tail: true, horns: true },
   Aurex: { kind: 'humanoid', body: '#6a4a2a', head: '#8a5a2a', limb: '#5a3a1a', accent: '#c88a3a', eye: '#ff6a2a', bulk: 1.5 },
+  'Chain Anchor': { kind: 'dummy', body: '#3a3440', head: '#8a8090', eye: '#ff6a8a' },
   Threefang: { kind: 'quad', body: '#3a2c4a', head: '#4a3a5e', limb: '#241c30', accent: '#ff7a3a', eye: '#ff4a2a', heads: 3, tail: true },
 };
 const DEFAULT_LOOK: Look = { kind: 'humanoid', body: '#4a4050', head: '#6a6070', eye: '#ffd04a' };

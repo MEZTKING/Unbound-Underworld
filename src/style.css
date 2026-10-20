@@ -2951,3 +2951,49 @@ body.fold canvas#game3d {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------- daily challenge */
+
+.daily-mods {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  text-align: left;
+}
+.daily-mod {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(8, 4, 12, 0.55);
+  border: 1px solid rgba(255, 208, 74, 0.35);
+  border-radius: 6px;
+}
+.daily-mod i {
+  font-style: normal;
+  font-size: 26px;
+  color: #ffd04a;
+  width: 32px;
+  text-align: center;
+}
+.daily-mod b {
+  display: block;
+  font-family: 'Cinzel', Georgia, serif;
+  color: #ffe6a0;
+}
+.daily-mod small {
+  color: #d8c8c0;
+  font-size: 14px;
+}
+.daily-score {
+  margin: 8px 0 12px;
+  font: 700 46px 'Cinzel', Georgia, serif;
+  color: #ffd04a;
+  text-shadow: 0 0 18px rgba(255, 200, 80, 0.45);
+}
+.daily-score small {
+  display: block;
+  font: italic 16px 'EB Garamond', Georgia, serif;
+  color: #e8dcc8;
+  text-shadow: none;
+}

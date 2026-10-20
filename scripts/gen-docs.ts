@@ -2,6 +2,7 @@
 // always matches the code. Run with `npm run docs`; CI fails if it's stale.
 import { writeFileSync } from 'node:fs';
 import { ARTIFACTS } from '../src/game/artifacts';
+import { DAILY_MODS } from '../src/game/daily';
 import { BOON_BY_ID, BOON_RARITY_BY_REGION, boonRarityOdds, BOONS, boonValue, GODS, HAMMERS, RARITY_MULT } from '../src/game/boons';
 import { CHARACTERS, heroForWeapon } from '../src/game/characters';
 import { createBoss, createEnemy } from '../src/game/enemies';
@@ -10,7 +11,7 @@ import { heatScale, WEAPON_IDS } from '../src/game/meta';
 import { ALTAR, ALTAR_BY_ID, altarTotal } from '../src/game/altar';
 import { HERO_MAX_LEVEL, HERO_TREES, heroPoints, heroXpForLevel, heroXpToNext, ROW_GATE } from '../src/game/herotree';
 import { SMITH_PARTS } from '../src/game/smith';
-import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, PAINTED, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
+import { CHEST, DOOR_COUNT, DOOR_RULE, DOOR_WEIGHT, DUO_CHANCE, ENDGAME_TRAIT_HEAT, GUARDIAN_RULE_HEAT, PAINTED, eliteChance, FOE_DROP, GHOST_CHANCE, PLAIN_TIER, POM_DOUBLE, POT, SIPHON, STAR_CHANCE, STARRED_TIER, type DoorReward, type DropSource } from '../src/game/odds';
 import { AFFIXES, costText, CRAFTS, GEAR_RARITY, GEAR_SLOTS, INVENTORY_SIZE, levelMult, MATERIAL_IDS, MATERIALS, MAX_GEAR_LEVEL, maxDropStars, minRoll, PERKS, RARITY_ORDER, regionMaterial, SLOT_NAME, starOdds, upgradeCost } from '../src/game/gear';
 import { FORGE, levelBonus, levelFromXp, MAX_LEVEL, tierFor, TIERS, UNLOCKS, WEAPON_LEVEL, WRATH_MAX, WRATH_PER_DEALT, WRATH_PER_TAKEN, XP, xpForLevel, xpToNext } from '../src/game/progression';
 import { REWARD_INFO } from '../src/game/render';
@@ -317,6 +318,28 @@ table(
     const s = heatScale(h);
     return [h, `+${Math.round((s.hp - 1) * 100)}%`, `+${Math.round((s.dmg - 1) * 100)}%`, `×${s.ash.toFixed(2)}`];
   }),
+);
+line();
+line(`**Endgame traits** (Torment ${ENDGAME_TRAIT_HEAT}+): besides Armored, Swift, Volatile and Regenerating, elite foes may be *Warded* (a ward soaks 90% of damage until a powered attack, Special or Cast breaks it), *Vampiric* (heals twice the damage it deals you), *Splitting* (splits into two foes with half health on death) or *Hasting* (foes near it act 30% faster).`);
+line();
+line(`**Guardian rules** (Torment ${GUARDIAN_RULE_HEAT}+): every guardian has a rule to learn; its banner names it when the fight starts.`);
+line();
+table(
+  ['Guardian', 'Rule', 'How it works'],
+  (['fury', 'hydra', 'talos', 'cerberus'] as const).map((k) => {
+    const b = createBoss(k, 0, 0);
+    return [b.name, b.ruleName, b.ruleHint];
+  }),
+);
+line();
+
+line('## Daily challenge');
+line();
+line('One escape a day, the same for everyone: the date (UTC) sets the seed and two modifiers. You play your own hero, at Torment 0. Score: 100 per chamber, 600 per guardian, and for an escape 2,500 plus up to 1,500 for speed (1 point a second under 25 minutes). The best score of each day is kept (30 days). The first daily run of a day extends your streak (or starts a new one) and pays 10 Ash per day of streak, up to 100. A daily run is never saved mid-way and never touches a saved escape.');
+line();
+table(
+  ['Modifier', 'Effect'],
+  Object.values(DAILY_MODS).map((m) => [`${m.glyph} ${m.name}`, m.desc]),
 );
 
 line('## Door rewards');

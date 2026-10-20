@@ -1383,8 +1383,34 @@ function renderLights(w: World, ctx: CanvasRenderingContext2D, dpr: number): voi
 
 // ---------------------------------------------------------------- main entry
 
-/** High-contrast foes (accessibility): a bright two-tone ring under every foe. */
+/** Wards around Warded foes, and (accessibility) a bright two-tone ring under every foe. */
 function drawFoeMarks(ctx: CanvasRenderingContext2D, w: World): void {
+  // Chain Anchors (a guardian's rule): a chain on the ground to the guardian they shield.
+  for (const e of w.enemies) {
+    const holder = (e as { holder?: { x: number; y: number; dead: boolean } }).holder;
+    if (!holder || holder.dead || e.dead) continue;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,106,138,${0.5 + Math.sin(w.time * 6) * 0.15})`;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([12, 9]);
+    ctx.lineDashOffset = -w.time * 40;
+    ctx.beginPath();
+    ctx.moveTo(e.x, e.y);
+    ctx.lineTo(holder.x, holder.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+  for (const e of w.enemies) {
+    if (!e.ward || e.dead || e.spawning) continue;
+    const pulse = 0.6 + Math.sin(w.time * 4 + e.x) * 0.2;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(159,247,255,${pulse})`;
+    ctx.fillStyle = 'rgba(159,247,255,0.08)';
+    ctx.beginPath();
+    ctx.ellipse(e.x, e.y, e.r + 16, (e.r + 16) * 0.75, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
   if (!prefs.foeOutline) return;
   for (const e of w.enemies) {
     if (e.dead || e.spawning || e.isDummy) continue;
