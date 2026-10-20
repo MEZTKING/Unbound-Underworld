@@ -48,8 +48,8 @@ export const BESTIARY: FoeEntry[] = [
   foe('bonecaller', 'Summons Numblings, which die with it.', 'Kill the Bonecaller first.'),
   foe('mimic', 'A chest that bites back with hopping slams. Rare, and it guards a Unique piece of gear.', 'Dash or jump out of its landing zone.'),
   foe('dummy', 'The training dummy in the Hall of Shades. Heals when left alone.', 'Practise your combos.'),
-  guardian('fury', 'Warden of Chains. Whip lashes, a dashing charge and bullet rings.', 'Step off the dash lane; slip through gaps in the rings.'),
-  guardian('hydra', 'Rooted in place. Bites, spits fire and grows extra heads.', 'Clear the heads if overwhelmed, then focus the body.'),
+  guardian('fury', 'Warden of Chains. Whip lashes, a dashing charge and bullet rings.', 'Step off the dash lane; slip through gaps in the rings. Torment 4+: break her three chain anchors to drop her shield.'),
+  guardian('hydra', 'Rooted in place. Bites, spits fire and grows extra heads.', 'Clear the heads if overwhelmed, then focus the body. Torment 4+: the body shrugs off blows while any head lives.'),
   {
     name: 'Maw Head',
     guardian: true,
@@ -57,8 +57,8 @@ export const BESTIARY: FoeEntry[] = [
     counter: 'Strike them down when the fire gets too thick.',
     make: () => new HydraHead(0, 0),
   },
-  guardian('talos', 'The Bronze Colossus. Slams, a sweeping laser and bomb barrages.', 'Break his armor: he overheats and takes extra damage.'),
-  guardian('cerberus', 'Warden of the Gate. Charges, fire breath, leaps and summons.', 'Bait the charges into walls; jump the shockwaves.'),
+  guardian('talos', 'The Bronze Colossus. Slams, a sweeping laser and bomb barrages.', 'Break his armor: he overheats and takes extra damage. Torment 4+: only powered attacks, Specials and Casts crack it.'),
+  guardian('cerberus', 'Warden of the Gate. Charges, fire breath, leaps and summons.', 'Bait the charges into walls; jump the shockwaves. Torment 4+: he only takes full damage while dazed from a crash.'),
 ];
 
 /** The region(s) a foe appears in. */

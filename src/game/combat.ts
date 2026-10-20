@@ -58,6 +58,20 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   if (p.hero?.id === 'rook' && ABILITY.has(o.source) && Math.hypot(e.x - p.x, e.y - p.y) < 160) mult += 0.3;
   let dmg = base * mult;
 
+  // Warded foes: the ward soaks 90% until a powered attack, a Special or a Cast breaks it.
+  if (e.ward) {
+    const breaks = (o.source === 'attack' && !!p.action?.def.power) || o.source === 'special' || o.source === 'cast';
+    if (breaks) {
+      e.ward = false;
+      w.particles.text(e.x, e.y, e.height + 22, 'WARD BROKEN', '#9ff7ff', 18);
+      w.particles.ring(e.x, e.y, '#9ff7ff', e.r * 3, 0.35, 5);
+      audio.play('armorBreak');
+    } else {
+      dmg *= 0.1;
+      if (Math.random() < 0.3) w.particles.text(e.x, e.y, e.height + 22, 'WARDED', '#9ff7ff', 13);
+    }
+  }
+
   const guard = e.guard(o.from);
   dmg *= guard;
   if (guard < 1) {
@@ -87,7 +101,7 @@ export function damageEnemy(w: World, e: Enemy, base: number, o: DamageOpts): nu
   // Armour soaks damage first; breaking it staggers the foe.
   let shown = dmg;
   if (e.armor > 0) {
-    const am = (o.armorMult ?? 1) * (1 + s.armorBonus);
+    const am = (o.armorMult ?? 1) * (1 + s.armorBonus) * e.armorFactor(o.source, o.source === 'attack' && !!p.action?.def.power);
     const toArmor = dmg * am;
     if (toArmor >= e.armor) {
       const overflow = (toArmor - e.armor) / am;

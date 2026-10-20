@@ -2,7 +2,7 @@ import { angleDiff, angleTo, clamp, damp, dist, TAU } from '../../engine/math';
 import { Actor } from '../actor';
 import { CHILL_MAX, damageEnemy, updateStatuses } from '../combat';
 import { GODS } from '../boons';
-import type { DamageSource, EliteMod, Shape } from '../types';
+import type { DamageSource, EliteMod, EnemyKind, Shape } from '../types';
 import type { World } from '../world';
 
 export interface EnemySpec {
@@ -38,6 +38,10 @@ export const ELITE_NAMES: Record<EliteMod, string> = {
   swift: 'Swift',
   volatile: 'Volatile',
   regenerating: 'Regenerating',
+  warded: 'Warded',
+  vampiric: 'Vampiric',
+  splitting: 'Splitting',
+  hasting: 'Hasting',
 };
 
 /** Base class for every hostile actor, including bosses. */
@@ -63,6 +67,14 @@ export abstract class Enemy extends Actor {
   hpBarT = 0;
   /** Enchanted-foe modifier, if any. */
   eliteMod: EliteMod | null = null;
+  /** The kind it was spawned as (Splitting foes split into two of it). */
+  spawnKind: EnemyKind | null = null;
+  /** Warded: a ward soaks 90% of damage until a powered attack, Special or Cast breaks it. */
+  ward = false;
+  /** Born from a Splitting foe: it doesn't split again. */
+  splitChild = false;
+  /** Seconds left of a Hasting foe's aura (acts 30% faster). */
+  hastedT = 0;
   /** Attack-rate multiplier (Swift foes). */
   haste = 1;
   /** Time since death (for the fade-out). */
@@ -141,8 +153,12 @@ export abstract class Enemy extends Actor {
       this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.04 * dt);
       if (Math.random() < 0.1) w.particles.spawn({ kind: 'dot', x: this.x + (Math.random() - 0.5) * 30, y: this.y - 10, z: 10, vz: 60, color: '#7dff8a', size: 2.5, life: 0.6 });
     }
-    this.stateT += dt * this.speedMult * this.haste;
-    this.cd -= dt * this.speedMult * this.haste;
+    // Hasting foes speed up those around them.
+    if (this.eliteMod === 'hasting') for (const o of w.enemies) if (o !== this && !o.dead && !o.isBoss && Math.hypot(o.x - this.x, o.y - this.y) < 260) o.hastedT = 0.3;
+    const aura = this.hastedT > 0 ? 1.3 : 1;
+    this.hastedT = Math.max(0, this.hastedT - dt);
+    this.stateT += dt * this.speedMult * this.haste * aura;
+    this.cd -= dt * this.speedMult * this.haste * aura;
     this.tokenT = Math.max(0, this.tokenT - dt);
     if (this.reactT > 0 && !this.isBoss) {
       this.reactT -= dt;
@@ -179,6 +195,11 @@ export abstract class Enemy extends Actor {
 
   /** Damage multiplier based on where a hit came from (shields). */
   guard(_from: { x: number; y: number } | undefined): number {
+    return 1;
+  }
+
+  /** How much of a hit reaches its armour (a guardian's rule may only let some hits through). */
+  armorFactor(_source: string, _powered: boolean): number {
     return 1;
   }
 

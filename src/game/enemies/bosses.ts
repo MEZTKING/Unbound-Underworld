@@ -8,6 +8,13 @@ import { Enemy } from './enemy';
 export abstract class Boss extends Enemy {
   isBoss = true;
   abstract readonly title: string;
+  /**
+   * Endgame (Torment 4+): the guardian has a rule to learn, and damage alone
+   * won't do. Each guardian names its rule and how to beat it.
+   */
+  rule = false;
+  abstract readonly ruleName: string;
+  abstract readonly ruleHint: string;
   phase = 1;
   /** Seconds of invulnerable transition between phases. */
   transition = 0;
@@ -98,16 +105,65 @@ export abstract class Boss extends Enemy {
 export class Campe extends Boss {
   readonly name = 'Vexa';
   readonly title = 'Warden of Chains';
+  readonly ruleName = 'Break the anchors';
+  readonly ruleHint = 'Three chain anchors shield her. Break them all, then strike before they rise again.';
   private dashDir = { x: 0, y: 0 };
   private lashes = 0;
   private aim = 0;
   private summoned = false;
+  /** Rule: anchors raised, and how long the shield stays down once they all fall. */
+  private anchored = false;
+  private shieldDownT = 0;
+  private shielded = false;
 
   constructor(x: number, y: number, s = 1) {
     super(x, y, 2400, 26, 74, 170, 13, s);
   }
 
+  guard(from: { x: number; y: number } | undefined): number {
+    return (this.rule && this.shielded ? 0.12 : 1) * super.guard(from);
+  }
+
+  /** Raises three anchors around the room, chained to her. */
+  private raiseAnchors(w: World): void {
+    const cx = w.room.w / 2;
+    const cy = w.room.h / 2;
+    for (let i = 0; i < 3; i++) {
+      const a = -Math.PI / 2 + (i * TAU) / 3;
+      const x = clamp(cx + Math.cos(a) * w.room.w * 0.32, 120, w.room.w - 120);
+      const y = clamp(cy + Math.sin(a) * w.room.h * 0.3, 200, w.room.h - 120);
+      w.addEnemy(new ChainAnchor(x, y, this, this.maxHp / 2400));
+    }
+    this.shielded = true;
+    w.particles.ring(this.x, this.y, '#ff6a8a', 160, 0.5, 6);
+  }
+
+  private updateRule(w: World, dt: number): void {
+    if (!this.anchored) {
+      this.anchored = true;
+      this.raiseAnchors(w);
+      return;
+    }
+    if (this.shieldDownT > 0) {
+      this.shieldDownT -= dt;
+      if (this.shieldDownT <= 0) {
+        this.raiseAnchors(w);
+        w.showBanner('THE ANCHORS RISE', 'Break them again.');
+      }
+      return;
+    }
+    if (this.shielded && !w.enemies.some((e) => e instanceof ChainAnchor && !e.dead)) {
+      this.shielded = false;
+      this.shieldDownT = 14;
+      this.status.stun = 1.5;
+      audio.play('armorBreak');
+      w.particles.burst(this.x, this.y - this.height / 2, '#ff6a8a', 30, 420);
+      w.showBanner('SHIELD BROKEN', 'Strike now!');
+    }
+  }
+
   protected think(w: World, dt: number): void {
+    if (this.rule) this.updateRule(w, dt);
     switch (this.state) {
       case 'idle':
         this.circle(w, 230, dt);
@@ -341,6 +397,9 @@ function drawSerpentHead(ctx: CanvasRenderingContext2D, t: number, facing: numbe
 export class Hydra extends Boss {
   readonly name = 'The Many-Maw';
   readonly title = 'Coiled Terror of the Fields';
+  readonly ruleName = 'Heads first';
+  readonly ruleHint = 'The body shrugs off blows while any head still bites. Sever the heads, then strike the body.';
+  private ruleHeads = false;
   private heads = 0;
   private bite = { x: 0, y: 0 };
   private lunge = 0;
@@ -350,8 +409,26 @@ export class Hydra extends Boss {
     super(x, y, 3400, 60, 120, 0, 18, s);
   }
 
+  guard(from: { x: number; y: number } | undefined): number {
+    const headsUp = this.rule && this.world?.enemies.some((e) => e instanceof HydraHead && !e.dead);
+    return (headsUp ? 0.2 : 1) * super.guard(from);
+  }
+
+  /** Set while thinking, so guard() can see the heads. */
+  private world: World | null = null;
+
   protected think(w: World, dt: number): void {
     const p = w.player;
+    this.world = w;
+    // Rule: two heads rise at once, before any damage.
+    if (this.rule && !this.ruleHeads) {
+      this.ruleHeads = true;
+      for (const side of [-1, 1]) {
+        const h = new HydraHead(this.x + side * 240, this.y + 110, this.maxHp / 3400);
+        h.dmg = this.dmg * 0.55;
+        w.addEnemy(h);
+      }
+    }
     this.stop(dt);
     this.facing = angleTo(this, p);
     this.lunge = Math.max(0, this.lunge - dt * 2.5);
@@ -476,6 +553,8 @@ export class Hydra extends Boss {
 export class Talos extends Boss {
   readonly name = 'Aurex';
   readonly title = 'the Gilded Colossus';
+  readonly ruleName = 'Crack the plating';
+  readonly ruleHint = 'Ordinary blows spark off his plating. Only powered attacks, Specials and Casts crack it.';
   private aim = 0;
   private sweep = 0;
   private tick = 0;
@@ -501,6 +580,11 @@ export class Talos extends Boss {
 
   guard(): number {
     return this.status.stun !== undefined ? 1.5 : 1;
+  }
+
+  armorFactor(source: string, powered: boolean): number {
+    if (!this.rule) return 1;
+    return powered || source === 'special' || source === 'cast' ? 1.5 : 0.08;
   }
 
   protected think(w: World, dt: number): void {
@@ -694,6 +778,13 @@ export class Talos extends Boss {
 export class Cerberus extends Boss {
   readonly name = 'Threefang';
   readonly title = 'Hound of the Last Gate';
+  readonly ruleName = 'Bait the charge';
+  readonly ruleHint = 'His hide turns most blows. Dodge his charge so he crashes into a wall, then strike while he is dazed.';
+
+  guard(from: { x: number; y: number } | undefined): number {
+    const dazed = this.status.stun !== undefined;
+    return (this.rule ? (dazed ? 1.3 : 0.22) : 1) * super.guard(from);
+  }
   private dir = { x: 0, y: 0 };
   private leap = { sx: 0, sy: 0, tx: 0, ty: 0 };
   z = 0;
@@ -889,5 +980,45 @@ export class Cerberus extends Boss {
     ctx.moveTo(-56, -60);
     ctx.quadraticCurveTo(-90, -90 + Math.sin(this.t * 3) * 10, -80, -120);
     ctx.stroke();
+  }
+}
+
+// ================================================================ Chain Anchor (Vexa's rule at Torment 4+)
+
+/** An iron anchor chained to Vexa: while any stands, she is shielded. */
+export class ChainAnchor extends Enemy {
+  readonly name = 'Chain Anchor';
+  constructor(
+    x: number,
+    y: number,
+    /** The guardian it shields (its chain is drawn to her: render.ts drawFoeMarks). */
+    readonly holder: Enemy | null,
+    s = 1,
+  ) {
+    super(x, y, { hp: 220, speed: 0, r: 24, height: 76, damage: 0, knockResist: 1, gold: [0, 0] }, s);
+    this.passive = true;
+    this.spawnT = 0.5;
+  }
+  protected think(_w: World, dt: number): void {
+    this.stop(dt);
+  }
+  protected drawBody(ctx: CanvasRenderingContext2D): void {
+    const white = this.flash > 0;
+    ctx.fillStyle = white ? '#fff' : '#3a3440';
+    ctx.fillRect(-14, -70, 28, 70);
+    ctx.fillStyle = white ? '#fff' : '#5a5060';
+    ctx.fillRect(-20, -78, 40, 12);
+    ctx.fillRect(-18, -6, 36, 8);
+    ctx.strokeStyle = white ? '#fff' : '#8a8090';
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(0, -52 + i * 16, 9, 6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ff6a8a';
+    ctx.beginPath();
+    ctx.arc(0, -72, 4, 0, Math.PI * 2);
+    ctx.fill();
   }
 }

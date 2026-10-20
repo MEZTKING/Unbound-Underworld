@@ -635,6 +635,7 @@ export class World {
 
   spawn(kind: EnemyKind, x: number, y: number, mod: EliteMod | null = null, hpScale = 1, dmgScale = 1): Enemy {
     const e = createEnemy(kind, x, y, hpScale);
+    e.spawnKind = kind;
     e.dmg *= dmgScale;
     if (mod) applyEliteMod(e, mod);
     return this.addEnemy(e);
@@ -859,6 +860,11 @@ export class World {
     amount = Math.max(1, Math.round(amount));
     if (this.host.godMode) amount = 0;
     p.hp -= amount;
+    // Vampiric foes heal twice what they take from you.
+    if (src instanceof Enemy && src.eliteMod === 'vampiric' && !src.dead && amount > 0) {
+      src.hp = Math.min(src.maxHp, src.hp + amount * 2);
+      this.particles.text(src.x, src.y, src.height + 16, `+${Math.round(amount * 2)}`, '#ff4a6a', 15);
+    }
     if (s.canWrath && amount > 0) p.gainWrath(amount * WRATH_PER_TAKEN * s.wrathGain);
     if (environmental) {
       p.flash = 0.1;
@@ -961,6 +967,16 @@ export class World {
         const x = e.x;
         const y = e.y;
         this.telegraphs.push({ shape: { type: 'circle', x, y, r: 110 }, t: 0, dur: 0.8, color: 'rgba(200,90,255,1)', owner: null, onDone: () => hostileBlast(this, x, y, 110, 15 * (this.encounter?.dmgScale ?? 1), '#c86bff', null) });
+      }
+      // Splitting foes split into two smaller ones (which don't split again).
+      if (e.eliteMod === 'splitting' && e.spawnKind && !e.splitChild) {
+        for (const side of [-1, 1]) {
+          const c = this.spawn(e.spawnKind, e.x + side * (e.r + 14), e.y, null, (this.encounter?.hpScale ?? 1) * 0.5, this.encounter?.dmgScale ?? 1);
+          c.splitChild = true;
+          c.spawnT = 0.25;
+          c.knock(side, 0, 260);
+        }
+        this.particles.ring(e.x, e.y, '#7dffb0', 90, 0.35, 5);
       }
       onEnemyKilled(this, e);
       this.host.onEnemyKilled(this, e);
@@ -1643,8 +1659,14 @@ export function applyEliteMod(e: Enemy, mod: EliteMod): void {
       e.speed *= 1.5;
       e.haste = 1.45;
       break;
+    case 'warded':
+      e.ward = true;
+      break;
     case 'volatile':
     case 'regenerating':
+    case 'vampiric':
+    case 'splitting':
+    case 'hasting':
       break;
   }
 }

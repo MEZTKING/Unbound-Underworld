@@ -139,11 +139,18 @@ and the codex records it afterwards.
 | **Oblivia, the Unremembering** | Chapter V | *Keep her in the light* | She only exists inside your lantern's light. Plant the lantern to light a circle, then drive her into it. She steals the lantern if she touches it. |
 | **The Hollow King** | Chapter VI | *Break the crown, not the king* | Phase 1: only his floating crown takes damage, and it orbits him. Phase 2 (**2D**): the room flattens, and he can only be hit from below, by a jump. Phase 3: every earlier rule, one at a time. |
 
-**Rules come to the escape too.** At Torment 4 and above, the four escape
-guardians gain a rule of their own (planned, see [Endgame](#endgame)):
+**Rules come to the escape too. Done in v0.14.** At Torment 4 and above, the
+four escape guardians each have a rule. The fight's opening banner names it,
+and the bestiary records it.
 
-| Guardian | Endgame rule |
-|---|---|
+| Guardian | Endgame rule | How it plays |
+|---|---|---|
+| Vexa, Warden of Chains | *Break the anchors* | Three chain anchors rise around the room, chained to her, and cut the damage she takes to 12%. Break all three and she staggers, and her shield stays down for 14 seconds before they rise again. |
+| The Many-Maw | *Heads first* | Two heads rise at the start. While any head lives, the body takes 20% damage. |
+| Aurex, the Gilded Colossus | *Crack the plating* | Ordinary hits do only 8% to his plating. Powered attacks, Specials and Casts crack it (150%). |
+| Threefang | *Bait the charge* | His hide turns most blows (22%). Make him charge into a wall: while he's dazed, he takes 130%. |
+
+---|---|
 | Vexa, Warden of Chains | *Break the anchors*: three chain anchors shield her; break them to drop the shield. |
 | The Many-Maw | *Burn the roots*: severed heads regrow unless their stump is hit with fire (a Cast or a burning boon). |
 | Aurex, the Gilded Colossus | *Turn the beam*: only his own sweeping laser, parried back, can crack his core. |
@@ -174,21 +181,25 @@ Where the world goes flat:
 
 ## Daily challenge
 
-**Next.** One escape a day, the same for everyone:
+**Done in v0.14** (title screen → *Daily Challenge*). One escape a day, the same for everyone:
 
 - **The same run for everyone.** The seed comes from the date (UTC), so every
-  player gets the same hero, starting boon, rooms, foes, rewards and
-  **modifiers**.
-- **Modifiers.** Each day has two, e.g. *Glass Cannon* (double damage dealt and
-  taken), *Swarm* (+50% foes, half health), *Flatland* (the whole run is 2D),
-  *Miser* (no shops, double gold), *Elite Day* (every foe has a trait),
-  *Ember Rain* (fire falls in every chamber).
+  player gets the same rooms, foes, rewards and **modifiers**. You play your own
+  hero, at Torment 0.
+- **Modifiers.** Two each day, from seven:
+  - *Glass Cannon*: double damage dealt and taken.
+  - *Swarm*: +50% foes, each with half health.
+  - *Flatland*: the whole run is 2D.
+  - *Miser's Road*: no shops, double obols.
+  - *Enchanted Day*: every chamber holds enchanted foes.
+  - *No Second Chances*: no Death Defiance, Ash ×1.5.
+  - *Bounty*: guardians +50% health, Ash ×1.5, score ×1.25.
 - **Score.** Chambers cleared, guardians slain, time and health kept. The best
   score of the day counts, and you can try as often as you like.
-- **Streaks.** Days in a row with at least one attempt. Streaks earn a small
-  Ash bonus and cosmetic flairs for your hero's banner.
-- **Leaderboard.** Kept on your own device. With a game server (the one used
-  for multiplayer) it shows everyone on that server.
+- **Streaks.** Days in a row with at least one run. The first run of a day
+  pays 10 Ash per day of streak, up to 100.
+- **Leaderboard.** Your last 30 days are kept on your device. A shared
+  leaderboard on a game server is planned.
 - The daily run never touches your saved escape. Experience and Ash count as in
   a normal escape.
 
@@ -196,13 +207,14 @@ Where the world goes flat:
 
 ## Endgame
 
-**Next, in stages.** For players who have escaped and are climbing Torment:
+For players who have escaped and are climbing Torment. Stages 1 and 2 are done; the rest are planned:
 
-1. **Elite traits, round two.** Four new traits for foes at higher Torment:
-   *Warded* (a shield that only breaks to a powered attack), *Vampiric* (heals
-   on hit), *Splitting* (splits in two on death), *Hasting* (speeds up nearby
-   foes).
-2. **Guardian rules** at Torment 4+ (table above).
+1. **Elite traits, round two — done in v0.14.** From Torment 3, elite foes may
+   also be *Warded* (a ward soaks 90% until a powered attack, Special or Cast
+   breaks it), *Vampiric* (heals twice the damage it deals you), *Splitting*
+   (splits into two half-health foes on death) or *Hasting* (foes near it act
+   30% faster).
+2. **Guardian rules at Torment 4+ — done in v0.14** (table above).
 3. **Trial Chambers.** A rare door: a chamber with one condition (no dashing,
    parries only, a time limit) and a reward a tier above normal.
 4. **Torment beyond 5.** New Torment levels, each adding a named condition (e.g.

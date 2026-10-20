@@ -1,6 +1,6 @@
 import { circleCircle, circleRect, type Circle, type Rect } from '../engine/collision';
 import type { Rng } from '../engine/math';
-import { CHEST, eliteChance as eliteOdds } from './odds';
+import { CHEST, ENDGAME_TRAIT_HEAT, ENDGAME_TRAITS, eliteChance as eliteOdds } from './odds';
 import { PARTY_FOES } from './party';
 import type { BiomeId, BossKind, EliteMod, EnemyKind, RoomKind } from './types';
 
@@ -709,13 +709,13 @@ export interface SpawnSpec {
 
 export type Wave = SpawnSpec[];
 
-export function generateEncounter(rng: Rng, biome: BiomeInfo, biomeIndex: number, depth: number, elite = false, party = 1): Wave[] {
+export function generateEncounter(rng: Rng, biome: BiomeInfo, biomeIndex: number, depth: number, elite = false, party = 1, foeMult = 1, heat = 0): Wave[] {
   const waves = depth === 0 ? 1 : depth < 3 ? 2 : 3;
   // Party play brings more foes: +35% per extra hero.
-  const budget = (6 + depth * 2.2 + biomeIndex * 4 + (elite ? 6 : 0)) * (1 + PARTY_FOES * Math.max(0, party - 1));
+  const budget = (6 + depth * 2.2 + biomeIndex * 4 + (elite ? 6 : 0)) * (1 + PARTY_FOES * Math.max(0, party - 1)) * foeMult;
   const perWave = budget / waves;
   const eliteChance = eliteOdds(depth, biomeIndex, elite);
-  const mods: EliteMod[] = ['armored', 'swift', 'volatile', 'regenerating'];
+  const mods: EliteMod[] = ['armored', 'swift', 'volatile', 'regenerating', ...(heat >= ENDGAME_TRAIT_HEAT ? ENDGAME_TRAITS : [])];
   const out: Wave[] = [];
   for (let wv = 0; wv < waves; wv++) {
     const wave: Wave = [];

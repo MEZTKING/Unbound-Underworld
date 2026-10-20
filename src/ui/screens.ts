@@ -25,6 +25,8 @@ import { esc, type Card } from './overlay';
 import { campaign } from './campaign';
 import { COLOR_MODE_NAME, type ColorMode } from '../game/palette';
 export { campaign, missionComplete, missionFailed } from './campaign';
+export { dailyMenu, dailyResults } from './daily';
+import { dailyMenu } from './daily';
 
 export type CardData = Card;
 
@@ -210,6 +212,7 @@ export function title(g: Game): void {
         ${saved ? `<button class="btn primary resume" data-nav data-a="resume">Resume Escape<small>${esc(saved)}</small></button>` : ''}
         <button class="btn${saved ? '' : ' primary'}" data-nav data-a="play">${saved ? 'Hall of Shades' : g.save.stats.runs > 0 ? 'Continue' : 'Begin'}</button>
         <button class="btn" data-nav data-a="campaign">Campaign</button>
+        <button class="btn" data-nav data-a="daily">Daily Challenge</button>
         <button class="btn" data-nav data-a="multi">Multiplayer</button>
         <button class="btn" data-nav data-a="slots">Save Slot ${currentSlot()}</button>
         <button class="btn" data-nav data-a="help">How to Play</button>
@@ -244,6 +247,7 @@ export function title(g: Game): void {
       g.world?.showBanner('The Hall of Shades', 'Prepare yourself, then walk through the gate.');
     } else if (a === 'help') help(g);
     else if (a === 'campaign') campaign(g);
+    else if (a === 'daily') dailyMenu(g);
     else if (a === 'multi') multiplayer(g);
     else if (a === 'slots') saveSlots(g);
     else if (a === 'quit') exitGame();

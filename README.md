@@ -141,6 +141,23 @@ New players start with just Attack, Special and Dash. The other controls unlock 
 ### Campaign
 **Campaign** on the title screen is a story mode alongside the escapes. **Chapter I, Chains of the Deep**, has six hand-made missions in the Shackled Deep: you wake in chains, follow Ysolde, a shade who remembers, through the cell blocks and up the Long Stair, and face Vexa, Warden of Chains. Each mission has a short story scene before and after, set chambers and foes, and its own goals (slay every foe, hold out until a gate turns, or defeat the guardian). Boons drop as you go; your hero, gear, skills and Altar come with you. Each mission earns up to three stars (finish it, beat its par time, lose no more than half your health) and Ash and experience, in full the first time. Missions open in order, aren't saved part-way, and never touch a saved escape. Chapter II is on the way.
 
+### Daily challenge
+**Daily Challenge** on the title screen is one escape a day, the same for everyone: the date (UTC) sets the seed and two modifiers out of seven. You play your own hero at Torment 0. The seven are *Glass Cannon*, *Swarm*, *Flatland* (the whole run in 2D), *Miser's Road*, *Enchanted Day*, *No Second Chances* and *Bounty*. The score counts chambers (100), guardians (600) and an escape (2,500, plus up to 1,500 for speed). Your best of the day is kept, and you can try as often as you like. Playing on consecutive days builds a streak, and the first run of each day pays 10 Ash per day of streak (up to 100). A daily run never touches your saved escape.
+
+### Endgame
+- **From Torment 3**, elite foes may also be:
+  - *Warded*: a ward soaks 90% of damage until a powered attack, Special or Cast breaks it.
+  - *Vampiric*: it heals twice what it deals you.
+  - *Splitting*: it splits into two on death.
+  - *Hasting*: foes near it act 30% faster.
+- **From Torment 4**, every guardian has a **rule** you must learn. The fight's banner names it, and the bestiary records it:
+  - Vexa: break her three chain anchors.
+  - The Many-Maw: heads first.
+  - Aurex: only powered attacks, Specials and Casts crack his plating.
+  - Threefang: bait his charge into a wall, then strike while he's dazed.
+
+The chapters, bosses and modes still to come are in [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ### Multiplayer
 Up to four heroes play together. Everyone keeps their own progress: experience, Ash, loot and kills go to each player's own save on their own device. Foes get tougher (+40% health) and more numerous (+35%) with each extra hero. A hero who falls is **downed**, not dead: stand beside them for a moment to revive them, and everyone gets back up when the chamber is cleared; the escape ends only when every hero is down. Rewards come to each player (on their own screen online, in turn on a shared screen), and when someone picks a door the party goes through it together two seconds later. Open *Multiplayer* from the title screen or the pause menu.
 

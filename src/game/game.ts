@@ -1,3 +1,4 @@
+import { dailyFor, dailyKey, dailyScore, recordDaily, type DailyRun } from './daily';
 import { applyColorMode } from './palette';
 import { audio, type Mood } from '../engine/audio';
 import { Camera } from '../engine/camera';
@@ -51,7 +52,7 @@ import type { PlayerStats } from './stats';
 import type { GodId, RewardSpec } from './types';
 import { createWeapon, WEAPON_INFO } from './weapons';
 import { World, type Door, type Interactable, type WorldHost } from './world';
-import { CHEST, FOE_DROP, GHOST_CHANCE, POM_DOUBLE } from './odds';
+import { CHEST, FOE_DROP, GHOST_CHANCE, GUARDIAN_RULE_HEAT, POM_DOUBLE } from './odds';
 import { MAX_PARTY, MEMBER_COLORS, partyHp, type Member, type MemberKind } from './party';
 
 const STEP = 1 / 60;
@@ -493,7 +494,7 @@ export class Game implements WorldHost {
   /** The chamber is flat: painted chambers, flat missions and daily Flatland runs are drawn in 2D. */
   get flatNow(): boolean {
     const run = this.run;
-    return !!run && (!!run.current.reward?.painted || !!this.mission?.room.flat);
+    return !!run && (!!run.current.reward?.painted || !!this.mission?.room.flat || run.hasMod('flatland'));
   }
 
   /** The game is 3D, except in flat chambers and on devices that can't draw 3D (and with ?view=2d). */
@@ -995,11 +996,16 @@ export class Game implements WorldHost {
   // ---------------------------------------------------------------- run flow
 
   /** Starts an escape. `dev` (developer options) picks the region and first chamber. */
-  startRun(dev?: { biome: number; kind: RoomPlan['kind'] }, missionId?: string): void {
+  startRun(dev?: { biome: number; kind: RoomPlan['kind'] }, missionId?: string, daily?: DailyRun): void {
     const mission = missionId ? MISSION_BY_ID[missionId] : undefined;
-    if (!mission && loadRun()) this.ui.toast('A new escape begins. The saved one was set aside.', 3000);
+    if (!mission && !daily && loadRun()) this.ui.toast('A new escape begins. The saved one was set aside.', 3000);
     const seedParam = this.params.get('seed');
-    this.run = new Run(this.save, mission ? mission.rooms[0].seed : seedParam ? Number(seedParam) : undefined);
+    this.run = new Run(this.save, mission ? mission.rooms[0].seed : daily ? daily.seed : seedParam ? Number(seedParam) : undefined);
+    if (daily) {
+      // The same for everyone: no Torment, the day's seed and modifiers.
+      this.run.daily = daily;
+      this.run.heat = 0;
+    }
     const biomeParam = dev ? dev.biome : Number(this.params.get('biome'));
     if (biomeParam > 0) this.run.biomeIndex = clamp(Math.floor(biomeParam), 0, BIOMES.length - 1);
     if (mission) {
@@ -1029,6 +1035,7 @@ export class Game implements WorldHost {
         m.player.souls = m.stats.soulMax * Math.min(1, m.stats.soulStart);
       });
     }
+    if (run.hasMod('nosecond')) run.deathDefiance = 0;
     this.mode = 'run';
     if (mission && this.run.mission) {
       this.run.mission.lastHp = this.player.hp;
@@ -1047,6 +1054,26 @@ export class Game implements WorldHost {
     if (!mr || !m) return null;
     const room = m.rooms[Math.min(mr.step, m.rooms.length - 1)];
     return { m, room, last: mr.step >= m.rooms.length - 1 };
+  }
+
+  /** Starts today's daily challenge (from its menu). */
+  startDaily(): void {
+    const daily = dailyFor(dailyKey());
+    this.ui.closeAll();
+    this.transition(() => this.startRun(undefined, undefined, daily), true);
+  }
+
+  /** A daily run is over (fallen, escaped or given up): score it and show the results. */
+  private finishDaily(victory: boolean): void {
+    const run = this.run;
+    const d = run?.daily;
+    if (!run || !d) return;
+    const score = dailyScore({ rooms: run.roomsCleared, bosses: run.guardians, victory, time: run.time, mods: d.mods });
+    const { newBest, streakBonus } = recordDaily(this.save.daily, d.key, score);
+    if (streakBonus > 0) this.addAsh(streakBonus);
+    this.persist();
+    this.mode = 'over';
+    screens.dailyResults(this, { daily: d, score, newBest, streakBonus, victory, rooms: run.roomsCleared, guardians: run.guardians, time: run.time, kills: run.kills });
   }
 
   /** Starts a campaign mission (from the campaign menu or after the last one). */
@@ -1168,7 +1195,9 @@ export class Game implements WorldHost {
     switch (plan.kind) {
       case 'combat': {
         const elite = plan.reward?.kind === 'hammer' || plan.reward?.kind === 'artifact';
-        const waves = ms?.room.waves ? missionWaves(ms.room, this.members.length) : generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite, this.members.length);
+        const waves = ms?.room.waves
+          ? missionWaves(ms.room, this.members.length)
+          : generateEncounter(run.rng, biome, run.biomeIndex, run.depth, elite || run.hasMod('enchanted'), this.members.length, run.hasMod('swarm') ? 1.5 : 1, run.heat);
         w.startEncounter(waves, sc.hp, sc.dmg);
         if (run.depth === 0) w.showBanner(biome.name, biome.subtitle);
         else if (plan.reward?.painted) w.showBanner('A Painted Chamber', 'The world turns flat. A boon here is at least Rare.');
@@ -1176,11 +1205,13 @@ export class Game implements WorldHost {
         break;
       }
       case 'boss': {
-        const boss = createBoss(biome.boss, layout.w / 2, 380, sc.hp);
+        const boss = createBoss(biome.boss, layout.w / 2, 380, sc.hp * (run.hasMod('bounty') ? 1.5 : 1));
         boss.dmg *= sc.dmg;
+        // From Torment 4 every guardian has a rule to learn.
+        boss.rule = run.heat >= GUARDIAN_RULE_HEAT;
         w.addEnemy(boss);
         w.startEncounter([], sc.hp, sc.dmg);
-        w.showBanner(boss.name.toUpperCase(), boss.title);
+        w.showBanner(boss.name.toUpperCase(), boss.rule ? `Rule: ${boss.ruleName}. ${boss.ruleHint}` : boss.title);
         if (!restore) audio.play('roar');
         break;
       }
@@ -1265,7 +1296,7 @@ export class Game implements WorldHost {
   private saveRun(extra: Partial<RunSnapshot> = {}): void {
     const run = this.run;
     // Missions are short and never saved mid-way (an escape's save is left alone).
-    if (!run || this.net?.clientStep || this.runSaveOff || run.mission) return;
+    if (!run || this.net?.clientStep || this.runSaveOff || run.mission || run.daily) return;
     if (this.members.length !== 1) {
       writeRun(null);
       return;
@@ -1397,6 +1428,7 @@ export class Game implements WorldHost {
     const cx = clamp(p.x, 200, w.room.w - 200);
     const cy = clamp(p.y - 140, 220, w.room.h - 160);
     if (run.current.kind === 'boss') {
+      run.guardians++;
       this.save.stats.bossesSlain++;
       for (const m of this.members) if (m.kind === 'remote') this.grant?.(m, { boss: true });
       this.persist();
@@ -1514,6 +1546,14 @@ export class Game implements WorldHost {
       w.later(1.8, () => screens.missionFailed(this, m));
       return;
     }
+    if (run.daily) {
+      // A daily run is scored; a saved escape is left alone.
+      this.mode = 'over';
+      this.save.stats.deaths++;
+      this.persist();
+      w.later(1.8, () => this.finishDaily(false));
+      return;
+    }
     this.mode = 'over';
     this.save.stats.deaths++;
     this.persist();
@@ -1541,7 +1581,7 @@ export class Game implements WorldHost {
     const run = this.run;
     if (!run || run.won) return null;
     run.won = true;
-    writeRun(null);
+    if (!run.daily) writeRun(null);
     const bonus = Math.round(60 * run.ashMult());
     this.addAsh(bonus);
     const couldJump = this.has('jump');
@@ -1569,6 +1609,11 @@ export class Game implements WorldHost {
 
   private showVictory(summary: RunSummary): void {
     if (this.mode !== 'run') return;
+    if (this.run?.daily) {
+      this.ui.closeAll();
+      this.finishDaily(true);
+      return;
+    }
     this.mode = 'over';
     this.ui.closeAll();
     this.net?.over?.(true, summary);
@@ -2086,6 +2131,12 @@ export class Game implements WorldHost {
   abandonRun(): void {
     if (this.run?.mission) {
       this.toCampaign();
+      return;
+    }
+    if (this.run?.daily) {
+      // Giving up still scores what you reached.
+      this.ui.closeAll();
+      this.finishDaily(false);
       return;
     }
     writeRun(null);

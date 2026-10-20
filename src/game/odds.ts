@@ -4,6 +4,7 @@
 // enchants.ts; gear.ts turns the gear tables below into pieces.
 
 import type { GearRarity } from './gear';
+import type { EliteMod } from './types';
 
 /** How many doors a cleared chamber opens: [doors, weight]. */
 export const DOOR_COUNT: readonly [number, number][] = [
@@ -48,6 +49,12 @@ export const DOOR_RULE: Record<DoorReward, string> = {
 
 /** Painted Chambers: in this region (the Gilded Groves), from its second chamber, a combat door may lead into a fresco (drawn flat, in 2D). */
 export const PAINTED = { region: 2, chance: 0.18 };
+
+/** From this Torment, foes may also carry the endgame traits: Warded, Vampiric, Splitting and Hasting. */
+export const ENDGAME_TRAIT_HEAT = 3;
+export const ENDGAME_TRAITS: EliteMod[] = ['warded', 'vampiric', 'splitting', 'hasting'];
+/** From this Torment, every guardian has a rule to learn (see enemies/bosses.ts). */
+export const GUARDIAN_RULE_HEAT = 4;
 
 /** Chance a foe of cost 2+ in a wave carries an elite trait (armored, swift, volatile or regenerating). */
 export function eliteChance(depth: number, region: number, eliteRoom: boolean): number {

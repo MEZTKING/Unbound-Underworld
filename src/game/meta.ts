@@ -8,6 +8,7 @@ import type { RunSnapshot } from './run';
 import { partsFromHistory } from './smith';
 import type { RoomKind, WeaponId } from './types';
 import { defaultCampaign, normalizeCampaign, type CampaignProgress } from './campaign';
+import { defaultDaily, normalizeDaily, type DailyRecord } from './daily';
 
 export const WEAPON_IDS: WeaponId[] = ['sword', 'spear', 'bow', 'fists', 'nunchaku', 'scythe', 'blunderbuss', 'katana'];
 
@@ -137,6 +138,8 @@ export interface SaveData {
   gear: GearState;
   /** Campaign missions finished (stars and best times). */
   campaign: CampaignProgress;
+  /** Daily challenge scores and streak. */
+  daily: DailyRecord;
 }
 
 /** A hero's customised appearance; anything unset uses the hero's default. */
@@ -237,6 +240,7 @@ export function defaultSave(): SaveData {
     smith: { parts: [] },
     progress: 2,
     campaign: defaultCampaign(),
+    daily: defaultDaily(),
   };
 }
 
@@ -328,6 +332,7 @@ export function normalizeSave(raw: unknown): SaveData {
     smith: { parts },
     progress: 2,
     campaign: normalizeCampaign(r.campaign),
+    daily: normalizeDaily(r.daily),
   };
 }
 
